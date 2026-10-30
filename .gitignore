@@ -1,0 +1,18 @@
+# 비밀값
+.env
+.env.*
+!.env.example
+
+# Gradle / Java
+.gradle/
+build/
+out/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
