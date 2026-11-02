@@ -3,7 +3,10 @@
 .env.*
 !.env.example
 
-# Gradle / Java
+# Maven / Java
+target/
+
+# Gradle (쓰지 않지만 실수로 생긴 파일 방지)
 .gradle/
 build/
 out/

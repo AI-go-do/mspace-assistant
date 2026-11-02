@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 예약 코어(mspace-core)와 같은 Boot 버전. 올릴 때는 core와 함께 올린다 -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>kr.ac.chosun</groupId>
+    <artifactId>mspace-assistant</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>mspace-assistant</name>
+    <description>M-SPACE AI 비서 (MCP 서버 + 에이전트)</description>
+
+    <modules>
+        <module>mcp-server</module>
+        <module>agent</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- 2.0.2는 Spring Boot 4.1.2를 기준으로 빌드됐다 (A-1, docs/설계.md 1장) -->
+        <spring-ai.version>2.0.2</spring-ai.version>
+        <wiremock.version>3.13.2</wiremock.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- 가짜 예약 코어. standalone은 Jetty를 안에 숨겨 Boot의 Tomcat과 부딪히지 않는다 -->
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock-standalone</artifactId>
+                <version>${wiremock.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
