@@ -1,11 +1,13 @@
 package kr.ac.chosun.mspace.assistant.mcp.common;
 
+import java.io.IOException;
 import java.net.http.HttpClient;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
@@ -61,7 +63,7 @@ public class CoreHttp {
                     .headers(h -> credential.headers().forEach(h::set))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        throw toException(res.getStatusCode(), res.getBody().readAllBytes());
+                        throw toException(res.getStatusCode(), readBody(res));
                     })
                     .toEntity(type);
             ok = true;
@@ -103,5 +105,14 @@ public class CoreHttp {
     }
 
     record CoreError(String code, String message) {
+    }
+
+    /** 오류 본문을 읽다 끊겨도 이미 받은 상태 코드(409·401 등)는 살린다. 본문 없이 상태 코드로 분류된다 */
+    private static byte[] readBody(ClientHttpResponse res) {
+        try {
+            return res.getBody().readAllBytes();
+        } catch (IOException e) {
+            return new byte[0];
+        }
     }
 }
