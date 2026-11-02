@@ -44,8 +44,16 @@ class ChatControllerTest {
     }
 
     @Test
-    @DisplayName("말이 비어 있으면 400")
+    @DisplayName("말이 비어 있으면 400 INVALID_REQUEST")
     void rejectsBlankMessage() throws Exception {
-        assertThat(chat("{\"message\":\" \"}").statusCode()).isEqualTo(400);
+        // given
+        String body = "{\"message\":\" \"}";
+
+        // when
+        HttpResponse<String> response = chat(body);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("INVALID_REQUEST");
     }
 }
