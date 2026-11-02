@@ -32,19 +32,13 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         try {
             return send(credential, body, idempotencyKey);
         } catch (CoreApiException first) {
-            if (CoreHttp.BAD_RESPONSE.equals(first.code())) {
-                throw unknown();
-            }
             if (!CoreHttp.UNAVAILABLE.equals(first.code())) {
-                throw first;
+                throw unknownIfServerSide(first);
             }
             try {
                 return send(credential, body, idempotencyKey);
             } catch (CoreApiException second) {
-                if (CoreHttp.UNAVAILABLE.equals(second.code()) || CoreHttp.BAD_RESPONSE.equals(second.code())) {
-                    throw unknown();
-                }
-                throw second;
+                throw unknownIfServerSide(second);
             }
         }
     }
@@ -61,7 +55,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
 
     /**
      * 취소·퇴실은 멱등 키 없이 보낸다: core가 조건부 UPDATE라 두 번째는 409로 끝난다 (설계.md 2.3).
-     * 응답이 없거나 읽지 못하면 이미 처리됐을 수 있다. "다시 시도"가 아니라 내 예약부터 확인하게 안내한다
+     * 응답이 없거나 읽지 못하거나 core 5xx면 이미 처리됐을 수 있다. "다시 시도"가 아니라 내 예약부터 확인하게 안내한다
      * (다시 누르면 처리된 경우 409가 와서 실패처럼 보인다).
      */
     private StatusChange change(UserCredential credential, long reservationId, String verb, String doneStatus) {
@@ -70,17 +64,25 @@ class CoreReservationCommandClient implements ReservationCommandPort {
             body = core.call("POST /api/reservations/{id}/" + verb, credential,
                     rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), StatusChange.class);
         } catch (CoreApiException e) {
-            if (CoreHttp.UNAVAILABLE.equals(e.code()) || CoreHttp.BAD_RESPONSE.equals(e.code())) {
+            if (e.status() >= 500) {
                 throw new CoreApiException("STATUS_CHANGE_UNKNOWN",
                         "처리됐는지 확인하지 못했어요. 다시 누르기 전에 내 예약에서 먼저 확인해 주세요.", 503);
             }
             throw e;
         }
-        // 2xx면 core가 처리를 끝낸 것(실패는 4xx·5xx로 온다). 본문이 비었거나 status가 없으면 처리된 상태로 채운다
+        // 여기까지 왔으면 2xx(CoreHttp가 2xx 아닌 응답은 BAD_RESPONSE로 바꾼다). 본문이 비었거나 status가 없으면 처리된 상태로 채운다
         if (body == null || body.status() == null) {
             return new StatusChange(reservationId, doneStatus);
         }
         return body;
+    }
+
+    /**
+     * 5xx(닿지 못함·읽지 못함·코어 500)는 저장한 뒤에 났을 수 있다. "다시 시도"로 안내하면 새 확인 토큰 = 새 멱등 키라
+     * 중복 예약이 될 수 있어 '모름'으로 바꾼다. 4xx(409 겹침 등)는 처리 안 된 것이 확실해서 그대로 둔다
+     */
+    private static CoreApiException unknownIfServerSide(CoreApiException e) {
+        return e.status() >= 500 ? unknown() : e;
     }
 
     private static CoreApiException unknown() {

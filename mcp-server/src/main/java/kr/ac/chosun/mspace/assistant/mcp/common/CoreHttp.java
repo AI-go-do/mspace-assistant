@@ -66,6 +66,11 @@ public class CoreHttp {
                         throw toException(res.getStatusCode(), readBody(res));
                     })
                     .toEntity(type);
+            if (!entity.getStatusCode().is2xxSuccessful()) {
+                // 3xx 등(HttpClient는 리다이렉트를 따라가지 않음): 코어가 아니라 앞단의 응답일 수 있어 '읽지 못함'으로 본다
+                log.warn("core 응답이 2xx가 아님 {} status={}", label, entity.getStatusCode().value());
+                throw new CoreApiException(BAD_RESPONSE, "예약 서버 응답을 확인하지 못했어요. 예약 상태를 먼저 확인해 주세요.", 502);
+            }
             ok = true;
             return entity;
         } catch (ResourceAccessException e) {

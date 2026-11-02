@@ -195,4 +195,38 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("아직 입실하지 않은 예약");
     }
+
+    @Test
+    @DisplayName("취소에 core 500이 오면 처리 뒤에 났을 수 있으니 '다시 시도'가 아니라 내 예약부터 확인하게")
+    void serverErrorOnCancelIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations/7/cancel").willReturn(aResponse().withStatus(500)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"code\":\"INTERNAL_ERROR\",\"message\":\"서버 오류\"}")));
+        String token = token(call(ME, "cancel_reservation", Map.of("reservationId", 7)));
+
+        // when
+        HttpResponse<String> response = confirm(token);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("STATUS_CHANGE_UNKNOWN").doesNotContain("잠시 후 다시 시도");
+        core.verify(1, postRequestedFor(urlEqualTo("/api/reservations/7/cancel")));
+    }
+
+    @Test
+    @DisplayName("퇴실에 302처럼 2xx가 아닌 응답이 오면 CHECKED_OUT으로 채우지 않는다")
+    void redirectOnCheckoutIsNotDone() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations/8/checkout").willReturn(aResponse().withStatus(302)
+                .withHeader("Location", "/login")));
+        String token = token(call(ME, "checkout_reservation", Map.of("reservationId", 8)));
+
+        // when
+        HttpResponse<String> response = confirm(token);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("STATUS_CHANGE_UNKNOWN").doesNotContain("CHECKED_OUT");
+    }
 }
