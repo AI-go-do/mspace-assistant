@@ -27,6 +27,9 @@ mspace:
       - Authorization
       - X-User-Id
     timeout: 3s
+  # 쓰기 도구 확인 토큰. 짧게 두어 오래된 확인안이 실행되지 않게 한다
+  confirm:
+    ttl: 2m
 
 logging:
   level:

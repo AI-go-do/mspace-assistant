@@ -5,6 +5,7 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
@@ -17,6 +18,9 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 public class CoreHttp {
+
+    /** 코어에 닿지 못함(꺼짐·타임아웃). 쓰기 요청이면 처리됐는지 모른다는 뜻이다 */
+    public static final String UNAVAILABLE = "CORE_UNAVAILABLE";
 
     private static final Logger log = LoggerFactory.getLogger(CoreHttp.class);
 
@@ -39,22 +43,29 @@ public class CoreHttp {
      */
     public <T> T call(String label, UserCredential credential,
                       Function<RestClient, RestClient.RequestHeadersSpec<?>> request, Class<T> type) {
+        return callEntity(label, credential, request, type).getBody();
+    }
+
+    /** call과 같고, 상태 코드도 필요할 때 (예약 생성: 201 새로 만듦 / 200 같은 멱등 키 재전송) */
+    public <T> ResponseEntity<T> callEntity(String label, UserCredential credential,
+                                            Function<RestClient, RestClient.RequestHeadersSpec<?>> request,
+                                            Class<T> type) {
         long started = System.nanoTime();
         boolean ok = false;
         try {
-            T body = request.apply(rest)
+            ResponseEntity<T> entity = request.apply(rest)
                     .headers(h -> credential.headers().forEach(h::set))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw toException(res.getStatusCode(), res.getBody().readAllBytes());
                     })
-                    .body(type);
+                    .toEntity(type);
             ok = true;
-            return body;
+            return entity;
         } catch (ResourceAccessException e) {
             // 코어가 꺼졌거나 느림. 주소·원인은 로그에만
             log.warn("core 호출 실패 {} cause={}", label, e.getClass().getSimpleName());
-            throw new CoreApiException("CORE_UNAVAILABLE", "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+            throw new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
         } finally {
             log.info("core {} ok={} {}ms", label, ok, (System.nanoTime() - started) / 1_000_000);
         }
@@ -65,15 +76,15 @@ public class CoreHttp {
         try {
             CoreError error = json.readValue(body, CoreError.class);
             if (error.code() != null && error.message() != null) {
-                return new CoreApiException(error.code(), error.message());
+                return new CoreApiException(error.code(), error.message(), status.value());
             }
         } catch (RuntimeException ignored) {
             // 본문이 JSON이 아님 (프록시 오류 페이지 등)
         }
         return switch (status.value()) {
-            case 401 -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다");
-            case 403 -> new CoreApiException("FORBIDDEN", "이 기능을 사용할 권한이 없습니다");
-            default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.");
+            case 401 -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다", 401);
+            case 403 -> new CoreApiException("FORBIDDEN", "이 기능을 사용할 권한이 없습니다", 403);
+            default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.", 502);
         };
     }
 

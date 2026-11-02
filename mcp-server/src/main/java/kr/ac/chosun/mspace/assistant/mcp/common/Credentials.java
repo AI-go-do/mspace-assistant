@@ -10,6 +10,6 @@ public final class Credentials {
 
     public static UserCredential require(McpSyncRequestContext context) {
         return UserCredential.from(context.transportContext().get(UserCredential.CONTEXT_KEY))
-                .orElseThrow(() -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다"));
+                .orElseThrow(() -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다", 401));
     }
 }
