@@ -1,9 +1,0 @@
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/McpServerApplication.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/common/CoreApiException.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/common/CoreProperties.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/common/McpTransportConfig.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/common/UserCredential.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/in/mcp/MyReservationsTool.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/out/core/CoreReservationClient.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/reservation/application/MyReservation.java
-/home/claude/mspace-assistant/mcp-server/src/main/java/kr/ac/chosun/mspace/assistant/mcp/reservation/application/ReservationQueryPort.java

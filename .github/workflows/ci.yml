@@ -1,4 +1,5 @@
-# PR마다 빌드·테스트 (인프라·CI/CD 문서 4절 "PR 올릴 때"). 이미지 빌드·GHCR·배포는 재웅의 인프라 규칙이 정해지면 붙인다
+# PR마다 빌드·테스트 (인프라·CI/CD 문서 4절 "PR 올릴 때"). core의 ci.yml과 같은 모양
+# + SonarQube Cloud 분석: main에 합칠 때 "새 코드 커버리지 80% 이상" 품질 게이트를 본다
 name: CI
 
 on:
@@ -7,22 +8,42 @@ on:
   push:
     branches: [develop, main]
 
+# 같은 PR에 커밋을 연달아 올리면 이전 실행은 취소하고 최신 것만 돌린다
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  build:
+  build:                     # 브랜치 보호에서 "필수 검사"로 고를 이름
+    name: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: 코드 받기
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # Sonar가 "새 코드"를 git 기록으로 가려낸다
+
+      - name: JDK 21 설치
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: 빌드·테스트
+
+      - name: 빌드 + 테스트 + 커버리지
         run: ./mvnw -B verify
+
+      # SONAR_TOKEN이 아직 없으면(설정 전·fork PR) 건너뛴다. 빌드·테스트는 그대로 필수
+      - name: SonarQube Cloud 분석
+        if: env.SONAR_TOKEN != ''
+        run: ./mvnw -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+
       - name: 테스트 결과 보관
         if: always()
         uses: actions/upload-artifact@v4

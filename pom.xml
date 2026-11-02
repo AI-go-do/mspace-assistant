@@ -29,6 +29,15 @@
         <!-- 2.0.2는 Spring Boot 4.1.2를 기준으로 빌드됐다 (A-1, docs/설계.md 1장) -->
         <spring-ai.version>2.0.2</spring-ai.version>
         <wiremock.version>3.13.2</wiremock.version>
+        <jacoco.version>0.8.16</jacoco.version>
+
+        <!-- SonarQube Cloud (main에 합칠 때 새 코드 커버리지 80% 이상, 팀 규칙). 값은 공개돼도 되는 식별자뿐, 토큰은 Secrets -->
+        <sonar.organization>ai-go-do</sonar.organization>
+        <sonar.projectKey>AI-go-do_mspace-assistant</sonar.projectKey>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <!-- main() 한 줄짜리 시작 클래스는 테스트할 게 없어 커버리지 계산에서 뺀다 -->
+        <sonar.coverage.exclusions>**/*Application.java</sonar.coverage.exclusions>
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -48,4 +57,38 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <!-- 테스트 커버리지: 모듈마다 target/site/jacoco/jacoco.xml을 만들고, Sonar가 이 파일을 읽는다 -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
