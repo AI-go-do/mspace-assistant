@@ -1,12 +1,12 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 
-import java.net.http.HttpClient;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
@@ -15,15 +15,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
 
 /**
  * 화면이 부르는 API.
@@ -36,16 +33,13 @@ import org.springframework.web.client.RestClient;
 class ChatController {
 
     private final AgentLoop agent;
+    private final ConfirmationGateway confirmations;
     private final AgentProperties props;
-    private final RestClient mcpServer;
 
-    ChatController(AgentLoop agent, AgentProperties props) {
+    ChatController(AgentLoop agent, ConfirmationGateway confirmations, AgentProperties props) {
         this.agent = agent;
+        this.confirmations = confirmations;
         this.props = props;
-        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1).connectTimeout(props.timeout()).build());
-        factory.setReadTimeout(props.timeout().multipliedBy(3)); // 예약 생성은 재시도까지 기다린다
-        this.mcpServer = RestClient.builder().baseUrl(props.mcpServerUrl()).requestFactory(factory).build();
     }
 
     @PostMapping("/api/agent/chat")
@@ -72,19 +66,8 @@ class ChatController {
     @PostMapping("/api/agent/confirmations/{token}")
     ResponseEntity<String> confirm(@PathVariable String token, @RequestHeader HttpHeaders headers,
                                    @RequestBody(required = false) String body) {
-        UserHeaders user = user(headers);
-        try {
-            return mcpServer.post().uri("/api/confirmations/{token}", token)
-                    .headers(h -> user.values().forEach(h::set))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body == null ? "{}" : body)
-                    .exchange((req, res) -> ResponseEntity.status(res.getStatusCode())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .body(new String(res.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)));
-        } catch (ResourceAccessException e) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.APPLICATION_JSON)
-                    .body("{\"code\":\"TOOLS_UNAVAILABLE\",\"message\":\"예약 도구에 연결하지 못했어요. 내 예약에서 결과를 확인해 주세요.\"}");
-        }
+        ConfirmationGateway.Relayed relayed = confirmations.confirm(token, user(headers), body);
+        return ResponseEntity.status(relayed.status()).contentType(MediaType.APPLICATION_JSON).body(relayed.json());
     }
 
     @ExceptionHandler(LlmException.class)

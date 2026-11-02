@@ -32,3 +32,8 @@ mspace:
     # 대화 한 번에 도구 호출 최대 횟수. 넘으면 멈추고 알린다 (CLAUDE.md 4장)
     max-tool-calls: 8
     timeout: 10s
+    # 지시문에 넣는 예약 규칙. core 설정(mspace.reservation)과 같은 값으로 둔다
+    rules:
+      slot-minutes: 30
+      max-hours: 2
+      advance-days: 7

@@ -2,6 +2,8 @@ package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.Confirmation;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolSpec;
 
 /** mcp-server의 도구 목록·호출. 어댑터는 MCP Streamable HTTP 클라이언트 */
@@ -16,14 +18,22 @@ public interface ToolGateway {
 
         List<ToolSpec> tools();
 
-        /** @return 도구 결과 본문(JSON 문자열)과 오류 여부 */
+        /** @return 모델에게 줄 결과(확인 토큰은 빠짐), 오류 여부, 쓰기 도구면 확인 카드 */
         Outcome call(String name, Map<String, Object> arguments);
 
         @Override
         void close();
     }
 
-    record Outcome(String json, boolean isError) {
+    /**
+     * @param json         모델에게 줄 결과 JSON. 확인 토큰은 들어 있지 않다
+     * @param confirmation 쓰기 도구가 확인안을 냈으면 화면용 카드 (토큰 포함)
+     */
+    record Outcome(String json, boolean isError, Optional<Confirmation> confirmation) {
+
+        public Outcome(String json, boolean isError) {
+            this(json, isError, Optional.empty());
+        }
     }
 
     /** mcp-server에 붙지 못함. message는 학생에게 보여 줄 문장 */

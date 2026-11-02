@@ -17,6 +17,7 @@ import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * mcp-server에 공식 MCP Java 클라이언트(Streamable HTTP)로 붙는다. 학생 헤더를 모든 요청에 싣는다.
@@ -28,9 +29,11 @@ class McpToolGateway implements ToolGateway {
     private static final Logger log = LoggerFactory.getLogger(McpToolGateway.class);
 
     private final AgentProperties props;
+    private final JsonMapper json;
 
-    McpToolGateway(AgentProperties props) {
+    McpToolGateway(AgentProperties props, JsonMapper json) {
         this.props = props;
+        this.json = json;
     }
 
     @Override
@@ -45,7 +48,7 @@ class McpToolGateway implements ToolGateway {
             List<ToolSpec> tools = client.listTools().tools().stream()
                     .map(t -> new ToolSpec(t.name(), t.description(), schema(t.inputSchema())))
                     .toList();
-            return new McpSession(client, tools);
+            return new McpSession(client, tools, json);
         } catch (RuntimeException e) {
             // 예외 메시지에는 헤더·대화가 섞일 수 있어 남기지 않는다 (CLAUDE.md 4장)
             log.warn("mcp open ok=false {}ms", (System.nanoTime() - started) / 1_000_000);
@@ -59,7 +62,7 @@ class McpToolGateway implements ToolGateway {
         return inputSchema instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of("type", "object");
     }
 
-    private record McpSession(McpSyncClient client, List<ToolSpec> tools) implements Session {
+    private record McpSession(McpSyncClient client, List<ToolSpec> tools, JsonMapper json) implements Session {
 
         @Override
         public Outcome call(String name, Map<String, Object> arguments) {
@@ -68,7 +71,7 @@ class McpToolGateway implements ToolGateway {
                 String text = result.content().stream()
                         .filter(TextContent.class::isInstance).map(c -> ((TextContent) c).text())
                         .collect(Collectors.joining("\n"));
-                return new Outcome(text, Boolean.TRUE.equals(result.isError()));
+                return ProposalParser.parse(name, text, Boolean.TRUE.equals(result.isError()), json);
             } catch (RuntimeException e) {
                 // 없는 도구 이름, mcp-server 응답 없음 등. 모델에는 짧은 문장만
                 return new Outcome("{\"message\":\"도구를 실행하지 못했어요. 잠시 후 다시 시도해 주세요.\"}", true);
