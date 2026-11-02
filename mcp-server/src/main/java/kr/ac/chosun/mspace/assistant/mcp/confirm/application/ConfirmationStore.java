@@ -30,8 +30,8 @@ public class ConfirmationStore {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final Map<String, Entry> pending = new ConcurrentHashMap<>();
-    /** 이미 쓴 토큰 → 기억할 시각까지. "이미 처리했어요"와 "찾을 수 없어요"를 구분하려고 둔다 */
-    private final Map<String, Instant> used = new ConcurrentHashMap<>();
+    /** 이미 쓴 토큰 → 주인 지문·기억할 시각. 주인에게만 "이미 처리했어요", 남에게는 "찾을 수 없어요" */
+    private final Map<String, Used> used = new ConcurrentHashMap<>();
     private final Clock clock;
     private final ConfirmProperties props;
 
@@ -61,7 +61,7 @@ public class ConfirmationStore {
         Entry entry = check(token, credential);
         // 지우기 전에 사용 기록부터 남긴다. 반대 순서면 동시에 누른 다른 요청이 그 틈에
         // "없음"(CONFIRMATION_NOT_FOUND)을 받는다. 기록만 남고 지우기에 지면 아래에서 USED로 끝난다
-        used.put(token, clock.instant().plus(props.ttl().multipliedBy(5)));
+        used.put(token, new Used(entry.fingerprint(), clock.instant().plus(props.ttl().multipliedBy(5))));
         if (!pending.remove(token, entry)) {
             throw alreadyUsed();
         }
@@ -69,11 +69,14 @@ public class ConfirmationStore {
     }
 
     private Entry check(String token, UserCredential credential) {
+        String me = fingerprint(credential);
         Entry entry = token == null ? null : pending.get(token);
         if (entry == null) {
-            throw used.containsKey(token == null ? "" : token) ? alreadyUsed() : notFound();
+            Used u = token == null ? null : used.get(token);
+            // 다른 학생에게는 토큰이 쓰였다는 사실도 숨긴다 (설계.md 2.3)
+            throw u != null && u.fingerprint().equals(me) ? alreadyUsed() : notFound();
         }
-        if (!entry.fingerprint().equals(fingerprint(credential))) {
+        if (!entry.fingerprint().equals(me)) {
             throw notFound();
         }
         if (!clock.instant().isBefore(entry.expiresAt())) {
@@ -86,7 +89,7 @@ public class ConfirmationStore {
     private void purgeExpired() {
         Instant now = clock.instant();
         pending.values().removeIf(e -> !now.isBefore(e.expiresAt()));
-        used.values().removeIf(until -> !now.isBefore(until));
+        used.values().removeIf(u -> !now.isBefore(u.until()));
     }
 
     static String fingerprint(UserCredential credential) {
@@ -116,5 +119,8 @@ public class ConfirmationStore {
     }
 
     private record Entry(String fingerprint, PendingAction action, Instant expiresAt) {
+    }
+
+    private record Used(String fingerprint, Instant until) {
     }
 }

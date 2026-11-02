@@ -205,4 +205,40 @@ class CreateReservationFlowTest extends McpToolTestSupport {
         assertThat(response.body()).contains("RESERVATION_UNKNOWN", "내 예약에서 확인해 주세요");
         core.verify(1, postRequestedFor(urlEqualTo("/api/reservations")));
     }
+
+    @Test
+    @DisplayName("게이트웨이 502는 본문에 다른 code가 있어도 처리 여부를 모르니 같은 멱등 키로 다시 보낸다")
+    void retriesOnGatewayErrorWithJsonBody() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations").inScenario("bad-gateway").whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(502).withHeader("Content-Type", "application/json")
+                        .withBody("{\"code\":\"BAD_GATEWAY\",\"message\":\"upstream error\"}"))
+                .willSetStateTo("retried"));
+        core.stubFor(post("/api/reservations").inScenario("bad-gateway").whenScenarioStateIs("retried")
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(CREATED)));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(200);
+        core.verify(2, postRequestedFor(urlEqualTo("/api/reservations")).withHeader("Idempotency-Key", equalTo(token)));
+    }
+
+    @Test
+    @DisplayName("core 201에 입실 번호가 없으면 성공으로 단정하지 않고 '예약 여부 모름'")
+    void missingAccessCodeIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations").willReturn(aResponse().withStatus(201)
+                .withHeader("Content-Type", "application/json").withBody(CREATED.replace("\"482913\"", "null"))));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("RESERVATION_UNKNOWN");
+    }
 }
