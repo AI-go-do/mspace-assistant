@@ -173,10 +173,35 @@ class GeminiLlmClientTest {
     @Test
     @DisplayName("응답 본문이 JSON이 아니면 응답 없음으로 끝난다")
     void unreadableBody() {
+        // given
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json").withBody("{\"candidates\": [")));
 
+        // when / then
         assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
+    }
+
+    @Test
+    @DisplayName("Gemini가 준 호출 id는 functionCall·functionResponse에 그대로 돌려보내고, 어댑터가 만든 id는 보내지 않는다")
+    void echoesGeminiCallIds() {
+        // given
+        gemini.stubFor(post(PATH).willReturn(okJson("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"됐어요"}]}}]}""")));
+        var a = new ToolCall("g-1", "find_available_rooms", Map.of("date", "2026-11-03"));
+        var b = new ToolCall("local_x", "find_available_rooms", Map.of("date", "2026-11-04"));
+
+        // when
+        client("k").chat("s", List.of(
+                new LlmMessage.User("내일·모레 빈방"),
+                new LlmMessage.Assistant("", List.of(a, b)),
+                new LlmMessage.ToolResult("g-1", "find_available_rooms", "{}", false),
+                new LlmMessage.ToolResult("local_x", "find_available_rooms", "{}", false)), List.of(FIND));
+
+        // then
+        gemini.verify(postRequestedFor(urlEqualTo(PATH))
+                .withRequestBody(matchingJsonPath("$.contents[1].parts[0].functionCall.id", equalTo("g-1")))
+                .withRequestBody(matchingJsonPath("$.contents[2].parts[0].functionResponse.id", equalTo("g-1")))
+                .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notMatching(".*local_x.*")));
     }
 }
