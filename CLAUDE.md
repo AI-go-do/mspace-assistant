@@ -25,7 +25,7 @@
 |---|---|---|---|
 | `find_available_rooms` | 읽기 | `GET /api/rooms/availability?date=` (오늘~+6일, 방별 30분 칸 48개. 자정 넘김은 시작 날짜만 조회) | FR-ROOM-001 |
 | `room_status` | 읽기 | 방 현황 API (v0.2 FR-DEV-102에서 나옴, 경로 확인 필요) | FR-DEV-102 |
-| `my_reservations` | 읽기 | `GET /api/reservations/me` (core 없음, 응답 모양 가정해 구현) | FR-RSV-006 |
+| `my_reservations` | 읽기 | `GET /api/reservations/me` (응답 모양 11/2 합의, core PR 11/3 예정) | FR-RSV-006 |
 | `usage_rules` | 읽기 | `GET /api/rules` | FR-WEB-003 |
 | `create_reservation` | **쓰기** | `POST /api/reservations` | FR-RSV-001 |
 | `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` | FR-RSV-007 |
@@ -40,7 +40,7 @@
 ## 4. 안전 규칙 (모든 기능이 따라야 해요)
 - **AI 모델을 믿지 않아요.** 권한 검사는 예약 코어가 해요. 이 레포는 사용자 본인의 토큰을 그대로 넘기고, 관리자 토큰이나 서비스 공용 토큰으로 예약 API를 부르지 않아요
 - **쓰기 도구는 두 단계예요.** 모델이 `create/cancel/checkout`을 부르면 바로 실행하지 않고 "이렇게 예약할까요?" 확인안과 확인 토큰을 돌려줘요. 사용자가 확인했을 때만 실행해요. 확인 토큰은 한 번만 쓸 수 있고 짧게 만료돼요
-- 같은 확인을 두 번 보내도 예약이 두 번 생기지 않게 **멱등 키**를 예약 코어에 같이 넘겨요 (코어가 지원하지 않으면 코어 담당자와 상의)
+- 같은 확인을 두 번 보내도 예약이 두 번 생기지 않게 **멱등 키**(`Idempotency-Key` 헤더 = 확인 토큰)를 예약 생성에 같이 넘겨요. 같은 키 재전송은 core가 처음 예약을 `200`으로 돌려줘요 (11/2 합의, core 11/4 PR)
 - 에이전트 반복에는 **최대 횟수**(예: 도구 호출 8번)를 둬요. 넘으면 멈추고 사용자에게 알려요
 - 로그에 사용자 말 원문, 토큰, 이름·학번·전화번호를 남기지 않아요. 도구 이름, 걸린 시간, 성공 여부만 남겨요
 - 외부 AI(Gemini)로 보내는 내용에는 이름·학번·전화번호를 넣지 않아요. 시연은 테스트 계정·가짜 데이터로만 해요
