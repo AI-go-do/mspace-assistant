@@ -13,6 +13,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import kr.ac.chosun.mspace.assistant.mcp.confirm.adapter.out.memory.InMemoryConfirmationRepository;
 import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.ConfirmProperties;
@@ -50,7 +51,8 @@ class ConfirmationStoreTest {
     }
 
     final MovableClock clock = new MovableClock();
-    final ConfirmationStore store = new ConfirmationStore(clock, new ConfirmProperties(Duration.ofMinutes(2)));
+    final ConfirmationStore store = new ConfirmationStore(new InMemoryConfirmationRepository(), clock,
+            new ConfirmProperties(Duration.ofMinutes(2)));
 
     @Test
     @DisplayName("토큰은 한 번만 꺼낼 수 있다. 두 번째는 '이미 처리한 확인'")
