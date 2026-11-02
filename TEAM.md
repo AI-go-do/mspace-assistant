@@ -92,7 +92,8 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 | 백엔드 | Java 21 · Spring Boot 4 · **Maven** |
 | DB | PostgreSQL · Flyway (`ddl-auto: validate`) |
 | 장치 | ESP32·아두이노 (부품 오기 전에는 우노 + 노트북 USB) |
-| Jetson·비서 | Python (docs 기준. 비서 언어는 영준 확인 필요) |
+| Jetson | Python |
+| AI 비서 | Java 21 · Spring Boot 4 · Maven (core와 같은 스택, 11/2 결정) |
 | CI | GitHub Actions · Testcontainers(PostgreSQL, H2 안 씀) · SonarQube Cloud · CodeRabbit(참고용) |
 | 배포 | Docker · docker compose · GHCR · nginx · 학교 실습 서버 |
 
@@ -169,7 +170,6 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 |---|---|
 | `front` 저장소 담당, 화면 공통 틀 | 정해지지 않음 |
 | IoT 저장소 이름 | 수연 |
-| 비서(`mspace-assistant`) 언어: Python(docs) vs Java | 영준 확인 |
 | 학교 서버 사용 조건 (11/20까지 가능? HTTPS? Actions SSH 배포 허용?) | 재웅 확인 |
 | Jetson 보드 B에 맡길 것 (CO2 예측 / 비서용 Ollama / 규칙 답변) | 팀 결정 대기 |
 | 설문 추첨 개수·금액·비용 분담 | 11/9 마감 전 |

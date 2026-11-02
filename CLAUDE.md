@@ -11,7 +11,7 @@
 | `agent` | 사용자 말을 받아 모델에 넘기고, 모델이 도구를 부르면 실행 결과를 돌려주고 **다시 묻는 반복**을 돌려요 |
 | `academic-collector` (나중) | 학과 공지, 휴강·보강, 시간표를 모아요. 일정이 밀리면 가장 먼저 빼요 |
 
-이 레포는 **2단계 기능**이에요. 학교 시범운영(12/7~24)에는 들어가지 않아요.
+팀 일정의 **v0.3 기능**이에요. 11/13 기능 동결 전에 끝내고, 그 뒤에는 버그 수정·측정·시연 준비만 해요.
 
 ## 2. 소통 방식
 - **한국어 해요체**로 답해요. 영어를 섞지 않아요. 진행 중 상태 메시지도 한국어로 써요
@@ -21,22 +21,24 @@
 - 설계 제안 때는 트랜잭션 실패, 동시성, 인덱스 영향, 트래픽이 늘 때의 병목을 함께 짚어요
 
 ## 3. MCP 도구 목록 (첫 버전)
-| 도구 | 종류 | 예약 코어 API (v1 기준, v2에서 바뀔 수 있음) |
-|---|---|---|
-| `find_available_rooms` | 읽기 | `GET /api/board`, `GET /api/rooms`, `GET /api/policy` |
-| `room_status` | 읽기 | `GET /api/board` |
-| `my_reservations` | 읽기 | `GET /api/me/reservations` |
-| `create_reservation` | **쓰기** | `POST /api/reservations` |
-| `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` |
-| `return_room` | **쓰기** | `POST /api/reservations/{id}/finish` |
-| `list_notices`, `class_changes`, `my_schedule` | 읽기 | 학사 정보 수집기 (나중) |
+| 도구 | 종류 | 예약 코어 API (요구사항 명세 v0.4 기준) | 요구사항 |
+|---|---|---|---|
+| `find_available_rooms` | 읽기 | `GET /api/rooms` + 빈 시간 조회 API (**core에 아직 없음, 지영과 합의 필요**) | FR-ROOM-001 |
+| `room_status` | 읽기 | 방 현황 API (v0.2 FR-DEV-102에서 나옴, 경로 확인 필요) | FR-DEV-102 |
+| `my_reservations` | 읽기 | `GET /api/reservations/me` | FR-RSV-006 |
+| `usage_rules` | 읽기 | `GET /api/rules` | FR-WEB-003 |
+| `create_reservation` | **쓰기** | `POST /api/reservations` | FR-RSV-001 |
+| `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` | FR-RSV-007 |
+| `checkout_reservation` | **쓰기** | `POST /api/reservations/{id}/checkout` | FR-RSV-008 |
+| `list_notices`, `class_changes`, `my_schedule` | 읽기 | 학사 정보 수집기 (나중) | FR-AGT-102 |
 
-- API 형식은 예약 코어 레포의 `docs/API명세서.md`가 기준이에요. 여기서 따로 정의하지 않아요. 명세가 바뀌면 도구를 맞춰 고쳐요
+- API 형식의 기준은 [요구사항 명세](https://github.com/AI-go-do/docs/blob/main/requirements/requirements.md)와 core의 OpenAPI 자동 문서(`/swagger-ui`)예요. 여기서 따로 정의하지 않아요. 둘이 바뀌면 도구를 맞춰 고쳐요
+- 예전 이름 `return_room`(`/finish`)은 요구사항 v0.4에서 "반납 → 퇴실"로 바뀌어 `checkout_reservation`(`/checkout`)으로 바꿨어요
 - 도구 설명(description)은 모델이 읽는 문장이라, 언제 쓰는지와 입력 형식을 분명히 적어요
 
 ## 4. 안전 규칙 (모든 기능이 따라야 해요)
 - **AI 모델을 믿지 않아요.** 권한 검사는 예약 코어가 해요. 이 레포는 사용자 본인의 토큰을 그대로 넘기고, 관리자 토큰이나 서비스 공용 토큰으로 예약 API를 부르지 않아요
-- **쓰기 도구는 두 단계예요.** 모델이 `create/cancel/return`을 부르면 바로 실행하지 않고 "이렇게 예약할까요?" 확인안과 확인 토큰을 돌려줘요. 사용자가 확인했을 때만 실행해요. 확인 토큰은 한 번만 쓸 수 있고 짧게 만료돼요
+- **쓰기 도구는 두 단계예요.** 모델이 `create/cancel/checkout`을 부르면 바로 실행하지 않고 "이렇게 예약할까요?" 확인안과 확인 토큰을 돌려줘요. 사용자가 확인했을 때만 실행해요. 확인 토큰은 한 번만 쓸 수 있고 짧게 만료돼요
 - 같은 확인을 두 번 보내도 예약이 두 번 생기지 않게 **멱등 키**를 예약 코어에 같이 넘겨요 (코어가 지원하지 않으면 코어 담당자와 상의)
 - 에이전트 반복에는 **최대 횟수**(예: 도구 호출 8번)를 둬요. 넘으면 멈추고 사용자에게 알려요
 - 로그에 사용자 말 원문, 토큰, 이름·학번·전화번호를 남기지 않아요. 도구 이름, 걸린 시간, 성공 여부만 남겨요
@@ -47,13 +49,14 @@
 - 도구를 여러 번 이어서 부르는 건 모델 기능이 아니라 **에이전트 반복**이 해요: 모델 응답에 도구 호출이 있으면 실행 → 결과를 대화에 붙여 다시 요청 → 도구 호출이 없을 때까지
 - 작은 로컬 모델은 도구를 이어 부르는 정확도가 낮을 수 있어요(확인 필요). 같은 질문 세트로 두 모델의 성공률을 재서 기록해요
 
-## 6. 기술 스택 (정해지면 고쳐요)
+## 6. 기술 스택 (11/2 확정)
 | 영역 | 사용 기술 |
 |---|---|
-| 언어 | Java 21 (예약 코어와 맞춤) |
+| 언어 | Java 21 (예약 코어와 맞춤. 팀 docs의 Python 표기는 11/2에 Java로 정함) |
+| 빌드 | Maven (팀 공통. Gradle 쓰지 않아요) |
 | 프레임워크 | Spring Boot 4.1. MCP는 Spring AI MCP 서버 사용을 우선 검토 (Boot 4 지원 여부 확인 필요) |
 | 테스트 | JUnit 5. 예약 코어는 WireMock 같은 가짜 서버로 대신해요 |
-| 배포 | 재웅의 인프라 레포 규칙을 따라요 (Docker 이미지, GitHub Actions) |
+| 배포 | 재웅의 인프라 규칙을 따라요 (Docker 이미지 → GHCR, GitHub Actions, 학교 서버) |
 
 - 새 라이브러리를 넣기 전에는 먼저 물어봐요
 - 최신 버전이라 예전 방식(`com.fasterxml.jackson.databind`, `@MockBean`)을 쓰지 않아요. 확신이 없으면 예약 코어 레포 코드를 먼저 찾아봐요
