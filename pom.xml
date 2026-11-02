@@ -29,6 +29,8 @@
         <!-- 2.0.2는 Spring Boot 4.1.2를 기준으로 빌드됐다 (A-1, docs/설계.md 1장) -->
         <spring-ai.version>2.0.2</spring-ai.version>
         <wiremock.version>3.13.2</wiremock.version>
+        <!-- spring-ai 2.0.2 MCP 서버가 쓰는 SDK와 같은 버전. Spring AI를 올리면 같이 맞춘다 -->
+        <mcp-sdk.version>2.1.0</mcp-sdk.version>
         <jacoco.version>0.8.16</jacoco.version>
 
         <!-- 학교 SonarQube 서버 (main에 합칠 때 새 코드 커버리지 80% 이상, 팀 규칙).
@@ -52,6 +54,11 @@
                 <scope>import</scope>
             </dependency>
             <!-- 가짜 예약 코어. standalone은 Jetty를 안에 숨겨 Boot의 Tomcat과 부딪히지 않는다 -->
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp</artifactId>
+                <version>${mcp-sdk.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.wiremock</groupId>
                 <artifactId>wiremock-standalone</artifactId>

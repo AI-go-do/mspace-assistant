@@ -15,4 +15,19 @@
 - [회의 기록](docs/meetings/README.md)
 
 ## 상태
-설계 단계예요 (M1: 11/2–11/6). 팀 일정의 v0.3 기능이고 11/13 기능 동결 전에 끝내요. Java 21 · Spring Boot 4 · Maven으로 만들어요.
+M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Boot 4 · Maven으로 만들어요.
+
+| 모듈 | 포트 | 열어 둔 것 |
+|---|---|---|
+| `mcp-server` | 8090 | MCP `/mcp` (도구 7개 중 읽기 2·쓰기 3 구현), 확인 실행 `POST /api/confirmations/{token}` |
+| `agent` | 8091 | 채팅 `POST /api/agent/chat`, 확인 `POST /api/agent/confirmations/{token}` |
+
+## 로컬 실행
+```bash
+mvn -B verify                                   # 전체 테스트 (core·Gemini는 가짜 서버)
+CORE_BASE_URL=http://localhost:8080 mvn -pl mcp-server spring-boot:run
+GEMINI_API_KEY=... mvn -pl agent spring-boot:run  # 키는 .env에만. 커밋 금지
+curl -X POST localhost:8091/api/agent/chat -H 'X-User-Id: 1' -H 'Content-Type: application/json' \
+     -d '{"message":"내일 오후 2시 빈방 있어?"}'
+```
+- 사용자 인증은 core와 같이 임시 `X-User-Id` 헤더예요. JWT로 바뀌면 `mspace.agent.forward-headers`만 고쳐요
