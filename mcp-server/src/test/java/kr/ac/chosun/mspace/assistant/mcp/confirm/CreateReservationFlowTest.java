@@ -241,4 +241,38 @@ class CreateReservationFlowTest extends McpToolTestSupport {
         assertThat(response.statusCode()).isEqualTo(503);
         assertThat(response.body()).contains("RESERVATION_UNKNOWN");
     }
+
+    @Test
+    @DisplayName("core 500은 저장 뒤에 났을 수 있으니 '다시 시도'가 아니라 '예약 여부 모름'으로, 다시 보내지 않는다")
+    void serverErrorIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations").willReturn(aResponse().withStatus(500)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"code\":\"INTERNAL_ERROR\",\"message\":\"서버 오류\"}")));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("RESERVATION_UNKNOWN").doesNotContain("잠시 후 다시 시도");
+        core.verify(1, postRequestedFor(urlEqualTo("/api/reservations")));
+    }
+
+    @Test
+    @DisplayName("앞단이 302처럼 2xx가 아닌 응답을 주면 성공으로 보지 않고 '예약 여부 모름'")
+    void redirectIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations").willReturn(aResponse().withStatus(302).withHeader("Location", "/login")));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("RESERVATION_UNKNOWN");
+        core.verify(1, postRequestedFor(urlEqualTo("/api/reservations")));
+    }
 }

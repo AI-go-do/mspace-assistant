@@ -32,21 +32,23 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         try {
             return send(credential, body, idempotencyKey);
         } catch (CoreApiException first) {
-            if (CoreHttp.BAD_RESPONSE.equals(first.code())) {
-                throw unknown();
-            }
             if (!CoreHttp.UNAVAILABLE.equals(first.code())) {
-                throw first;
+                throw unknownIfServerSide(first);
             }
             try {
                 return send(credential, body, idempotencyKey);
             } catch (CoreApiException second) {
-                if (CoreHttp.UNAVAILABLE.equals(second.code()) || CoreHttp.BAD_RESPONSE.equals(second.code())) {
-                    throw unknown();
-                }
-                throw second;
+                throw unknownIfServerSide(second);
             }
         }
+    }
+
+    /**
+     * 5xx(닿지 못함·읽지 못함·코어 500)는 저장한 뒤에 났을 수 있다. "다시 시도"로 안내하면 새 확인 토큰 = 새 멱등 키라
+     * 중복 예약이 될 수 있어 '모름'으로 바꾼다. 4xx(409 겹침 등)는 처리 안 된 것이 확실해서 그대로 둔다
+     */
+    private static CoreApiException unknownIfServerSide(CoreApiException e) {
+        return e.status() >= 500 ? unknown() : e;
     }
 
     private static CoreApiException unknown() {
