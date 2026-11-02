@@ -7,6 +7,7 @@ import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.MyReservation;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationQueryPort;
+import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,7 +38,7 @@ class CoreReservationClient implements ReservationQueryPort {
         MyReservation toMine() {
             int count = participants == null ? 0 : participants.size();
             return new MyReservation(id, room == null ? null : room.name(),
-                    SeoulTime.of(startAt), SeoulTime.of(endAt), status, owner, count);
+                    SeoulTime.of(startAt), SeoulTime.of(endAt), ReservationStatus.fromCore(status), owner, count);
         }
     }
 

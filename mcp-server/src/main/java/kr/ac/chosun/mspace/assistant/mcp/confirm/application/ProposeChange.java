@@ -11,6 +11,7 @@ import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.MyReservation;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationQueryPort;
+import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationStatus;
 import org.springframework.stereotype.Service;
 
 /** 쓰기 도구 1단계: 확인안 문장과 확인 토큰을 만든다. 쓰기 API는 부르지 않는다(취소·퇴실은 내 예약 조회만) */
@@ -36,9 +37,9 @@ public class ProposeChange {
     public Proposal cancel(UserCredential credential, long reservationId) {
         MyReservation r = mine(credential, reservationId);
         requireOwner(r, "취소");
-        if (!"BOOKED".equals(r.status())) {
+        if (r.status() != ReservationStatus.BOOKED) {
             throw new CoreApiException("RESERVATION_NOT_CANCELABLE",
-                    "IN_USE".equals(r.status()) ? "사용 중인 예약은 취소할 수 없어요. 퇴실을 해 주세요."
+                    r.status() == ReservationStatus.IN_USE ? "사용 중인 예약은 취소할 수 없어요. 퇴실을 해 주세요."
                             : "이미 끝났거나 취소된 예약이에요.", 409);
         }
         String summary = "%s 예약을 취소할까요?".formatted(describe(r));
@@ -50,9 +51,9 @@ public class ProposeChange {
     public Proposal checkout(UserCredential credential, long reservationId) {
         MyReservation r = mine(credential, reservationId);
         requireOwner(r, "퇴실");
-        if (!"IN_USE".equals(r.status())) {
+        if (r.status() != ReservationStatus.IN_USE) {
             throw new CoreApiException("RESERVATION_NOT_IN_USE",
-                    "BOOKED".equals(r.status()) ? "아직 입실하지 않은 예약이에요. 쓰지 않을 거면 취소해 주세요."
+                    r.status() == ReservationStatus.BOOKED ? "아직 입실하지 않은 예약이에요. 쓰지 않을 거면 취소해 주세요."
                             : "이미 끝난 예약이에요.", 409);
         }
         List<String> notes = new ArrayList<>();
