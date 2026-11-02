@@ -35,6 +35,8 @@
              주소(SONAR_HOST_URL)와 토큰(SONAR_TOKEN)은 GitHub Secrets에서 받는다 -->
         <sonar.projectKey>mspace-assistant</sonar.projectKey>
         <sonar.projectName>mspace-assistant</sonar.projectName>
+        <!-- 새 코드가 20줄 미만이어도 커버리지·중복 조건을 건너뛰지 않음 (main 80% 규칙). 서버 화면 설정이 이 값보다 우선할 수 있음(확인 필요) -->
+        <sonar.qualitygate.ignoreSmallChanges>false</sonar.qualitygate.ignoreSmallChanges>
         <!-- main() 한 줄짜리 시작 클래스는 테스트할 게 없어 커버리지 계산에서 뺀다 -->
         <sonar.coverage.exclusions>**/*Application.java</sonar.coverage.exclusions>
         <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
