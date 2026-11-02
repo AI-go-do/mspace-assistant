@@ -45,9 +45,11 @@ class FindAvailableRoomsToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("도구 목록에 find_available_rooms가 읽기 전용, date 필수로 보인다")
     void listsTool() {
+        // when
         Tool tool = connect(USER).listTools().tools().stream()
                 .filter(t -> t.name().equals("find_available_rooms")).findFirst().orElseThrow();
 
+        // then
         assertThat(tool.annotations().readOnlyHint()).isTrue();
         assertThat((java.util.List<Object>) tool.inputSchema().get("required")).containsExactly("date");
         assertThat((Map<Object, Object>) tool.inputSchema().get("properties")).containsKeys("date", "from", "to", "headcount");
@@ -73,12 +75,15 @@ class FindAvailableRoomsToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("조회 범위 밖 날짜 → 코어의 400 문장을 그대로 오류 결과로")
     void outOfRange() {
+        // given
         core.stubFor(get(urlPathEqualTo("/api/rooms/availability")).willReturn(aResponse().withStatus(400)
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"code\":\"ROOM_DATE_OUT_OF_RANGE\",\"message\":\"오늘부터 예약 가능한 기간 안의 날짜만 조회할 수 있습니다\"}")));
 
+        // when
         CallToolResult result = call(USER, "find_available_rooms", Map.of("date", "2026-12-25"));
 
+        // then
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("예약 가능한 기간 안의 날짜만");
     }
@@ -86,8 +91,10 @@ class FindAvailableRoomsToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("날짜 형식이 틀리면 코어를 부르지 않고 형식 오류")
     void invalidDate() {
+        // when
         CallToolResult result = call(USER, "find_available_rooms", Map.of("date", "내일"));
 
+        // then
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("YYYY-MM-DD");
         core.verify(0, getRequestedFor(urlPathEqualTo("/api/rooms/availability")));
@@ -96,8 +103,10 @@ class FindAvailableRoomsToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("사용자 헤더 없이 부르면 로그인 필요")
     void noCredential() {
+        // when
         CallToolResult result = call(Map.of(), "find_available_rooms", Map.of("date", "2026-11-03"));
 
+        // then
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("로그인이 필요합니다");
     }

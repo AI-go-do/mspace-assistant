@@ -10,6 +10,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -21,6 +22,9 @@ public class CoreHttp {
 
     /** 코어에 닿지 못함(꺼짐·타임아웃). 쓰기 요청이면 처리됐는지 모른다는 뜻이다 */
     public static final String UNAVAILABLE = "CORE_UNAVAILABLE";
+
+    /** 응답은 왔지만 읽지 못함. 쓰기 요청이면 처리됐을 수 있다 */
+    public static final String BAD_RESPONSE = "CORE_BAD_RESPONSE";
 
     private static final Logger log = LoggerFactory.getLogger(CoreHttp.class);
 
@@ -66,6 +70,10 @@ public class CoreHttp {
             // 코어가 꺼졌거나 느림. 주소·원인은 로그에만
             log.warn("core 호출 실패 {} cause={}", label, e.getClass().getSimpleName());
             throw new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
+        } catch (RestClientException e) {
+            // 응답은 왔는데 읽지 못함(본문 모양이 다름 등). 쓰기 요청이면 처리됐을 수 있다
+            log.warn("core 응답 해석 실패 {} cause={}", label, e.getClass().getSimpleName());
+            throw new CoreApiException(BAD_RESPONSE, "예약 서버 응답을 확인하지 못했어요. 예약 상태를 먼저 확인해 주세요.", 502);
         } finally {
             log.info("core {} ok={} {}ms", label, ok, (System.nanoTime() - started) / 1_000_000);
         }
@@ -84,6 +92,8 @@ public class CoreHttp {
         return switch (status.value()) {
             case 401 -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다", 401);
             case 403 -> new CoreApiException("FORBIDDEN", "이 기능을 사용할 권한이 없습니다", 403);
+            // 앞단 프록시(nginx)의 게이트웨이 오류: core가 처리했는지 모르므로 '닿지 못함'과 같게 본다
+            case 502, 503, 504 -> new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
             default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.", 502);
         };
     }

@@ -59,10 +59,12 @@ public class ConfirmationStore {
     /** 토큰을 꺼낸다. 꺼낸 순간 지워져서 두 번째 호출은 CONFIRMATION_USED */
     public PendingAction take(String token, UserCredential credential) {
         Entry entry = check(token, credential);
+        // 지우기 전에 사용 기록부터 남긴다. 반대 순서면 동시에 누른 다른 요청이 그 틈에
+        // "없음"(CONFIRMATION_NOT_FOUND)을 받는다. 기록만 남고 지우기에 지면 아래에서 USED로 끝난다
+        used.put(token, clock.instant().plus(props.ttl().multipliedBy(5)));
         if (!pending.remove(token, entry)) {
             throw alreadyUsed();
         }
-        used.put(token, clock.instant().plus(props.ttl().multipliedBy(5)));
         return entry.action();
     }
 

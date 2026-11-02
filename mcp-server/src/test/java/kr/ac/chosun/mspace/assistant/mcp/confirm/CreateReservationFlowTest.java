@@ -169,4 +169,40 @@ class CreateReservationFlowTest extends McpToolTestSupport {
         assertThat(response.statusCode()).isEqualTo(409);
         assertThat(response.body()).contains("RESERVATION_TIME_TAKEN", "이미 예약된 시간입니다");
     }
+
+    @Test
+    @DisplayName("앞단 프록시가 504를 주면 처리 여부를 모르니 같은 멱등 키로 한 번 더 보낸다")
+    void retriesOnGatewayTimeout() throws Exception {
+        // given: 첫 요청은 nginx 504(HTML 본문), 두 번째는 같은 키 재전송이라 200
+        core.stubFor(post("/api/reservations").inScenario("gateway").whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(504).withBody("<html>504 Gateway Time-out</html>"))
+                .willSetStateTo("retried"));
+        core.stubFor(post("/api/reservations").inScenario("gateway").whenScenarioStateIs("retried")
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(CREATED)));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(200);
+        core.verify(2, postRequestedFor(urlEqualTo("/api/reservations")).withHeader("Idempotency-Key", equalTo(token)));
+    }
+
+    @Test
+    @DisplayName("core가 201인데 본문을 읽을 수 없으면 실패가 아니라 '예약 여부 모름'으로 안내한다")
+    void unreadableCreatedBodyIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations").willReturn(aResponse().withStatus(201)
+                .withHeader("Content-Type", "application/json").withBody("{\"id\": ")));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("RESERVATION_UNKNOWN", "내 예약에서 확인해 주세요");
+        core.verify(1, postRequestedFor(urlEqualTo("/api/reservations")));
+    }
 }

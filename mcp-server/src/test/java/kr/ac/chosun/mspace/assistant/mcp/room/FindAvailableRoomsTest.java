@@ -82,30 +82,39 @@ class FindAvailableRoomsTest {
     @Test
     @DisplayName("인원이 방 범위(min~max)를 벗어나면 그 방은 뺀다 (6명 → 5번 방만)")
     void filtersByHeadcount() {
+        // given
         var find = with(room(1, 3, 5, Set.of()), room(5, 5, 8, Set.of()));
 
+        // when
         AvailableRooms result = find.find(DAY, null, null, 6, USER);
 
+        // then
         assertThat(result.rooms()).extracting(AvailableRooms.FreeRoom::roomId).containsExactly(5);
     }
 
     @Test
     @DisplayName("from만 주면 그 시각 이후에 끝나는 구간만 남긴다")
     void fromOnly() {
+        // given
         var find = with(room(1, 3, 5, busyBetween("10:00", "12:00")));
 
+        // when
         AvailableRooms result = find.find(DAY, LocalTime.of(13, 0), null, null, USER);
 
+        // then
         assertThat(result.rooms().getFirst().free()).extracting(FreeRange::startAt).containsExactly(at("12:00"));
     }
 
     @Test
     @DisplayName("자정 넘김(23:00–01:00)은 시작 날짜의 23:00–24:00만 보고, 다음 날 부분은 예약 때 확인한다는 note")
     void crossesMidnight() {
+        // given
         var find = with(room(1, 3, 5, Set.of()), room(2, 3, 5, Set.of("23:30")));
 
+        // when
         AvailableRooms result = find.find(DAY, LocalTime.of(23, 0), LocalTime.of(1, 0), null, USER);
 
+        // then
         assertThat(result.rooms()).extracting(AvailableRooms.FreeRoom::roomId).containsExactly(1);
         assertThat(result.note()).contains("자정 이후 부분은 예약할 때 확인돼요");
     }
@@ -113,10 +122,13 @@ class FindAvailableRoomsTest {
     @Test
     @DisplayName("맞는 방이 없으면 빈 목록 + 다른 시간을 권하는 note")
     void none() {
+        // given
         var find = with(room(1, 3, 5, busyBetween("00:00", "23:30")));
 
+        // when
         AvailableRooms result = find.find(DAY, LocalTime.of(14, 0), LocalTime.of(16, 0), null, USER);
 
+        // then
         assertThat(result.rooms()).isEmpty();
         assertThat(result.note()).contains("조건에 맞는 빈방이 없어요");
     }

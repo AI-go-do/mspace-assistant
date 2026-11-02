@@ -96,7 +96,7 @@ class ConfirmationStoreTest {
     }
 
     @Test
-    @DisplayName("같은 토큰으로 동시에 32번 눌러도 성공은 1번")
+    @DisplayName("같은 토큰으로 동시에 32번 눌러도 성공은 1번, 나머지는 모두 CONFIRMATION_USED")
     void concurrentDoubleClick() throws Exception {
         // given
         String token = store.issue(ME, ACTION).token();
@@ -117,7 +117,9 @@ class ConfirmationStoreTest {
                         store.take(token, ME);
                         success.incrementAndGet();
                     } catch (CoreApiException e) {
-                        used.incrementAndGet();
+                        if ("CONFIRMATION_USED".equals(e.code())) {
+                            used.incrementAndGet();
+                        }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } finally {
