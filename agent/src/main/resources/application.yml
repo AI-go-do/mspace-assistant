@@ -13,13 +13,17 @@ management:
 
 mspace:
   llm:
-    # gemini(시연) | ollama(학교 도입, #14)
+    # gemini(시연) | ollama(학교 도입)
     provider: ${LLM_PROVIDER:gemini}
     gemini:
       model: ${GEMINI_MODEL:gemini-2.5-flash}
       # 키는 .env·GitHub Secrets에만. 비어 있으면 비서는 "준비되지 않았어요"로 답한다
       api-key: ${GEMINI_API_KEY:}
       timeout: 20s
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:qwen2.5:7b}
+      timeout: 60s
   agent:
     mcp-server-url: ${MCP_SERVER_URL:http://localhost:8090}
     forward-headers:
