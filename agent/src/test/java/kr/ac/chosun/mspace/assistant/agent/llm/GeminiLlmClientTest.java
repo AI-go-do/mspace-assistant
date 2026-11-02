@@ -194,6 +194,20 @@ class GeminiLlmClientTest {
     }
 
     @Test
+    @DisplayName("candidates나 parts에 null 요소가 오면 NullPointerException 대신 응답 없음으로 끝난다")
+    void nullElements() {
+        for (String body : new String[] {"{\"candidates\":[null]}",
+                "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[null]}}]}"}) {
+            // given
+            gemini.stubFor(post(PATH).willReturn(okJson(body)));
+
+            // when / then
+            assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+                    .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
+        }
+    }
+
+    @Test
     @DisplayName("응답 본문이 JSON이 아니면 응답 없음으로 끝난다")
     void unreadableBody() {
         // given
