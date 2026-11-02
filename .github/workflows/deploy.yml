@@ -1,0 +1,71 @@
+# develop/main에 합쳐지면 assistant 이미지 2개를 만들어 GHCR(GitHub 이미지 저장소)에 올린다.
+#   ghcr.io/ai-go-do/mspace-assistant-mcp    (MCP 서버, 8090)
+#   ghcr.io/ai-go-do/mspace-assistant-agent  (에이전트, 8091)
+# core의 deploy.yml과 같은 모양. 학교 서버 배포 job은 서버가 열리면 이어 붙인다.
+name: Deploy
+
+on:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:          # Actions 탭에서 손으로도 돌릴 수 있게
+
+# 같은 브랜치 배포가 겹치면 앞의 것은 취소하고 최신 것만
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+# 외부 액션은 태그(v3 등) 대신 커밋 SHA로 고정한다. 태그는 바꿔치기될 수 있어서,
+# packages: write 권한을 가진 이 job에서 남의 코드가 바뀌어 실행되는 걸 막는다. 뒤 주석이 원래 버전
+jobs:
+  image:
+    name: image (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write         # GHCR에 이미지를 올릴 권한 (별도 토큰 필요 없음)
+
+    # 모듈 2개를 동시에 빌드한다. 한쪽이 실패해도 다른 쪽은 끝까지
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: mcp-server
+            image: ghcr.io/ai-go-do/mspace-assistant-mcp
+          - module: agent
+            image: ghcr.io/ai-go-do/mspace-assistant-agent
+
+    steps:
+      - name: 코드 받기
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: GHCR 로그인
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # Actions가 자동으로 주는 토큰
+
+      - name: 태그 정하기
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=ref,event=branch     # develop 또는 main
+            type=sha,prefix=sha-      # sha-ab12cd3 (되돌릴 때 이 태그로)
+
+      - name: Buildx 준비
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: 이미지 빌드 + 올리기
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          build-args: MODULE=${{ matrix.module }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 모듈마다 캐시를 따로 둬서 서로 덮어쓰지 않게
+          cache-from: type=gha,scope=${{ matrix.module }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.module }}
