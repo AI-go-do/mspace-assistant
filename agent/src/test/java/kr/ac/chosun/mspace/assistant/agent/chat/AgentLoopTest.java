@@ -186,15 +186,16 @@ class AgentLoopTest {
     }
 
     @Test
-    @DisplayName("외부 AI로 보내기 전에 학번·전화번호를 가린다 (지난 대화 포함)")
+    @DisplayName("외부 AI로 보내기 전에 학번·전화번호(+82 포함)를 가린다. 지난 대화의 비서 차례도")
     void masksPersonalInfo() {
         var llm = new ScriptedLlm().then(say("알겠어요"));
 
-        loop(llm, new FakeTools(Map.of())).run(ME, List.of(new LlmMessage.User("내 번호는 010-1234-5678")),
+        loop(llm, new FakeTools(Map.of())).run(ME, List.of(new LlmMessage.User("내 번호는 010-1234-5678"),
+                        new LlmMessage.Assistant("+82 10-9876-5432로 연락드릴게요", List.of())),
                 "친구 학번 20231234도 넣어 줘");
 
         String sent = llm.seen.getFirst().toString();
-        assertThat(sent).doesNotContain("20231234", "010-1234-5678").contains("[학번]", "[전화번호]");
+        assertThat(sent).doesNotContain("20231234", "010-1234-5678", "9876-5432").contains("[학번]", "[전화번호]");
     }
 
     @Test
