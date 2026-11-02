@@ -151,8 +151,10 @@ public class GeminiLlmClient implements LlmClient {
         } catch (RuntimeException e) {
             parsed = r.json();
         }
-        // 도구 결과가 JSON null이면 Map.of가 null을 못 받으므로 빈 객체로 보낸다
-        return Map.of(r.isError() ? "error" : "result", parsed == null ? Map.of() : parsed);
+        // 도구 결과가 JSON null이어도 {"result":null}로 그대로 보낸다 (Map.of는 null을 못 받아 LinkedHashMap)
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put(r.isError() ? "error" : "result", parsed);
+        return response;
     }
 
     private static Map<String, Object> content(String role, List<Map<String, Object>> parts) {
