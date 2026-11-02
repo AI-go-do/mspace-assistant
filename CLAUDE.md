@@ -23,15 +23,16 @@
 ## 3. MCP 도구 목록 (첫 버전)
 | 도구 | 종류 | 예약 코어 API (요구사항 명세 v0.4 기준) | 요구사항 |
 |---|---|---|---|
-| `find_available_rooms` | 읽기 | `GET /api/rooms` + 빈 시간 조회 API (**core에 아직 없음, 지영과 합의 필요**) | FR-ROOM-001 |
+| `find_available_rooms` | 읽기 | `GET /api/rooms/availability?date=` (오늘~+6일, 방별 30분 칸 48개. 자정 넘김은 시작 날짜만 조회) | FR-ROOM-001 |
 | `room_status` | 읽기 | 방 현황 API (v0.2 FR-DEV-102에서 나옴, 경로 확인 필요) | FR-DEV-102 |
-| `my_reservations` | 읽기 | `GET /api/reservations/me` | FR-RSV-006 |
+| `my_reservations` | 읽기 | `GET /api/reservations/me` (core 없음, 응답 모양 가정해 구현) | FR-RSV-006 |
 | `usage_rules` | 읽기 | `GET /api/rules` | FR-WEB-003 |
 | `create_reservation` | **쓰기** | `POST /api/reservations` | FR-RSV-001 |
 | `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` | FR-RSV-007 |
 | `checkout_reservation` | **쓰기** | `POST /api/reservations/{id}/checkout` | FR-RSV-008 |
 | `list_notices`, `class_changes`, `my_schedule` | 읽기 | 학사 정보 수집기 (나중) | FR-AGT-102 |
 
+- 도구별 입력·출력·오류는 [도구 명세](docs/도구-명세.md), 두 단계 확인은 [설계](docs/설계.md)에 있어요
 - API 형식의 기준은 [요구사항 명세](https://github.com/AI-go-do/docs/blob/main/requirements/requirements.md)와 core의 OpenAPI 자동 문서(`/swagger-ui`)예요. 여기서 따로 정의하지 않아요. 둘이 바뀌면 도구를 맞춰 고쳐요
 - 예전 이름 `return_room`(`/finish`)은 요구사항 v0.4에서 "반납 → 퇴실"로 바뀌어 `checkout_reservation`(`/checkout`)으로 바꿨어요
 - 도구 설명(description)은 모델이 읽는 문장이라, 언제 쓰는지와 입력 형식을 분명히 적어요
@@ -54,7 +55,7 @@
 |---|---|
 | 언어 | Java 21 (예약 코어와 맞춤. 팀 docs의 Python 표기는 11/2에 Java로 정함) |
 | 빌드 | Maven (팀 공통. Gradle 쓰지 않아요) |
-| 프레임워크 | Spring Boot 4.1. MCP는 Spring AI MCP 서버 사용을 우선 검토 (Boot 4 지원 여부 확인 필요) |
+| 프레임워크 | Spring Boot 4.1.2 (core와 같음). MCP는 Spring AI 2.0.2 MCP 서버(`spring-ai-starter-mcp-server-webmvc`, Streamable HTTP) |
 | 테스트 | JUnit 5. 예약 코어는 WireMock 같은 가짜 서버로 대신해요 |
 | 배포 | 재웅의 인프라 규칙을 따라요 (Docker 이미지 → GHCR, GitHub Actions, 학교 서버) |
 
@@ -75,7 +76,8 @@
 ## 9. 결정 대기 항목
 | ID | 항목 | 추천안 |
 |---|---|---|
-| A-1 | MCP 서버 구현 방식 | Spring AI MCP 서버 (Boot 4 지원 확인 필요). 안 되면 공식 MCP Java SDK |
+| ~~A-1~~ | MCP 서버 구현 방식 | **결정(11/2):** Spring AI 2.0.2 MCP 서버. 2.0.2가 Boot 4.1.2 기준으로 빌드됨, 실제 빌드·테스트로 확인 ([설계](docs/설계.md) 1장) |
 | A-2 | 기본 모델 | 시연은 Gemini, 학교 도입 제안 시 Ollama (데이터가 학교 밖으로 안 나감) |
 | A-3 | 사용자 화면 | 예약 코어 화면 안에 채팅 창을 붙일지, 별도 화면으로 둘지 (예약 코어 담당과 상의) |
 | A-4 | 학사 정보 수집 범위 | 학과 공지만 먼저. 시간표는 학생이 직접 넣는 방식 검토 |
+| A-5 | 참여자 학번 입력 위치 | 모델 대화가 아니라 확인 카드에서 입력 (학번이 외부 AI로 안 나가게, [설계](docs/설계.md) 2.4) |

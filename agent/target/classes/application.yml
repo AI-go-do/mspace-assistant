@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: mspace-assistant-agent
+
+server:
+  port: ${SERVER_PORT:8091}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

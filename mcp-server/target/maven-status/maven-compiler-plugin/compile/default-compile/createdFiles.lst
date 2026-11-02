@@ -1,0 +1,14 @@
+kr/ac/chosun/mspace/assistant/mcp/reservation/application/ReservationQueryPort.class
+kr/ac/chosun/mspace/assistant/mcp/common/McpTransportConfig.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/in/mcp/MyReservationsTool$MyReservationsResult.class
+kr/ac/chosun/mspace/assistant/mcp/McpServerApplication.class
+kr/ac/chosun/mspace/assistant/mcp/common/CoreApiException.class
+kr/ac/chosun/mspace/assistant/mcp/common/CoreProperties.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/out/core/CoreReservationClient$CoreError.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/in/mcp/MyReservationsTool.class
+kr/ac/chosun/mspace/assistant/mcp/common/UserCredential.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/application/MyReservation.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/out/core/CoreReservationClient.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/out/core/CoreReservationClient$CoreReservation.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/out/core/CoreReservationClient$CoreRoom.class
+kr/ac/chosun/mspace/assistant/mcp/reservation/adapter/out/core/CoreReservationClient$CoreParticipant.class

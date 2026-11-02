@@ -11,6 +11,7 @@
 - [팀 공통 맥락](TEAM.md)
 - [작업 가이드 (Claude Code용)](CLAUDE.md)
 - [일정](docs/일정.md)
+- [도구 명세](docs/도구-명세.md) · [설계](docs/설계.md)
 - [회의 기록](docs/meetings/README.md)
 
 ## 상태
