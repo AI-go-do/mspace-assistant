@@ -51,12 +51,12 @@ class CoreReservationCommandClient implements ReservationCommandPort {
 
     @Override
     public StatusChange cancel(UserCredential credential, long reservationId) {
-        return change(credential, reservationId, "cancel");
+        return change(credential, reservationId, "cancel", "CANCELED");
     }
 
     @Override
     public StatusChange checkout(UserCredential credential, long reservationId) {
-        return change(credential, reservationId, "checkout");
+        return change(credential, reservationId, "checkout", "CHECKED_OUT");
     }
 
     /**
@@ -64,7 +64,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
      * 응답이 없거나 읽지 못하면 이미 처리됐을 수 있다. "다시 시도"가 아니라 내 예약부터 확인하게 안내한다
      * (다시 누르면 처리된 경우 409가 와서 실패처럼 보인다).
      */
-    private StatusChange change(UserCredential credential, long reservationId, String verb) {
+    private StatusChange change(UserCredential credential, long reservationId, String verb, String doneStatus) {
         StatusChange body;
         try {
             body = core.call("POST /api/reservations/{id}/" + verb, credential,
@@ -76,7 +76,11 @@ class CoreReservationCommandClient implements ReservationCommandPort {
             }
             throw e;
         }
-        return body == null ? new StatusChange(reservationId, null) : body;
+        // 2xx면 core가 처리를 끝낸 것(실패는 4xx·5xx로 온다). 본문이 비었거나 status가 없으면 처리된 상태로 채운다
+        if (body == null || body.status() == null) {
+            return new StatusChange(reservationId, doneStatus);
+        }
+        return body;
     }
 
     private static CoreApiException unknown() {

@@ -126,6 +126,21 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("취소 응답이 204처럼 본문 없는 2xx면 처리된 것으로 보고 CANCELED로 안내한다")
+    void emptyCancelBodyIsDone() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations/7/cancel").willReturn(aResponse().withStatus(204)));
+        String token = token(call(ME, "cancel_reservation", Map.of("reservationId", 7)));
+
+        // when
+        HttpResponse<String> response = confirm(token);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("\"status\":\"CANCELED\"", "취소했어요");
+    }
+
+    @Test
     @DisplayName("퇴실 응답 본문을 읽지 못해도 같은 '처리 여부 모름' 안내")
     void unreadableCheckoutIsUnknown() throws Exception {
         // given
