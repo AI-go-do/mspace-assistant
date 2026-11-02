@@ -1,8 +1,7 @@
 package kr.ac.chosun.mspace.assistant.mcp.reservation.adapter.in.mcp;
 
 import java.util.List;
-import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
-import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
+import kr.ac.chosun.mspace.assistant.mcp.common.Credentials;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.MyReservation;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationQueryPort;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -29,9 +28,7 @@ class MyReservationsTool {
                     AUTO_CHECKED_OUT(자동 퇴실), NO_SHOW(노쇼), CANCELED(취소).""",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     MyReservationsResult myReservations(McpSyncRequestContext context) {
-        UserCredential credential = UserCredential.from(context.transportContext().get(UserCredential.CONTEXT_KEY))
-                .orElseThrow(() -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다"));
-        return new MyReservationsResult(reservations.findMine(credential));
+        return new MyReservationsResult(reservations.findMine(Credentials.require(context)));
     }
 
     /** 목록을 객체로 감싼다: MCP 구조화 결과(structuredContent)는 객체여야 해서 */

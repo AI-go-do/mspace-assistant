@@ -6,73 +6,21 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
-import io.modelcontextprotocol.client.McpClient;
-import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
-import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
-import java.net.http.HttpRequest;
-import java.time.Duration;
 import java.util.Map;
-import org.junit.jupiter.api.AfterEach;
+import kr.ac.chosun.mspace.assistant.mcp.McpToolTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * M1 목표: MCP 서버가 뜨고, 읽기 도구 하나가 가짜 코어(WireMock)를 불러 응답한다.
  * 진짜 MCP 클라이언트(공식 Java SDK)로 Streamable HTTP를 거쳐 부른다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class MyReservationsToolTest {
-
-    @RegisterExtension
-    static WireMockExtension core = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort())
-            .build();
-
-    @DynamicPropertySource
-    static void coreUrl(DynamicPropertyRegistry registry) {
-        registry.add("mspace.core.base-url", core::baseUrl);
-        registry.add("mspace.core.timeout", () -> "1s");
-    }
-
-    @LocalServerPort
-    int port;
-
-    McpSyncClient client;
-
-    @AfterEach
-    void close() {
-        if (client != null) {
-            client.closeGracefully();
-        }
-    }
-
-    private McpSyncClient connect(Map<String, String> headers) {
-        HttpRequest.Builder request = HttpRequest.newBuilder();
-        headers.forEach(request::header);
-        var transport = HttpClientStreamableHttpTransport.builder("http://localhost:" + port)
-                .requestBuilder(request)
-                .build();
-        client = McpClient.sync(transport).requestTimeout(Duration.ofSeconds(5)).build();
-        client.initialize();
-        return client;
-    }
-
-    private static String text(CallToolResult result) {
-        return ((TextContent) result.content().getFirst()).text();
-    }
+class MyReservationsToolTest extends McpToolTestSupport {
 
     private static final String TWO_RESERVATIONS = """
             [
