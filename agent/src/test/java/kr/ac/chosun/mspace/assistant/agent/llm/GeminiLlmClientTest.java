@@ -126,4 +126,57 @@ class GeminiLlmClientTest {
         assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
     }
+
+    @Test
+    @DisplayName("한 번에 도구 두 개를 부르면 결과 두 개를 한 user 차례에 묶어 보낸다")
+    void groupsParallelToolResults() {
+        // given
+        gemini.stubFor(post(PATH).willReturn(okJson("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"정리했어요"}]}}]}""")));
+        var find = new ToolCall("c1", "find_available_rooms", Map.of("date", "2026-11-03"), "sig-1");
+        var mine = new ToolCall("c2", "my_reservations", Map.of(), null);
+
+        // when
+        client("k").chat("s", List.of(
+                new LlmMessage.User("내일 빈방이랑 내 예약"),
+                new LlmMessage.Assistant("", List.of(find, mine)),
+                new LlmMessage.ToolResult("c1", "find_available_rooms", "{\"rooms\":[]}", false),
+                new LlmMessage.ToolResult("c2", "my_reservations", "{\"reservations\":[]}", false)), List.of(FIND));
+
+        // then
+        gemini.verify(postRequestedFor(urlEqualTo(PATH)).withRequestBody(equalToJson("""
+                {"contents":[
+                  {"role":"user","parts":[{"text":"내일 빈방이랑 내 예약"}]},
+                  {"role":"model","parts":[
+                    {"functionCall":{"name":"find_available_rooms","args":{"date":"2026-11-03"}},"thoughtSignature":"sig-1"},
+                    {"functionCall":{"name":"my_reservations","args":{}}}]},
+                  {"role":"user","parts":[
+                    {"functionResponse":{"name":"find_available_rooms","response":{"result":{"rooms":[]}}}},
+                    {"functionResponse":{"name":"my_reservations","response":{"result":{"reservations":[]}}}}]}
+                ]}""", true, true)));
+    }
+
+    @Test
+    @DisplayName("도구 인자에 null 값이 있어도 깨지지 않는다")
+    void nullArgumentValue() {
+        // given
+        var args = new java.util.HashMap<String, Object>();
+        args.put("date", null);
+
+        // when
+        var call = new ToolCall("c1", "find_available_rooms", args);
+
+        // then
+        assertThat(call.arguments()).containsEntry("date", null);
+    }
+
+    @Test
+    @DisplayName("응답 본문이 JSON이 아니면 응답 없음으로 끝난다")
+    void unreadableBody() {
+        gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("{\"candidates\": [")));
+
+        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+                .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
+    }
 }

@@ -1,5 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.llm.application;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -11,7 +13,8 @@ import java.util.Map;
 public record ToolCall(String id, String name, Map<String, Object> arguments, String signature) {
 
     public ToolCall {
-        arguments = arguments == null ? Map.of() : Map.copyOf(arguments);
+        // Map.copyOf는 null 값을 못 받는다. 모델이 {"note": null}처럼 보내도 깨지지 않게 순서 유지 복사
+        arguments = arguments == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(arguments));
     }
 
     public ToolCall(String id, String name, Map<String, Object> arguments) {
