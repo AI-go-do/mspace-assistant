@@ -9,8 +9,6 @@ import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.ExecuteConfirmation;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.ExecuteConfirmation.Executed;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,14 +46,6 @@ class ConfirmationController {
         return execute.execute(token, credential, request == null ? List.of() : request.participantStudentIds());
     }
 
-    @ExceptionHandler(CoreApiException.class)
-    ResponseEntity<ErrorBody> handle(CoreApiException e) {
-        return ResponseEntity.status(e.status()).body(new ErrorBody(e.code(), e.getMessage()));
-    }
-
     record ConfirmRequest(List<String> participantStudentIds) {
-    }
-
-    record ErrorBody(String code, String message) {
     }
 }
