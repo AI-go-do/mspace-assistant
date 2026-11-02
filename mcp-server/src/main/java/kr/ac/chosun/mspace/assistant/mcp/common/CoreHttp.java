@@ -27,7 +27,9 @@ public class CoreHttp {
 
     CoreHttp(CoreProperties props, JsonMapper json) {
         var factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(props.timeout()).build());
+                // HTTP/1.1 고정: 기본 HTTP/2는 http:// 주소에 h2c 업그레이드를 같이 요청하는데, 본문 있는 POST에서
+                // 가짜 core(WireMock)가 RST_STREAM으로 끊는 일이 났다 (모델 어댑터 TS-04와 같은 원인). core는 nginx 뒤 HTTP/1.1이라 영향 없음(확인 필요)
+                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(props.timeout()).build());
         factory.setReadTimeout(props.timeout());
         // Boot 4는 RestClient.Builder 자동 설정이 별도 모듈(spring-boot-restclient)이라 직접 만든다
         this.rest = RestClient.builder().baseUrl(props.baseUrl()).requestFactory(factory).build();
