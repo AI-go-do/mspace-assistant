@@ -81,6 +81,10 @@ public class CoreHttp {
 
     /** 코어 오류 본문 {code, message}를 그대로 살린다. 모양이 다르면 상태 코드로 대신 */
     private CoreApiException toException(HttpStatusCode status, byte[] body) {
+        // 게이트웨이 오류는 본문보다 먼저 본다: 앞단 프록시가 어떤 본문을 주든 core가 처리했는지 모르므로 '닿지 못함'
+        if (status.value() == 502 || status.value() == 503 || status.value() == 504) {
+            return new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
+        }
         try {
             CoreError error = json.readValue(body, CoreError.class);
             if (error.code() != null && error.message() != null) {
@@ -92,9 +96,9 @@ public class CoreHttp {
         return switch (status.value()) {
             case 401 -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다", 401);
             case 403 -> new CoreApiException("FORBIDDEN", "이 기능을 사용할 권한이 없습니다", 403);
-            // 앞단 프록시(nginx)의 게이트웨이 오류: core가 처리했는지 모르므로 '닿지 못함'과 같게 본다
-            case 502, 503, 504 -> new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
-            default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.", 502);
+            // 본문을 못 읽어도 받은 상태 코드(400·409 등)는 그대로 둔다
+            default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.",
+                    status.value());
         };
     }
 

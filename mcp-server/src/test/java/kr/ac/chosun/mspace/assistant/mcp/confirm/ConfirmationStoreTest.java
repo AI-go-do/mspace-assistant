@@ -89,6 +89,20 @@ class ConfirmationStoreTest {
     }
 
     @Test
+    @DisplayName("이미 쓴 토큰을 다른 사람이 보내면 '이미 처리함'이 아니라 '찾을 수 없음' (쓰였다는 사실도 숨김)")
+    void usedTokenHiddenFromOthers() {
+        // given
+        String token = store.issue(ME, ACTION).token();
+        store.take(token, ME);
+
+        // when / then
+        assertThatThrownBy(() -> store.take(token, OTHER))
+                .isInstanceOf(CoreApiException.class).extracting("code").isEqualTo("CONFIRMATION_NOT_FOUND");
+        assertThatThrownBy(() -> store.take(token, ME))
+                .isInstanceOf(CoreApiException.class).extracting("code").isEqualTo("CONFIRMATION_USED");
+    }
+
+    @Test
     @DisplayName("없는 토큰은 '찾을 수 없음'")
     void unknown() {
         assertThatThrownBy(() -> store.take("c_nope", ME))

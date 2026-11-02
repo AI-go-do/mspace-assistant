@@ -61,8 +61,8 @@ class CoreReservationCommandClient implements ReservationCommandPort {
                         .body(body),
                 CoreCreated.class);
         CoreCreated c = response.getBody();
-        if (c == null || c.id() <= 0) {
-            // 2xx인데 본문이 비었거나 id가 없음: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내
+        if (c == null || c.id() <= 0 || c.accessCode() == null || c.accessCode().isBlank()) {
+            // 2xx인데 본문이 비었거나 id·입실 번호가 없음: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내
             throw unknown();
         }
         return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
