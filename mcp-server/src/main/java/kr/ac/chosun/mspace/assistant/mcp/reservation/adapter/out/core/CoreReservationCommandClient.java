@@ -47,6 +47,23 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         }
     }
 
+    @Override
+    public StatusChange cancel(UserCredential credential, long reservationId) {
+        return change(credential, reservationId, "cancel");
+    }
+
+    @Override
+    public StatusChange checkout(UserCredential credential, long reservationId) {
+        return change(credential, reservationId, "checkout");
+    }
+
+    /** 취소·퇴실은 멱등 키 없이 보낸다: core가 조건부 UPDATE라 두 번째는 409로 끝난다 (설계.md 2.3) */
+    private StatusChange change(UserCredential credential, long reservationId, String verb) {
+        StatusChange body = core.call("POST /api/reservations/{id}/" + verb, credential,
+                rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), StatusChange.class);
+        return body == null ? new StatusChange(reservationId, null) : body;
+    }
+
     private CreatedReservation send(UserCredential credential, CreateRequest body, String idempotencyKey) {
         ResponseEntity<CoreCreated> response = core.callEntity("POST /api/reservations", credential,
                 rest -> rest.post().uri("/api/reservations")
