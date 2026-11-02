@@ -14,6 +14,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,6 +24,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class McpToolGateway implements ToolGateway {
+
+    private static final Logger log = LoggerFactory.getLogger(McpToolGateway.class);
 
     private final AgentProperties props;
 
@@ -35,6 +39,7 @@ class McpToolGateway implements ToolGateway {
         headers.values().forEach(request::header);
         var transport = HttpClientStreamableHttpTransport.builder(props.mcpServerUrl()).requestBuilder(request).build();
         McpSyncClient client = McpClient.sync(transport).requestTimeout(props.timeout()).build();
+        long started = System.nanoTime();
         try {
             client.initialize();
             List<ToolSpec> tools = client.listTools().tools().stream()
@@ -42,6 +47,8 @@ class McpToolGateway implements ToolGateway {
                     .toList();
             return new McpSession(client, tools);
         } catch (RuntimeException e) {
+            // 예외 메시지에는 헤더·대화가 섞일 수 있어 남기지 않는다 (CLAUDE.md 4장)
+            log.warn("mcp open ok=false {}ms", (System.nanoTime() - started) / 1_000_000);
             client.closeGracefully();
             throw new ToolGateway.Unavailable();
         }

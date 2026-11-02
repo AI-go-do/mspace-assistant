@@ -51,7 +51,12 @@ public class AgentLoop {
     public ChatResult run(UserHeaders headers, List<LlmMessage> history, String message) {
         List<LlmMessage> conversation = new ArrayList<>();
         for (LlmMessage m : history) {
-            conversation.add(m instanceof LlmMessage.User u ? new LlmMessage.User(PrivacyMask.mask(u.text())) : m);
+            // 비서 차례도 클라이언트가 보낸 글이라 가린다. 학생이 앞 대화를 고쳐 보낼 수 있다
+            conversation.add(switch (m) {
+                case LlmMessage.User u -> new LlmMessage.User(PrivacyMask.mask(u.text()));
+                case LlmMessage.Assistant a -> new LlmMessage.Assistant(PrivacyMask.mask(a.text()), a.toolCalls());
+                case LlmMessage.ToolResult r -> r;
+            });
         }
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         List<Confirmation> confirmations = new ArrayList<>();

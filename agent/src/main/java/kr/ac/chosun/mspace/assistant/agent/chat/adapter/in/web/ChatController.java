@@ -57,6 +57,9 @@ class ChatController {
         if (request == null || request.message() == null || request.message().isBlank()) {
             return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "말을 입력해 주세요.");
         }
+        if (request.history() != null && request.history().stream().anyMatch(t -> t == null || t.text() == null)) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "대화 기록이 올바르지 않아요.");
+        }
         List<LlmMessage> history = request.history() == null ? List.of() : request.history().stream()
                 .<LlmMessage>map(t -> "assistant".equals(t.role()) ? new LlmMessage.Assistant(t.text(), List.of())
                         : new LlmMessage.User(t.text()))

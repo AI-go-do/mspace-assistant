@@ -10,7 +10,9 @@ public final class PrivacyMask {
 
     /** 조선대 학번 8자리(20으로 시작)로 추정. 다른 형식이 있으면 확인 필요 */
     private static final Pattern STUDENT_ID = Pattern.compile("(?<!\\d)20\\d{6}(?!\\d)");
-    private static final Pattern PHONE = Pattern.compile("(?<!\\d)01[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)");
+    /** 010-1234-5678, 01012345678, +82 10-1234-5678 */
+    private static final Pattern PHONE = Pattern.compile(
+            "(?<!\\d)(?:\\+82[-\\s.]?1|01)[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)");
 
     private PrivacyMask() {
     }
