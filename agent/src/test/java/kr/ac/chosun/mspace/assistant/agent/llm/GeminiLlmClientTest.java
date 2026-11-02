@@ -157,7 +157,7 @@ class GeminiLlmClientTest {
     }
 
     @Test
-    @DisplayName("도구 결과가 JSON null이면 빈 객체로 보낸다")
+    @DisplayName("도구 결과가 JSON null이면 {\"result\":null}로 그대로 보낸다")
     void nullToolResult() {
         // given
         gemini.stubFor(post(PATH).willReturn(okJson("""
@@ -175,7 +175,7 @@ class GeminiLlmClientTest {
                 {"contents":[
                   {"role":"user","parts":[{"text":"내 예약"}]},
                   {"role":"model","parts":[{"functionCall":{"name":"my_reservations","args":{}}}]},
-                  {"role":"user","parts":[{"functionResponse":{"name":"my_reservations","response":{"result":{}}}}]}
+                  {"role":"user","parts":[{"functionResponse":{"name":"my_reservations","response":{"result":null}}}]}
                 ]}""", true, true)));
     }
 
