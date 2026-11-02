@@ -5,10 +5,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.Confirmation;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
@@ -17,7 +15,6 @@ import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 에이전트 반복: 모델 답에 도구 호출이 있으면 실행 → 결과를 대화에 붙여 다시 묻기 → 도구 호출이 없을 때까지.
@@ -34,14 +31,12 @@ public class AgentLoop {
     private final LlmClient llm;
     private final ToolGateway tools;
     private final AgentProperties props;
-    private final JsonMapper json;
     private final Clock clock;
 
-    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, JsonMapper json, Clock clock) {
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock) {
         this.llm = llm;
         this.tools = tools;
         this.props = props;
-        this.json = json;
         this.clock = clock;
     }
 
@@ -80,40 +75,16 @@ public class AgentLoop {
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
                     log.info("agent tool={} ok={} {}ms", call.name(), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
-                    String forModel = outcome.isError() ? outcome.json() : takeConfirmation(call.name(), outcome.json(), confirmations);
-                    conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), forModel, outcome.isError()));
+                    outcome.confirmation().ifPresent(confirmations::add);
+                    conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), outcome.json(), outcome.isError()));
                 }
             }
         }
     }
 
-    /**
-     * 쓰기 도구 결과에서 확인 토큰을 빼서 화면용 목록에 담고, 모델에는 토큰 없는 결과를 준다.
-     * 모델은 확인 API를 부를 수 없지만, 토큰이 답 문장에 섞여 나가는 일도 막는다.
-     */
-    @SuppressWarnings("unchecked")
-    private String takeConfirmation(String tool, String result, List<Confirmation> confirmations) {
-        Map<String, Object> body;
-        try {
-            body = json.readValue(result, LinkedHashMap.class);
-        } catch (RuntimeException e) {
-            return result;
-        }
-        Object token = body.remove("confirmToken");
-        if (token == null) {
-            return result;
-        }
-        Object notes = body.get("notes");
-        Object needs = body.get("needsParticipants");
-        confirmations.add(new Confirmation(tool, token.toString(), String.valueOf(body.get("summary")),
-                notes instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of(),
-                needs instanceof Number n ? n.intValue() : 0, String.valueOf(body.get("expiresAt"))));
-        body.put("confirmation", "학생 화면에 [확인] 카드로 보여 줬음. 학생이 눌러야 실행됨");
-        return json.writeValueAsString(body);
-    }
-
     String systemPrompt() {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
+        AgentProperties.Rules rules = props.rules();
         String today = "%s(%s) %02d:%02d".formatted(now.toLocalDate(),
                 now.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN), now.getHour(), now.getMinute());
         return """
@@ -126,7 +97,7 @@ public class AgentLoop {
                 - 학번·전화번호·이름을 묻지 않는다. 함께 쓰는 사람의 학번은 확인 화면에서 받는다.
                 - 도구가 오류를 주면 그 문장을 학생에게 전하고, 할 수 있는 다음 행동을 하나 제안한다.
                 - 수업 시간표는 아직 모른다. "수업 끝나고"처럼 말하면 끝나는 시각을 물어본다.
-                - 예약은 30분 단위, 1회 최대 2시간, 시작이 오늘부터 7일 안이다.
-                """.formatted(today);
+                - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
+                """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays());
     }
 }

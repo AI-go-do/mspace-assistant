@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.mcp.ProposalParser;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
@@ -71,7 +72,9 @@ class AgentLoopTest {
                 @Override
                 public Outcome call(String name, Map<String, Object> arguments) {
                     called.add(name);
-                    return results.getOrDefault(name, new Outcome("{\"message\":\"없는 도구\"}", true));
+                    // 진짜 어댑터처럼 mcp-server 원문을 ProposalParser에 통과시킨다
+                    Outcome raw = results.getOrDefault(name, new Outcome("{\"message\":\"없는 도구\"}", true));
+                    return ProposalParser.parse(name, raw.json(), raw.isError(), JSON);
                 }
 
                 @Override
@@ -90,8 +93,14 @@ class AgentLoopTest {
         return new LlmReply(text, List.of());
     }
 
+    static final JsonMapper JSON = JsonMapper.builder().build();
+
     static AgentLoop loop(LlmClient llm, ToolGateway tools) {
-        return new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null), JsonMapper.builder().build(), CLOCK);
+        return loop(llm, tools, null);
+    }
+
+    static AgentLoop loop(LlmClient llm, ToolGateway tools, AgentProperties.Rules rules) {
+        return new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, rules), CLOCK);
     }
 
     static final String FREE = "{\"date\":\"2026-11-03\",\"rooms\":[{\"roomId\":2,\"free\":[]}],\"note\":null}";
@@ -219,5 +228,28 @@ class AgentLoopTest {
         assertThat(llm.lastSystem).contains("수업 시간표는 아직 모른다");
         assertThat(result.reply()).contains("몇 시에 끝나요");
         assertThat(tools.called).isEmpty();
+    }
+
+    @Test
+    @DisplayName("지시문의 예약 규칙 숫자는 설정값에서 온다. 없으면 30분·2시간·7일")
+    void promptRulesFromConfig() {
+        var defaults = new ScriptedLlm().then(say("네"));
+        var custom = new ScriptedLlm().then(say("네"));
+
+        loop(defaults, new FakeTools(Map.of())).run(ME, List.of(), "빈방");
+        loop(custom, new FakeTools(Map.of()), new AgentProperties.Rules(60, 3, 14)).run(ME, List.of(), "빈방");
+
+        assertThat(defaults.lastSystem).contains("30분 단위, 1회 최대 2시간, 시작이 오늘부터 7일 안");
+        assertThat(custom.lastSystem).contains("60분 단위, 1회 최대 3시간, 시작이 오늘부터 14일 안");
+    }
+
+    @Test
+    @DisplayName("오류 결과·확인 토큰 없는 결과·JSON 아닌 결과는 카드 없이 그대로 모델에 간다")
+    void parserLeavesOthersAlone() {
+        assertThat(ProposalParser.parse("create_reservation", PROPOSAL, true, JSON).confirmation()).isEmpty();
+        assertThat(ProposalParser.parse("my_reservations", FREE, false, JSON))
+                .satisfies(o -> assertThat(o.confirmation()).isEmpty())
+                .satisfies(o -> assertThat(o.json()).isEqualTo(FREE));
+        assertThat(ProposalParser.parse("x", "not json", false, JSON).json()).isEqualTo("not json");
     }
 }
