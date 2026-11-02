@@ -157,6 +157,29 @@ class GeminiLlmClientTest {
     }
 
     @Test
+    @DisplayName("도구 결과가 JSON null이면 빈 객체로 보낸다")
+    void nullToolResult() {
+        // given
+        gemini.stubFor(post(PATH).willReturn(okJson("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"없어요"}]}}]}""")));
+        var mine = new ToolCall("c1", "my_reservations", Map.of(), null);
+
+        // when
+        client("k").chat("s", List.of(
+                new LlmMessage.User("내 예약"),
+                new LlmMessage.Assistant("", List.of(mine)),
+                new LlmMessage.ToolResult("c1", "my_reservations", "null", false)), List.of(FIND));
+
+        // then
+        gemini.verify(postRequestedFor(urlEqualTo(PATH)).withRequestBody(equalToJson("""
+                {"contents":[
+                  {"role":"user","parts":[{"text":"내 예약"}]},
+                  {"role":"model","parts":[{"functionCall":{"name":"my_reservations","args":{}}}]},
+                  {"role":"user","parts":[{"functionResponse":{"name":"my_reservations","response":{"result":{}}}}]}
+                ]}""", true, true)));
+    }
+
+    @Test
     @DisplayName("도구 인자에 null 값이 있어도 깨지지 않는다")
     void nullArgumentValue() {
         // given
