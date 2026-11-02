@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -77,14 +78,28 @@ public class GeminiLlmClient implements LlmClient {
             return reply;
         } catch (ResourceAccessException e) {
             throw unavailable();
+        } catch (RestClientException e) {
+            // 응답은 왔는데 모양이 다름(본문 해석 실패 등). 원인은 로그에만, 사용자에게는 같은 안내
+            log.warn("llm gemini 응답 해석 실패 cause={}", e.getClass().getSimpleName());
+            throw unavailable();
         } finally {
             log.info("llm gemini ok={} {}ms", ok, (System.nanoTime() - started) / 1_000_000);
         }
     }
 
+    /**
+     * 한 번에 여러 도구를 부르면(병렬 호출) 결과도 한 user 차례에 functionResponse 여러 개로 묶어 보낸다.
+     * 결과마다 user 차례를 따로 만들면 호출 수와 응답 수가 안 맞아 Gemini가 거절할 수 있다 (확인 필요).
+     */
     private List<Map<String, Object>> contents(List<LlmMessage> conversation) {
         List<Map<String, Object>> contents = new ArrayList<>();
+        List<Map<String, Object>> results = new ArrayList<>();
         for (LlmMessage m : conversation) {
+            if (m instanceof LlmMessage.ToolResult r) {
+                results.add(Map.of("functionResponse", Map.of("name", r.name(), "response", response(r))));
+                continue;
+            }
+            flushResults(contents, results);
             switch (m) {
                 case LlmMessage.User u -> contents.add(content("user", List.of(Map.of("text", u.text()))));
                 case LlmMessage.Assistant a -> {
@@ -102,11 +117,18 @@ public class GeminiLlmClient implements LlmClient {
                     }
                     contents.add(content("model", parts));
                 }
-                case LlmMessage.ToolResult r -> contents.add(content("user", List.of(Map.of("functionResponse",
-                        Map.of("name", r.name(), "response", response(r))))));
+                case LlmMessage.ToolResult r -> throw new IllegalStateException("위에서 처리함");
             }
         }
+        flushResults(contents, results);
         return contents;
+    }
+
+    private static void flushResults(List<Map<String, Object>> contents, List<Map<String, Object>> results) {
+        if (!results.isEmpty()) {
+            contents.add(content("user", List.copyOf(results)));
+            results.clear();
+        }
     }
 
     /** functionResponse.response는 객체여야 한다. 도구 결과 JSON을 result(또는 error) 아래에 둔다 */
