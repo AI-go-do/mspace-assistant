@@ -171,6 +171,7 @@ public class GeminiLlmClient implements LlmClient {
 
     private static LlmReply toReply(GenerateResponse response) {
         if (response == null || response.candidates() == null || response.candidates().isEmpty()
+                || response.candidates().getFirst() == null
                 || response.candidates().getFirst().content() == null) {
             throw unavailable();
         }
@@ -178,6 +179,9 @@ public class GeminiLlmClient implements LlmClient {
         List<ToolCall> calls = new ArrayList<>();
         List<Part> parts = response.candidates().getFirst().content().parts();
         for (Part part : parts == null ? List.<Part>of() : parts) {
+            if (part == null) {
+                throw unavailable(); // [null] 같은 깨진 응답이 NullPointerException으로 새지 않게
+            }
             if (part.functionCall() != null) {
                 FunctionCall f = part.functionCall();
                 String id = f.id() != null ? f.id() : LOCAL_ID + UUID.randomUUID();
