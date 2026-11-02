@@ -151,7 +151,8 @@ public class GeminiLlmClient implements LlmClient {
         } catch (RuntimeException e) {
             parsed = r.json();
         }
-        return Map.of(r.isError() ? "error" : "result", parsed);
+        // 도구 결과가 JSON null이면 Map.of가 null을 못 받으므로 빈 객체로 보낸다
+        return Map.of(r.isError() ? "error" : "result", parsed == null ? Map.of() : parsed);
     }
 
     private static Map<String, Object> content(String role, List<Map<String, Object>> parts) {

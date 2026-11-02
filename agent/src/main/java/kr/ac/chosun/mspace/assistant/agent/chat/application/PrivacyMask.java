@@ -13,6 +13,9 @@ public final class PrivacyMask {
     /** 010-1234-5678, 01012345678, +82 10-1234-5678 */
     private static final Pattern PHONE = Pattern.compile(
             "(?<!\\d)(?:\\+82[-\\s.]?1|01)[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)");
+    /** 일반 전화: 02-123-4567, 062-230-1234, 070-1234-5678 (지역번호 02·031~064·070) */
+    private static final Pattern LANDLINE = Pattern.compile(
+            "(?<!\\d)0(?:2|[3-6][1-5]|70)[-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)");
 
     private PrivacyMask() {
     }
@@ -21,6 +24,7 @@ public final class PrivacyMask {
         if (text == null) {
             return null;
         }
-        return STUDENT_ID.matcher(PHONE.matcher(text).replaceAll("[전화번호]")).replaceAll("[학번]");
+        String masked = LANDLINE.matcher(PHONE.matcher(text).replaceAll("[전화번호]")).replaceAll("[전화번호]");
+        return STUDENT_ID.matcher(masked).replaceAll("[학번]");
     }
 }
