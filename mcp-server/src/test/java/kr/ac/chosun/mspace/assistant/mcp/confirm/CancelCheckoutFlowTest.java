@@ -108,6 +108,40 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("취소 중 게이트웨이 504: 처리됐을 수 있으니 다시 보내지 않고 내 예약부터 확인하라고 안내한다")
+    void gatewayTimeoutOnCancelIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations/7/cancel").willReturn(aResponse().withStatus(504)
+                .withHeader("Content-Type", "text/html").withBody("<html>504 Gateway Time-out</html>")));
+        String token = token(call(ME, "cancel_reservation", Map.of("reservationId", 7)));
+
+        // when
+        HttpResponse<String> response = confirm(token);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("STATUS_CHANGE_UNKNOWN", "내 예약에서 먼저 확인해 주세요")
+                .doesNotContain("잠시 후 다시 시도");
+        core.verify(1, postRequestedFor(urlEqualTo("/api/reservations/7/cancel")));
+    }
+
+    @Test
+    @DisplayName("퇴실 응답 본문을 읽지 못해도 같은 '처리 여부 모름' 안내")
+    void unreadableCheckoutIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations/8/checkout").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("{\"id\": ")));
+        String token = token(call(ME, "checkout_reservation", Map.of("reservationId", 8)));
+
+        // when
+        HttpResponse<String> response = confirm(token);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("STATUS_CHANGE_UNKNOWN");
+    }
+
+    @Test
     @DisplayName("내 목록에 없는 예약 id → 찾을 수 없음")
     void unknownReservation() {
         CallToolResult result = call(ME, "cancel_reservation", Map.of("reservationId", 404));

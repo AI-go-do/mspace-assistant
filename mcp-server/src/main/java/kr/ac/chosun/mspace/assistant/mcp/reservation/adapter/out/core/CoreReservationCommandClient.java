@@ -59,10 +59,23 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         return change(credential, reservationId, "checkout");
     }
 
-    /** 취소·퇴실은 멱등 키 없이 보낸다: core가 조건부 UPDATE라 두 번째는 409로 끝난다 (설계.md 2.3) */
+    /**
+     * 취소·퇴실은 멱등 키 없이 보낸다: core가 조건부 UPDATE라 두 번째는 409로 끝난다 (설계.md 2.3).
+     * 응답이 없거나 읽지 못하면 이미 처리됐을 수 있다. "다시 시도"가 아니라 내 예약부터 확인하게 안내한다
+     * (다시 누르면 처리된 경우 409가 와서 실패처럼 보인다).
+     */
     private StatusChange change(UserCredential credential, long reservationId, String verb) {
-        StatusChange body = core.call("POST /api/reservations/{id}/" + verb, credential,
-                rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), StatusChange.class);
+        StatusChange body;
+        try {
+            body = core.call("POST /api/reservations/{id}/" + verb, credential,
+                    rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), StatusChange.class);
+        } catch (CoreApiException e) {
+            if (CoreHttp.UNAVAILABLE.equals(e.code()) || CoreHttp.BAD_RESPONSE.equals(e.code())) {
+                throw new CoreApiException("STATUS_CHANGE_UNKNOWN",
+                        "처리됐는지 확인하지 못했어요. 다시 누르기 전에 내 예약에서 먼저 확인해 주세요.", 503);
+            }
+            throw e;
+        }
         return body == null ? new StatusChange(reservationId, null) : body;
     }
 
