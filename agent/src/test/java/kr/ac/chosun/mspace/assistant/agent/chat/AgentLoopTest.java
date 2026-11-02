@@ -192,10 +192,10 @@ class AgentLoopTest {
 
         loop(llm, new FakeTools(Map.of())).run(ME, List.of(new LlmMessage.User("내 번호는 010-1234-5678"),
                         new LlmMessage.Assistant("+82 10-9876-5432로 연락드릴게요", List.of())),
-                "친구 학번 20231234도 넣어 줘. 학과 사무실은 062-230-1234");
+                "친구 학번 20231234도 넣어 줘. 학과 사무실은 062-230-1234, 해외에서는 +82 62-230-5678");
 
         String sent = llm.seen.getFirst().toString();
-        assertThat(sent).doesNotContain("20231234", "010-1234-5678", "9876-5432", "230-1234").contains("[학번]", "[전화번호]");
+        assertThat(sent).doesNotContain("20231234", "010-1234-5678", "9876-5432", "230-1234", "230-5678").contains("[학번]", "[전화번호]");
     }
 
     @Test
