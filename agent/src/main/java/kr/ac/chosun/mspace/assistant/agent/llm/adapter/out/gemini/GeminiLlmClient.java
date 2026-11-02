@@ -96,7 +96,13 @@ public class GeminiLlmClient implements LlmClient {
         List<Map<String, Object>> results = new ArrayList<>();
         for (LlmMessage m : conversation) {
             if (m instanceof LlmMessage.ToolResult r) {
-                results.add(Map.of("functionResponse", Map.of("name", r.name(), "response", response(r))));
+                Map<String, Object> fr = new LinkedHashMap<>();
+                if (fromGemini(r.callId())) {
+                    fr.put("id", r.callId()); // Gemini가 준 호출 id가 있으면 응답에도 같은 id (병렬 호출 짝 맞추기)
+                }
+                fr.put("name", r.name());
+                fr.put("response", response(r));
+                results.add(Map.of("functionResponse", fr));
                 continue;
             }
             flushResults(contents, results);
@@ -109,7 +115,13 @@ public class GeminiLlmClient implements LlmClient {
                     }
                     for (ToolCall call : a.toolCalls()) {
                         Map<String, Object> part = new LinkedHashMap<>();
-                        part.put("functionCall", Map.of("name", call.name(), "args", call.arguments()));
+                        Map<String, Object> fc = new LinkedHashMap<>();
+                        if (fromGemini(call.id())) {
+                            fc.put("id", call.id());
+                        }
+                        fc.put("name", call.name());
+                        fc.put("args", call.arguments());
+                        part.put("functionCall", fc);
                         if (call.signature() != null) {
                             part.put("thoughtSignature", call.signature());
                         }
@@ -165,13 +177,20 @@ public class GeminiLlmClient implements LlmClient {
         for (Part part : parts == null ? List.<Part>of() : parts) {
             if (part.functionCall() != null) {
                 FunctionCall f = part.functionCall();
-                String id = f.id() != null ? f.id() : "call_" + UUID.randomUUID();
+                String id = f.id() != null ? f.id() : LOCAL_ID + UUID.randomUUID();
                 calls.add(new ToolCall(id, f.name(), f.args(), part.thoughtSignature()));
             } else if (part.text() != null && !Boolean.TRUE.equals(part.thought())) {
                 text.append(part.text());
             }
         }
         return new LlmReply(text.toString(), calls);
+    }
+
+    /** Gemini가 id를 안 주면 어댑터가 만든 id. 이 id는 Gemini로 다시 보내지 않는다 */
+    private static final String LOCAL_ID = "local_";
+
+    private static boolean fromGemini(String id) {
+        return id != null && !id.startsWith(LOCAL_ID);
     }
 
     private static LlmException unavailable() {
