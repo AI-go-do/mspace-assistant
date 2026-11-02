@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: kr.ac.chosun.mspace.assistant.mcp.McpServerApplicationTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.451 s -- in kr.ac.chosun.mspace.assistant.mcp.McpServerApplicationTest
