@@ -32,19 +32,25 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         try {
             return send(credential, body, idempotencyKey);
         } catch (CoreApiException first) {
+            if (CoreHttp.BAD_RESPONSE.equals(first.code())) {
+                throw unknown();
+            }
             if (!CoreHttp.UNAVAILABLE.equals(first.code())) {
                 throw first;
             }
             try {
                 return send(credential, body, idempotencyKey);
             } catch (CoreApiException second) {
-                if (!CoreHttp.UNAVAILABLE.equals(second.code())) {
-                    throw second;
+                if (CoreHttp.UNAVAILABLE.equals(second.code()) || CoreHttp.BAD_RESPONSE.equals(second.code())) {
+                    throw unknown();
                 }
-                throw new CoreApiException("RESERVATION_UNKNOWN",
-                        "예약이 됐는지 확인하지 못했어요. 내 예약에서 확인해 주세요.", 503);
+                throw second;
             }
         }
+    }
+
+    private static CoreApiException unknown() {
+        return new CoreApiException("RESERVATION_UNKNOWN", "예약이 됐는지 확인하지 못했어요. 내 예약에서 확인해 주세요.", 503);
     }
 
     private CreatedReservation send(UserCredential credential, CreateRequest body, String idempotencyKey) {
@@ -55,8 +61,9 @@ class CoreReservationCommandClient implements ReservationCommandPort {
                         .body(body),
                 CoreCreated.class);
         CoreCreated c = response.getBody();
-        if (c == null) {
-            throw new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.", 502);
+        if (c == null || c.id() <= 0) {
+            // 2xx인데 본문이 비었거나 id가 없음: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내
+            throw unknown();
         }
         return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
                 c.status(), c.headcount(), c.accessCode(), response.getStatusCode().value() == 200);
