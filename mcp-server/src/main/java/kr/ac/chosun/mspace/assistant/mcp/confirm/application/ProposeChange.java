@@ -42,6 +42,11 @@ public class ProposeChange {
                     r.status() == ReservationStatus.IN_USE ? "사용 중인 예약은 취소할 수 없어요. 퇴실을 해 주세요."
                             : "이미 끝났거나 취소된 예약이에요.", 409);
         }
+        // BOOKED여도 시작 시각이 지났으면(노쇼 판정 전 15분) core가 409로 막는다. 확인을 누른 뒤 실패하지 않게 먼저 거른다
+        if (r.startAt() != null && !clock.instant().isBefore(r.startAt().toInstant())) {
+            throw new CoreApiException("RESERVATION_NOT_CANCELABLE",
+                    "이미 시작 시각이 지난 예약은 취소할 수 없어요. 쓰지 않으면 노쇼로 처리돼요.", 409);
+        }
         String summary = "%s 예약을 취소할까요?".formatted(describe(r));
         var issued = store.issue(credential, new PendingAction.Cancel(reservationId));
         return new Proposal(issued.token(), seoul(issued.expiresAt()), summary, List.of(), 0);

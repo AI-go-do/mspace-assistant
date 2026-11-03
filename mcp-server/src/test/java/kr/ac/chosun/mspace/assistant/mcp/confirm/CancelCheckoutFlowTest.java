@@ -28,18 +28,21 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
 
     static final Map<String, String> ME = Map.of("X-User-Id", "1");
 
-    /** 7: 내가 대표자, 시작 전 / 8: 내가 대표자, 사용 중(2099년 끝) / 9: 남이 대표자, 나는 참여자 */
+    /** 7: 내가 대표자, 시작 전(2099년) / 10: 내가 대표자, BOOKED인데 시작 시각 지남(노쇼 판정 전) / 8: 내가 대표자, 사용 중(2099년 끝) / 9: 남이 대표자, 나는 참여자 */
     static final String MINE = """
             [
-              {"id": 7, "room": {"id": 1, "name": "1번 방"}, "startAt": "2026-11-03T14:00:00+09:00",
-               "endAt": "2026-11-03T16:00:00+09:00", "status": "BOOKED", "owner": true, "accessCode": "482913",
+              {"id": 7, "room": {"id": 1, "name": "1번 방"}, "startAt": "2099-11-03T14:00:00+09:00",
+               "endAt": "2099-11-03T16:00:00+09:00", "status": "BOOKED", "owner": true, "accessCode": "482913",
                "participants": [{"name": "나*준", "owner": true}]},
               {"id": 8, "room": {"id": 2, "name": "2번 방"}, "startAt": "2099-11-03T10:00:00+09:00",
                "endAt": "2099-11-03T12:00:00+09:00", "status": "IN_USE", "owner": true, "accessCode": "111111",
                "participants": [{"name": "나*준", "owner": true}]},
               {"id": 9, "room": {"id": 3, "name": "3번 방"}, "startAt": "2026-11-04T10:00:00+09:00",
                "endAt": "2026-11-04T11:00:00+09:00", "status": "BOOKED", "owner": false, "accessCode": null,
-               "participants": [{"name": "박*영", "owner": true}, {"name": "나*준", "owner": false}]}
+               "participants": [{"name": "박*영", "owner": true}, {"name": "나*준", "owner": false}]},
+              {"id": 10, "room": {"id": 4, "name": "4번 방"}, "startAt": "2026-11-01T10:00:00+09:00",
+               "endAt": "2026-11-01T11:00:00+09:00", "status": "BOOKED", "owner": true, "accessCode": "222222",
+               "participants": [{"name": "나*준", "owner": true}]}
             ]""";
 
     @BeforeEach
@@ -82,6 +85,16 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"action\":\"CANCEL\"", "\"status\":\"CANCELED\"", "취소했어요");
         core.verify(postRequestedFor(urlEqualTo("/api/reservations/7/cancel")).withHeader("X-User-Id", equalTo("1")));
+    }
+
+    @Test
+    @DisplayName("시작 시각이 지난 BOOKED(노쇼 판정 전)는 취소 확인안을 주지 않고 core 문장과 같은 이유로 안내한다")
+    void startedBookedCannotCancel() {
+        CallToolResult result = call(ME, "cancel_reservation", Map.of("reservationId", 10));
+
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("이미 시작 시각이 지난 예약은 취소할 수 없어요").doesNotContain("confirmToken");
+        core.verify(0, postRequestedFor(urlMatching("/api/reservations/.*")));
     }
 
     @Test
