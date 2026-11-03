@@ -133,6 +133,23 @@ class AccessCodeTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("id 없이 물었는데 잡혀 있는 예약이 없으면(끝난 예약만 있음) 예약이 없다고 안내한다")
+    void noActiveReservation() {
+        // given
+        core.stubFor(get("/api/reservations/me").willReturn(okJson("""
+                [{"id": 8, "room": {"id": 2, "name": "2번 방"}, "startAt": "2099-11-01T10:00:00+09:00",
+                  "endAt": "2099-11-01T12:00:00+09:00", "status": "CHECKED_OUT", "owner": true, "accessCode": "111111",
+                  "participants": [{"name": "나*준", "owner": true}]}]""")));
+
+        // when
+        CallToolResult result = call(ME, "show_access_code", new HashMap<>());
+
+        // then
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("지금 잡혀 있는 예약이 없어요").doesNotContain("111111");
+    }
+
+    @Test
     @DisplayName("참여자: 대표자에게 문의하라는 안내, 카드 없음")
     void participantIsToldToAskOwner() {
         // given
