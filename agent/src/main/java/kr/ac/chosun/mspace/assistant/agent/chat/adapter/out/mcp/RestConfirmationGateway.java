@@ -21,7 +21,7 @@ class RestConfirmationGateway implements ConfirmationGateway {
     private final RestClient mcpServer;
 
     RestConfirmationGateway(AgentProperties props) {
-        // HTTP/1.1 고정: TS-04와 같은 이유 (h2c 업그레이드 끊김)
+        // HTTP/1.1 고정: TS-05와 같은 이유 (h2c 업그레이드 끊김)
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1).connectTimeout(props.timeout()).build());
         factory.setReadTimeout(props.timeout().multipliedBy(3)); // 예약 생성은 재시도까지 기다린다
