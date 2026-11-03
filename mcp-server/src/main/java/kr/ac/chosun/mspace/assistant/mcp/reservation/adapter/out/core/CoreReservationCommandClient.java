@@ -97,8 +97,11 @@ class CoreReservationCommandClient implements ReservationCommandPort {
                         .body(body),
                 CoreCreated.class);
         CoreCreated c = response.getBody();
-        if (c == null || c.id() <= 0 || c.accessCode() == null || c.accessCode().isBlank()) {
-            // 2xx인데 본문이 비었거나 id·입실 번호가 없음: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내
+        if (c == null || c.id() <= 0 || c.roomId() <= 0 || c.headcount() <= 0
+                || c.startAt() == null || c.endAt() == null || c.status() == null || c.status().isBlank()
+                || c.accessCode() == null || c.accessCode().isBlank()) {
+            // 2xx인데 본문이 비었거나 필수 값이 빠짐: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내.
+            // 빈 값으로 성공 카드를 보여 주면 토큰은 이미 쓰여 학생이 바로잡을 길이 없다
             throw unknown();
         }
         return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
