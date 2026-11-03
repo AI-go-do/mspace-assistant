@@ -100,7 +100,7 @@ class AgentLoopTest {
     }
 
     static AgentLoop loop(LlmClient llm, ToolGateway tools, AgentProperties.Rules rules) {
-        return new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, rules), CLOCK);
+        return new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, rules, null, 0, 0), CLOCK);
     }
 
     static final String FREE = "{\"date\":\"2026-11-03\",\"rooms\":[{\"roomId\":2,\"free\":[]}],\"note\":null}";
@@ -153,6 +153,58 @@ class AgentLoopTest {
         assertThat(result.toolCalls()).isEqualTo(8);
         assertThat(tools.called).hasSize(8);
         assertThat(result.reply()).contains("너무 많아져서 멈췄어요");
+    }
+
+    /** 읽을 때마다 정해 둔 만큼 흐르는 시계 (모델·도구가 느린 상황) */
+    static class SlowClock extends Clock {
+        Instant now = CLOCK.instant();
+        final java.time.Duration step;
+
+        SlowClock(java.time.Duration step) {
+            this.step = step;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(now, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            Instant current = now;
+            now = now.plus(step);
+            return current;
+        }
+    }
+
+    @Test
+    @DisplayName("대화 전체 시간 상한(45초)을 넘으면 모델을 더 부르지 않고, 그때까지의 확인 카드와 함께 멈춘다")
+    void stopsAtTimeLimit() {
+        // given: 시계를 읽을 때마다 20초가 흐른다
+        var llm = new ScriptedLlm()
+                .then(tool("create_reservation", Map.of("roomId", 2)))
+                .then(tool("my_reservations", Map.of()))
+                .then(tool("my_reservations", Map.of()))
+                .then(say("다 했어요"));
+        var tools = new FakeTools(Map.of(
+                "create_reservation", new ToolGateway.Outcome(PROPOSAL, false),
+                "my_reservations", new ToolGateway.Outcome("{\"reservations\":[]}", false)));
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0),
+                new SlowClock(java.time.Duration.ofSeconds(20)));
+
+        // when
+        ChatResult result = loop.run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then
+        assertThat(result.stoppedByLimit()).isTrue();
+        assertThat(result.reply()).contains("시간이 너무 오래 걸려서");
+        assertThat(result.confirmations()).hasSize(1);
+        assertThat(llm.seen.size()).isLessThan(4);
     }
 
     @Test

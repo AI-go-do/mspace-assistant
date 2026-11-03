@@ -1,6 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.TextStyle;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * 에이전트 반복: 모델 답에 도구 호출이 있으면 실행 → 결과를 대화에 붙여 다시 묻기 → 도구 호출이 없을 때까지.
- * 도구 호출은 대화 한 번에 최대 maxToolCalls번. 넘으면 멈추고 학생에게 알린다.
+ * 도구 호출은 대화 한 번에 최대 maxToolCalls번, 전체 시간은 chatTimeout까지. 넘으면 멈추고 학생에게 알린다.
  * 로그에는 도구 이름·걸린 시간·성공 여부만 남긴다 (사용자 말 원문·토큰 금지).
  */
 @Service
@@ -27,6 +28,7 @@ public class AgentLoop {
     private static final Logger log = LoggerFactory.getLogger(AgentLoop.class);
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     static final String LIMIT_REPLY = "요청을 처리하는 단계가 너무 많아져서 멈췄어요. 날짜·시간·인원을 넣어 조금 더 구체적으로 말해 주세요.";
+    static final String TIME_LIMIT_REPLY = "답을 찾는 데 시간이 너무 오래 걸려서 멈췄어요. 날짜·시간·인원을 넣어 다시 말해 주세요.";
 
     private final LlmClient llm;
     private final ToolGateway tools;
@@ -56,10 +58,17 @@ public class AgentLoop {
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         List<Confirmation> confirmations = new ArrayList<>();
         int calls = 0;
+        // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
+        // 그래서 모델을 다시 부르기 전에 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다
+        Instant deadline = clock.instant().plus(props.chatTimeout());
 
         try (ToolGateway.Session session = tools.open(headers)) {
             String system = systemPrompt();
             while (true) {
+                if (calls > 0 && !clock.instant().isBefore(deadline)) {
+                    log.warn("agent time limit reached calls={} limit={}s", calls, props.chatTimeout().toSeconds());
+                    return new ChatResult(TIME_LIMIT_REPLY, confirmations, calls, true);
+                }
                 LlmReply reply = llm.chat(system, conversation, session.tools());
                 if (!reply.wantsTools()) {
                     return new ChatResult(reply.text(), confirmations, calls, false);

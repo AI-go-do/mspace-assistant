@@ -11,6 +11,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -46,15 +47,28 @@ class ChatController {
     ResponseEntity<?> chat(@RequestHeader HttpHeaders headers, @RequestBody ChatRequest request) {
         UserHeaders user = user(headers);
         if (user.isEmpty()) {
-            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요.");
         }
         if (request == null || request.message() == null || request.message().isBlank()) {
             return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "말을 입력해 주세요.");
         }
+        if (request.message().length() > props.maxMessageChars()) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                    "말이 너무 길어요. %d자 안으로 줄여 주세요.".formatted(props.maxMessageChars()));
+        }
         if (request.history() != null && request.history().stream().anyMatch(t -> t == null || t.text() == null)) {
             return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "대화 기록이 올바르지 않아요.");
         }
-        List<LlmMessage> history = request.history() == null ? List.of() : request.history().stream()
+        if (request.history() != null && request.history().stream()
+                .anyMatch(t -> t.text().length() > props.maxMessageChars())) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "대화 기록이 올바르지 않아요.");
+        }
+        // 모델 무료 할당량을 지키려고 최근 대화만 넘긴다
+        List<Turn> recent = request.history() == null ? List.of() : request.history();
+        if (recent.size() > props.maxHistoryTurns()) {
+            recent = recent.subList(recent.size() - props.maxHistoryTurns(), recent.size());
+        }
+        List<LlmMessage> history = recent.stream()
                 .<LlmMessage>map(t -> "assistant".equals(t.role()) ? new LlmMessage.Assistant(t.text(), List.of())
                         : new LlmMessage.User(t.text()))
                 .toList();
@@ -67,7 +81,9 @@ class ChatController {
     ResponseEntity<String> confirm(@PathVariable String token, @RequestHeader HttpHeaders headers,
                                    @RequestBody(required = false) String body) {
         ConfirmationGateway.Relayed relayed = confirmations.confirm(token, user(headers), body);
-        return ResponseEntity.status(relayed.status()).contentType(MediaType.APPLICATION_JSON).body(relayed.json());
+        // 예약 생성 결과에는 입실 번호가 들어 있어 브라우저·프록시가 저장하지 않게 한다
+        return ResponseEntity.status(relayed.status()).contentType(MediaType.APPLICATION_JSON)
+                .cacheControl(CacheControl.noStore()).body(relayed.json());
     }
 
     @ExceptionHandler(LlmException.class)
