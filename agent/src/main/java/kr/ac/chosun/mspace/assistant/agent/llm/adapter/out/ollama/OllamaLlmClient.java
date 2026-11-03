@@ -113,7 +113,7 @@ public class OllamaLlmClient implements LlmClient {
         }
         List<ToolCall> calls = new ArrayList<>();
         for (OllamaToolCall c : response.message().toolCalls() == null ? List.<OllamaToolCall>of() : response.message().toolCalls()) {
-            if (c.function() != null && c.function().name() != null) {
+            if (c != null && c.function() != null && c.function().name() != null) {
                 Map<String, Object> args = c.function().arguments() == null ? Map.of() : c.function().arguments();
                 // Ollama는 호출 id를 주지 않아서 만든다. 결과는 tool_name으로 짝을 맞춘다
                 calls.add(new ToolCall("call_" + UUID.randomUUID(), c.function().name(), args, null));
