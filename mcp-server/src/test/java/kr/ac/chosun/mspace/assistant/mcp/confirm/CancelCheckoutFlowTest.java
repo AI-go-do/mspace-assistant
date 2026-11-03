@@ -90,8 +90,12 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("시작 시각이 지난 BOOKED(노쇼 판정 전)는 취소 확인안을 주지 않고 core 문장과 같은 이유로 안내한다")
     void startedBookedCannotCancel() {
+        // given: 예약 10은 BOOKED이지만 시작 시각이 지났다 (MINE 참고)
+
+        // when
         CallToolResult result = call(ME, "cancel_reservation", Map.of("reservationId", 10));
 
+        // then
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("이미 시작 시각이 지난 예약은 취소할 수 없어요").doesNotContain("confirmToken");
         core.verify(0, postRequestedFor(urlMatching("/api/reservations/.*")));
