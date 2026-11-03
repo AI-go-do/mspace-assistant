@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -67,6 +68,10 @@ public class OllamaLlmClient implements LlmClient {
             ok = true;
             return reply;
         } catch (ResourceAccessException e) {
+            throw unavailable();
+        } catch (RestClientException e) {
+            // 200인데 본문이 JSON이 아님 등. Gemini 어댑터와 같은 계약(LlmException)으로 맞춘다
+            log.warn("llm ollama 응답 해석 실패 cause={}", e.getClass().getSimpleName());
             throw unavailable();
         } finally {
             log.info("llm ollama ok={} {}ms", ok, (System.nanoTime() - started) / 1_000_000);

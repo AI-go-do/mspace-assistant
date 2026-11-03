@@ -89,4 +89,16 @@ class OllamaLlmClientTest {
         assertThatThrownBy(() -> client(Duration.ofMillis(500)).chat("s", List.of(new LlmMessage.User("a")), List.of()))
                 .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
     }
+
+    @Test
+    @DisplayName("200인데 본문이 JSON이 아니면 500 대신 응답 없음(LLM_UNAVAILABLE)으로 끝난다")
+    void unreadableBody() {
+        // given
+        ollama.stubFor(post("/api/chat").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("<html>not json</html>")));
+
+        // when, then
+        assertThatThrownBy(() -> client(Duration.ofSeconds(2)).chat("s", List.of(new LlmMessage.User("a")), List.of()))
+                .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
+    }
 }
