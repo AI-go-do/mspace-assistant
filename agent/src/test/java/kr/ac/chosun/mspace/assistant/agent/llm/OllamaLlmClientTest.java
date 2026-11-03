@@ -9,6 +9,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
@@ -97,8 +98,28 @@ class OllamaLlmClientTest {
         ollama.stubFor(post("/api/chat").willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json").withBody("<html>not json</html>")));
 
-        // when, then
-        assertThatThrownBy(() -> client(Duration.ofSeconds(2)).chat("s", List.of(new LlmMessage.User("a")), List.of()))
-                .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
+        // when
+        Throwable thrown = catchThrowable(
+                () -> client(Duration.ofSeconds(2)).chat("s", List.of(new LlmMessage.User("a")), List.of()));
+
+        // then
+        assertThat(thrown).isInstanceOfSatisfying(LlmException.class,
+                e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
+    }
+
+    @Test
+    @DisplayName("글도 도구 호출도 없는 응답은 빈 말풍선 대신 응답 없음으로 끝난다")
+    void emptyReply() {
+        // given
+        ollama.stubFor(post("/api/chat").willReturn(okJson("""
+                {"message":{"role":"assistant","content":""},"done":true}""")));
+
+        // when
+        Throwable thrown = catchThrowable(
+                () -> client(Duration.ofSeconds(2)).chat("s", List.of(new LlmMessage.User("a")), List.of()));
+
+        // then
+        assertThat(thrown).isInstanceOfSatisfying(LlmException.class,
+                e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
     }
 }
