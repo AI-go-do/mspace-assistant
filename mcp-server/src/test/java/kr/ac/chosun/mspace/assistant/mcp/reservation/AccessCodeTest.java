@@ -92,7 +92,7 @@ class AccessCodeTest extends McpToolTestSupport {
         // then
         assertThat(result.isError()).isFalse();
         assertThat(text(result)).contains("\"cardShown\":false", "\"choices\":[", "\"reservationId\":7",
-                        "\"reservationId\":9", "\"roomName\":\"3번 방\"", "어느 예약인지")
+                        "\"reservationId\":9", "\"roomName\":\"3번 방\"", "어느 예약의 입실 번호를 볼까요?")
                 .doesNotContain("482913", "\"reservationId\":8");
     }
 
