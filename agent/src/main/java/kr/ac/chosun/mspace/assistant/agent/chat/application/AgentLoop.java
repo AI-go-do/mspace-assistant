@@ -73,13 +73,21 @@ public class AgentLoop {
                     calls++;
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
-                    log.info("agent tool={} ok={} {}ms", call.name(), !outcome.isError(),
+                    log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
                     outcome.confirmation().ifPresent(confirmations::add);
                     conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), outcome.json(), outcome.isError()));
                 }
             }
         }
+    }
+
+    /**
+     * 모델이 지어낸 도구 이름에는 학생 말이 섞일 수 있어 로그에 그대로 남기지 않는다.
+     * 도구 목록에 있는 이름만 남기고 나머지는 "unknown"으로 쓴다.
+     */
+    public static String loggable(String name, ToolGateway.Session session) {
+        return session.tools().stream().anyMatch(t -> t.name().equals(name)) ? name : "unknown";
     }
 
     String systemPrompt() {

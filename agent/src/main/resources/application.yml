@@ -33,3 +33,11 @@ mspace:
       slot-minutes: 30
       max-hours: 2
       advance-days: 7
+
+logging:
+  level:
+    # 요청·응답 본문(참여자 학번, 입실 번호, 학생 말)이 DEBUG 로그에 찍히지 않게 고정한다.
+    # root를 DEBUG로 올려도 이 패키지들은 INFO/WARN에 머문다 (CLAUDE.md 4장)
+    org.springframework.web: INFO
+    org.springframework.http: INFO
+    io.modelcontextprotocol: WARN
