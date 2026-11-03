@@ -20,7 +20,7 @@ public class ShowAccessCode {
 
     static final String NOT_OWNER = "대표자가 아니라 입실 번호를 알 수 없어요. 대표자에게 문의하세요.";
     static final String FINISHED = "이미 끝났거나 취소된 예약이라 입실 번호를 쓸 수 없어요.";
-    static final String CHOOSE = "지금 잡혀 있는 예약이 %d개예요. choices를 학생에게 보여 주고 어느 예약인지 물은 뒤 reservationId를 넣어 다시 부를 것";
+    static final String CHOOSE = "지금 잡혀 있는 예약이 %d개예요. 어느 예약의 입실 번호를 볼까요?";
     static final String SHOWN = "학생 화면에 입실 번호 카드로 보여 줬음. 번호는 이 결과에 없고 모델은 알 수 없음. 번호를 지어내지 말 것";
 
     private final ReservationQueryPort reservations;
