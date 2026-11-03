@@ -37,7 +37,7 @@ public class GeminiLlmClient implements LlmClient {
 
     public GeminiLlmClient(GeminiProperties props, JsonMapper json) {
         // HTTP/1.1 고정: JDK 기본(HTTP/2)은 http:// 주소에서 h2c 업그레이드를 시도하는데,
-        // 본문이 있는 POST에서 일부 서버(WireMock 등)가 스트림을 끊는다(RST_STREAM, TS-04)
+        // 본문이 있는 POST에서 일부 서버(WireMock 등)가 스트림을 끊는다(RST_STREAM, TS-05)
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1).connectTimeout(props.timeout()).build());
         factory.setReadTimeout(props.timeout());
