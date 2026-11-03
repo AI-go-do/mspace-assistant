@@ -1,9 +1,11 @@
 package kr.ac.chosun.mspace.assistant.mcp.reservation.adapter.in.mcp;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
 import kr.ac.chosun.mspace.assistant.mcp.common.Credentials;
+import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.Proposal;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.ProposeChange;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -45,11 +47,22 @@ class CreateReservationTool {
         return propose.create(Credentials.require(context), roomId, parse(startAt), parse(endAt), headcount);
     }
 
-    private static OffsetDateTime parse(String value) {
+    /**
+     * 오프셋이 붙은 시각(14:00:00+09:00)이 기본이다. 모델이 오프셋을 빼고 보내면(2026-11-04T14:00) 서울 시간으로 본다.
+     * 실제 core와 붙여 보니 오프셋 없는 값을 400으로 돌려 모델이 같은 호출을 되풀이할 수 있었다 (docs/트러블슈팅.md TS-04)
+     */
+    static OffsetDateTime parse(String value) {
+        if (value == null) {
+            throw invalid();
+        }
         try {
             return OffsetDateTime.parse(value);
-        } catch (DateTimeParseException | NullPointerException e) {
-            throw invalid();
+        } catch (DateTimeParseException withoutOffset) {
+            try {
+                return LocalDateTime.parse(value).atZone(SeoulTime.ZONE).toOffsetDateTime();
+            } catch (DateTimeParseException e) {
+                throw invalid();
+            }
         }
     }
 

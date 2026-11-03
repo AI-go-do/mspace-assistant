@@ -73,6 +73,27 @@ class CreateReservationFlowTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("모델이 시각에 오프셋을 빼고 보내도 서울 시간으로 보고 확인안을 만든다")
+    void acceptsTimeWithoutOffset() {
+        CallToolResult result = call(ME, "create_reservation", Map.of("roomId", 1,
+                "startAt", "2026-11-03T14:00", "endAt", "2026-11-03T16:00:00", "headcount", 3));
+
+        assertThat(result.isError()).isFalse();
+        assertThat(text(result)).contains("1번 방, 11월 3일(화) 14:00–16:00, 3명으로 예약할까요?");
+        core.verify(0, postRequestedFor(urlEqualTo("/api/reservations")));
+    }
+
+    @Test
+    @DisplayName("시각 형식이 아예 틀리면 400 안내를 돌려준다")
+    void rejectsMalformedTime() {
+        CallToolResult result = call(ME, "create_reservation", Map.of("roomId", 1,
+                "startAt", "내일 2시", "endAt", "2026-11-03T16:00", "headcount", 3));
+
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("시작·끝 시각");
+    }
+
+    @Test
     @DisplayName("확인하면 예약 API를 멱등 키(=확인 토큰)와 학번으로 부르고, 입실 번호는 화면용 응답에만")
     void confirmCreates() throws Exception {
         // given
