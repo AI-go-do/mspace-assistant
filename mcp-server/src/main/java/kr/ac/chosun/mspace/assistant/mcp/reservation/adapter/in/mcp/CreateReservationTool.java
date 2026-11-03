@@ -49,7 +49,7 @@ class CreateReservationTool {
 
     /**
      * 오프셋이 붙은 시각(14:00:00+09:00)이 기본이다. 모델이 오프셋을 빼고 보내면(2026-11-04T14:00) 서울 시간으로 본다.
-     * 실제 core와 붙여 보니 오프셋 없는 값을 400으로 돌려 모델이 같은 호출을 되풀이할 수 있었다 (docs/트러블슈팅.md TS-07)
+     * 실제 core와 붙여 보니 오프셋 없는 값을 400으로 돌려 모델이 같은 호출을 되풀이할 수 있었다 (docs/트러블슈팅.md TS-04)
      */
     static OffsetDateTime parse(String value) {
         if (value == null) {
