@@ -241,4 +241,33 @@ class GeminiLlmClientTest {
                 .withRequestBody(matchingJsonPath("$.contents[2].parts[0].functionResponse.id", equalTo("g-1")))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notMatching(".*local_x.*")));
     }
+
+    @Test
+    @DisplayName("글도 도구 호출도 없는 응답(생각만 있음)은 빈 말풍선 대신 응답 없음으로 끝난다")
+    void emptyReply() {
+        // given
+        gemini.stubFor(post(PATH).willReturn(okJson("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"내부 생각","thought":true}]}}]}""")));
+
+        // when, then
+        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("안녕")), List.of()))
+                .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
+    }
+
+    @Test
+    @DisplayName("글이 빈 비서 차례(도구 호출도 없음)는 model 차례로 보내지 않는다")
+    void skipsEmptyAssistantTurn() {
+        // given
+        gemini.stubFor(post(PATH).willReturn(okJson("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"네"}]}}]}""")));
+        List<LlmMessage> history = List.of(new LlmMessage.User("안녕"), new LlmMessage.Assistant("", List.of()),
+                new LlmMessage.User("내일 빈방"));
+
+        // when
+        client("k").chat("s", history, List.of());
+
+        // then
+        gemini.verify(postRequestedFor(urlEqualTo(PATH))
+                .withRequestBody(matchingJsonPath("$.contents.length()", equalTo("2"))));
+    }
 }
