@@ -120,6 +120,10 @@ public class OllamaLlmClient implements LlmClient {
             }
         }
         String text = response.message().content() == null ? "" : response.message().content();
+        if (calls.isEmpty() && text.isBlank()) {
+            // 빈 말풍선을 성공으로 돌려주지 않는다 (Gemini 어댑터와 같은 계약)
+            throw unavailable();
+        }
         return new LlmReply(text, calls);
     }
 
