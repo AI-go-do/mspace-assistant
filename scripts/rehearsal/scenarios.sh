@@ -23,8 +23,10 @@ done
 : > "$SENT_LOG" || { echo "SENT_LOG를 비울 수 없어요: $SENT_LOG" >&2; exit 1; }
 
 echo '| 시나리오 | 판정 | 실제 |'; echo '|---|---|---|'
-r=$(chat "$OWNER" "내일 오후 2시 빈방 있어?"); n=$(echo "$r" | j 'd.get("toolCalls")')
-[ "$n" = 1 ] && row "내일 오후 2시 빈방" ok "find_available_rooms 1번" || row "내일 오후 2시 빈방" no "$r"
+# 어떤 도구를 불렀는지는 응답에 없으므로, 가짜 모델이 받은 마지막 요청의 대화에서 모델이 부른 도구 이름을 읽는다.
+tools_called() { tail -n 1 "$SENT_LOG" | python3 -c "import json,sys;d=json.loads(sys.stdin.read() or '{}');print(','.join(c['function']['name'] for m in d.get('messages',[]) for c in m.get('tool_calls',[])))"; }
+r=$(chat "$OWNER" "내일 오후 2시 빈방 있어?"); n=$(echo "$r" | j 'd.get("toolCalls")'); called=$(tools_called)
+[ "$n" = 1 ] && [ "$called" = find_available_rooms ] && row "내일 오후 2시 빈방" ok "$called 1번" || row "내일 오후 2시 빈방" no "도구 ${called:-없음}, $r"
 r=$(chat "$OWNER" "수업 끝나고 2시간 잡아 줘"); [ "$(echo "$r" | j 'd.get("toolCalls")')" = 0 ] \
   && row "수업 끝나고 2시간" ok "끝나는 시각을 되물음" || row "수업 끝나고 2시간" no "$r"
 r=$(chat "$OWNER" "내일 2시부터 2시간 2번 방 3명으로 예약해 줘"); tok=$(echo "$r" | j 'd["confirmations"][0]["token"] if d.get("confirmations") else ""')
@@ -36,7 +38,7 @@ tok1=$tok; code=$(curl -s "$AGENT/api/agent/reservations/$rid/access-code" -H "X
 [ "$(echo "$r" | j 'd.get("status")')" = BOOKED ] && row "본인이 [확인]" ok "예약 $rid BOOKED" || row "본인이 [확인]" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_USED ] \
   && row "같은 토큰 다시" ok "CONFIRMATION_USED" || row "같은 토큰 다시" no "$r"
-r=$(chat "$OWNER" "내 입실 번호 알려 줘"); [ "$(echo "$r" | j 'len(d.get("accessCodeCards",[]))')" = 1 ] && ! echo "$r" | grep -q accessCode\" \
+r=$(chat "$OWNER" "내 입실 번호 알려 줘"); [ -n "$code" ] && [ "$(echo "$r" | j 'len(d.get("accessCodeCards",[]))')" = 1 ] && ! echo "$r" | grep -qF -e 'accessCode"' -e "$code" \
   && row "입실 번호(대표자)" ok "화면 카드만, 답에 번호 없음" || row "입실 번호(대표자)" no "$r"
 r=$(curl -s "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OTHER"); [ "$(echo "$r" | j 'd.get("code")')" = NOT_RESERVATION_OWNER ] \
   && row "입실 번호(참여자, 화면 API)" ok "NOT_RESERVATION_OWNER" || row "입실 번호(참여자, 화면 API)" no "$r"
