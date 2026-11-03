@@ -1,13 +1,30 @@
 #!/usr/bin/env bash
 # 시연 리허설: 채팅 → agent → MCP 서버 → core를 가짜 모델로 한 바퀴 돌리고 표로 판정한다.
-# 준비: core(X-User-Id 켜기)·mcp-server·agent(LLM_PROVIDER=ollama, OLLAMA_BASE_URL=가짜 모델)·fake_ollama.py
-# 사용: MCP=http://localhost:18090 AGENT=http://localhost:18091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=sent.jsonl ./scenarios.sh
-# OWNER는 끝나지 않은 예약이 없는 테스트 계정, P1·P2는 함께 쓸 테스트 학번. 실제 학생 정보는 쓰지 않는다.
+# 준비: core(MSPACE_DEV_HEADER=true)·mcp-server·agent(둘 다 SPRING_PROFILES_ACTIVE=local, agent는 LLM_PROVIDER=ollama,
+#       OLLAMA_BASE_URL=가짜 모델)·fake_ollama.py. 자세한 건 README.md
+# 사용: CORE=http://localhost:18080 MCP=http://localhost:18090 AGENT=http://localhost:18091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=sent.jsonl ./scenarios.sh
+# OWNER·OTHER는 테스트 계정, P1은 OTHER의 학번(참여자 검사용), P2는 다른 테스트 학번. 실제 학생 정보는 쓰지 않는다.
+# 시작할 때와 끝날 때(중간에 실패해도) OWNER의 끝나지 않은 예약을 core에서 직접 정리한다. 테스트 계정에만 쓴다.
 set -u
-AGENT=${AGENT:-http://localhost:18091}; OWNER=${OWNER:-4}; OTHER=${OTHER:-2}
+CORE=${CORE:-http://localhost:18080}; AGENT=${AGENT:-http://localhost:18091}; OWNER=${OWNER:-4}; OTHER=${OTHER:-2}
 P1=${P1:-29990002}; P2=${P2:-29990003}; SENT_LOG=${SENT_LOG:-sent.jsonl}
-pass=0; fail=0
-row() { if [ "$2" = ok ]; then pass=$((pass+1)); printf '| %s | 통과 | %s |\n' "$1" "$3"; else fail=$((fail+1)); printf '| %s | **실패** | %s |\n' "$1" "$3"; fi; }
+pass=0; fail=0; code=""
+# 실패한 줄의 "실제" 칸에는 응답 원문이 찍힌다. 입실 번호가 섞여 나오지 않게 가린다
+row() { if [ "$2" = ok ]; then pass=$((pass+1)); printf '| %s | 통과 | %s |\n' "$1" "$3"; else fail=$((fail+1));
+  local shown=$3; [ -n "$code" ] && shown=${shown//$code/[입실 번호]}; printf '| %s | **실패** | %s |\n' "$1" "$shown"; fi; }
+# OWNER의 끝나지 않은 예약(BOOKED는 취소, IN_USE는 퇴실)을 정리한다. 앞 실행이 중간에 멈춰 남긴 예약 때문에
+# 대표자 동시 1건 규칙(OWNER_HAS_ACTIVE_RESERVATION)에 걸리지 않게 한다
+cleanup() {
+  curl -s --max-time 5 "$CORE/api/reservations/me" -H "X-User-Id: $OWNER" | python3 -c '
+import json,sys
+try: rs=json.load(sys.stdin)
+except Exception: rs=[]
+rs=rs.get("reservations",rs) if isinstance(rs,dict) else rs
+for r in rs if isinstance(rs,list) else []:
+    if r.get("owner") and r.get("status") in ("BOOKED","IN_USE"): print(r["id"], "cancel" if r["status"]=="BOOKED" else "checkout")' 2>/dev/null |
+  while read -r id verb; do curl -s -o /dev/null --max-time 5 -X POST "$CORE/api/reservations/$id/$verb" -H "X-User-Id: $OWNER"; done
+}
+trap cleanup EXIT
 chat() { curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
   -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1],"history":[]}))' "$2")"; }
 confirm() { curl -s -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
@@ -19,6 +36,7 @@ for svc in "$MCP" "$AGENT"; do
   for _ in $(seq 1 60); do curl -sf --max-time 2 "$svc/actuator/health" >/dev/null && break; sleep 1; done
   curl -sf --max-time 2 "$svc/actuator/health" >/dev/null || { echo "준비되지 않았어요: $svc" >&2; exit 1; }
 done
+cleanup
 # 이번 실행에서 외부 AI로 나간 요청만 검사하도록 로그를 비운다.
 : > "$SENT_LOG" || { echo "SENT_LOG를 비울 수 없어요: $SENT_LOG" >&2; exit 1; }
 

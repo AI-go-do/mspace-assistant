@@ -6,12 +6,17 @@
 표준 라이브러리만 쓴다. 실행: python3 -I fake_ollama.py [포트=18111]
 """
 import json, os, sys, datetime
+from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, HTTPServer
 LOG = os.environ.get("SENT_LOG", "sent.jsonl")
 def call(name, args): return {"message": {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": name, "arguments": args}}]}, "done": True}
 def say(t): return {"message": {"role": "assistant", "content": t}, "done": True}
-TOMORROW = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+SEOUL = ZoneInfo("Asia/Seoul")
+def tomorrow():
+    # core는 서울 날짜로 계산한다. 요청마다 서울 기준으로 계산해 자정을 넘기거나 UTC 기기에서도 하루 어긋나지 않게 한다
+    return (datetime.datetime.now(SEOUL).date() + datetime.timedelta(days=1)).isoformat()
 def brain(msgs):
+    TOMORROW = tomorrow()
     users = [m for m in msgs if m["role"] == "user"]
     q = users[-1]["content"]
     idx = max(i for i, m in enumerate(msgs) if m["role"] == "user")
@@ -45,7 +50,7 @@ class H(BaseHTTPRequestHandler):
                 if size == 0: self.rfile.readline(); break
                 raw += self.rfile.read(size); self.rfile.readline()
         body = json.loads(raw)
-        with open(LOG, "a") as f: f.write(json.dumps(body, ensure_ascii=False) + "\n")
+        with open(LOG, "a", encoding="utf-8") as f: f.write(json.dumps(body, ensure_ascii=False) + "\n")
         out = json.dumps(brain(body["messages"]), ensure_ascii=False).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(out))); self.end_headers(); self.wfile.write(out)
     def log_message(self, *a): pass
