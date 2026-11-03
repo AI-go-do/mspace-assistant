@@ -81,8 +81,8 @@ class AccessCodeTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("id 없이 물었는데 끝나지 않은 예약이 여러 개면 고를 목록을 주고 카드는 띄우지 않는다")
-    void asksWhichWhenSeveralActive() {
+    @DisplayName("id 없이 물었는데 대표자 예약과 참여자 예약이 있으면 대표자 예약으로 바로 답한다 (번호는 대표자만)")
+    void prefersOwnedReservation() {
         // given: MINE에는 끝나지 않은 예약이 7(대표자), 9(참여자) 두 개
         Map<String, Object> noId = new HashMap<>();
 
@@ -91,9 +91,49 @@ class AccessCodeTest extends McpToolTestSupport {
 
         // then
         assertThat(result.isError()).isFalse();
+        assertThat(text(result)).contains("\"reservationId\":7", "\"cardShown\":true", "\"choices\":[]",
+                        "10분 전부터")
+                .doesNotContain("482913", "\"reservationId\":9");
+    }
+
+    @Test
+    @DisplayName("id 없이 물었는데 대표자 예약이 여러 개로 보이면(core 규칙과 다른 응답) 고를 목록을 주고 카드는 띄우지 않는다")
+    void asksWhichWhenSeveralOwned() {
+        // given
+        core.stubFor(get("/api/reservations/me").willReturn(okJson("""
+                [{"id": 7, "room": {"id": 1, "name": "1번 방"}, "startAt": "2099-11-03T14:00:00+09:00",
+                  "endAt": "2099-11-03T16:00:00+09:00", "status": "BOOKED", "owner": true, "accessCode": "482913",
+                  "participants": [{"name": "나*준", "owner": true}]},
+                 {"id": 10, "room": {"id": 3, "name": "3번 방"}, "startAt": "2099-11-05T10:00:00+09:00",
+                  "endAt": "2099-11-05T11:00:00+09:00", "status": "BOOKED", "owner": true, "accessCode": "333333",
+                  "participants": [{"name": "나*준", "owner": true}]}]""")));
+
+        // when
+        CallToolResult result = call(ME, "show_access_code", new HashMap<>());
+
+        // then
         assertThat(text(result)).contains("\"cardShown\":false", "\"choices\":[", "\"reservationId\":7",
-                        "\"reservationId\":9", "\"roomName\":\"3번 방\"", "어느 예약의 입실 번호를 볼까요?")
-                .doesNotContain("482913", "\"reservationId\":8");
+                        "\"reservationId\":10", "어느 예약의 입실 번호를 볼까요?")
+                .doesNotContain("482913", "333333");
+    }
+
+    @Test
+    @DisplayName("상태가 BOOKED여도 종료 시각이 지났으면(core 상태 반영 전) 끝난 예약으로 보고 번호를 주지 않는다")
+    void endedByTimeIsFinished() throws Exception {
+        // given
+        core.stubFor(get("/api/reservations/me").willReturn(okJson("""
+                [{"id": 11, "room": {"id": 1, "name": "1번 방"}, "startAt": "2020-11-03T14:00:00+09:00",
+                  "endAt": "2020-11-03T16:00:00+09:00", "status": "BOOKED", "owner": true, "accessCode": "555555",
+                  "participants": [{"name": "나*준", "owner": true}]}]""")));
+
+        // when
+        CallToolResult tool = call(ME, "show_access_code", Map.of("reservationId", 11));
+        HttpResponse<String> response = card(11, ME);
+
+        // then
+        assertThat(text(tool)).contains("\"cardShown\":false", "입실 번호를 쓸 수 없어요").doesNotContain("555555");
+        assertThat(response.statusCode()).isEqualTo(409);
+        assertThat(response.body()).doesNotContain("555555");
     }
 
     @Test
@@ -117,7 +157,7 @@ class AccessCodeTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("id 없이 물었는데 끝나지 않은 예약이 1개이고 참여자면 대표자에게 문의하라고 한다")
+    @DisplayName("id 없이 물었는데 끝나지 않은 예약이 참여자 예약뿐이면 대표자에게 번호를 받으라고 한다")
     void onlyActiveIsParticipant() {
         // given
         core.stubFor(get("/api/reservations/me").willReturn(okJson("""
@@ -129,7 +169,7 @@ class AccessCodeTest extends McpToolTestSupport {
         CallToolResult result = call(ME, "show_access_code", new HashMap<>());
 
         // then
-        assertThat(text(result)).contains("\"reservationId\":9", "\"cardShown\":false", "대표자에게 문의하세요");
+        assertThat(text(result)).contains("\"reservationId\":9", "\"cardShown\":false", "대표자에게 번호를 받아 주세요");
     }
 
     @Test
@@ -150,7 +190,7 @@ class AccessCodeTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("참여자: 대표자에게 문의하라는 안내, 카드 없음")
+    @DisplayName("참여자: 대표자에게 번호를 받으라는 안내, 카드 없음")
     void participantIsToldToAskOwner() {
         // given
         Map<String, Object> args = Map.of("reservationId", 9);
@@ -160,7 +200,7 @@ class AccessCodeTest extends McpToolTestSupport {
 
         // then
         assertThat(result.isError()).isFalse();
-        assertThat(text(result)).contains("\"cardShown\":false", "대표자에게 문의하세요");
+        assertThat(text(result)).contains("\"cardShown\":false", "대표자에게 번호를 받아 주세요");
     }
 
     @Test
@@ -198,7 +238,8 @@ class AccessCodeTest extends McpToolTestSupport {
 
         // then
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(response.body()).contains("\"accessCode\":\"482913\"", "\"roomName\":\"1번 방\"");
+        assertThat(response.body()).contains("\"accessCode\":\"482913\"", "\"roomName\":\"1번 방\"",
+                "시작 10분 전부터 입력할 수 있어요");
         assertThat(response.headers().firstValue("Cache-Control")).hasValueSatisfying(v -> assertThat(v).contains("no-store"));
         core.verify(getRequestedFor(urlEqualTo("/api/reservations/me")).withHeader("X-User-Id", equalTo("1")));
     }
@@ -211,7 +252,7 @@ class AccessCodeTest extends McpToolTestSupport {
 
         // then
         assertThat(response.statusCode()).isEqualTo(403);
-        assertThat(response.body()).contains("NOT_RESERVATION_OWNER", "대표자에게 문의하세요");
+        assertThat(response.body()).contains("NOT_RESERVATION_OWNER", "대표자에게 번호를 받아 주세요");
     }
 
     @Test
