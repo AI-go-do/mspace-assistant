@@ -4,7 +4,8 @@
 #   docker build --build-arg MODULE=agent      -t mspace-assistant-agent .
 
 # ---------- 1단계: 빌드 (JDK + Maven Wrapper) ----------
-FROM eclipse-temurin:21-jdk AS build
+# 빌드 결과(jar·정적 파일)는 CPU와 상관없어서, 빌드는 러너 CPU에서 한 번만 한다 (arm64 이미지도 빠르게)
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 
 # 어떤 모듈의 jar를 만들지 (기본: mcp-server)

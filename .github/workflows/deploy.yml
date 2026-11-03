@@ -57,6 +57,9 @@ jobs:
             type=ref,event=branch     # develop 또는 main
             type=sha,prefix=sha-      # sha-ab12cd3 (되돌릴 때 이 태그로)
 
+      - name: QEMU 준비 (arm64 단계를 amd64 러너에서 돌리기 위해)
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
       - name: Buildx 준비
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
@@ -64,6 +67,8 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
+          # 서버(amd64)와 팀원 맥(애플 실리콘, arm64) 둘 다 받을 수 있게
+          platforms: linux/amd64,linux/arm64
           build-args: MODULE=${{ matrix.module }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
