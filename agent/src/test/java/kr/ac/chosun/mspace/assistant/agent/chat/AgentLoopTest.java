@@ -17,6 +17,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
@@ -293,5 +294,73 @@ class AgentLoopTest {
         loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕");
 
         assertThat(llm.lastSystem).contains("show_access_code", "번호를 지어내지 않는다");
+    }
+
+    @Test
+    @DisplayName("학생이 채팅에 적은 6자리 입실 번호도 외부 AI로 보내기 전에 가린다")
+    void masksAccessCode() {
+        // given
+        var llm = new ScriptedLlm().then(say("화면 카드에서 확인해 주세요"));
+
+        // when
+        loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "입실 번호 482913 맞아? 1번 방 14:00 예약");
+
+        // then
+        String sent = llm.seen.getFirst().toString();
+        assertThat(sent).doesNotContain("482913").contains("[입실 번호]", "1번 방 14:00");
+    }
+
+    @Test
+    @DisplayName("모델이 지어낸 도구 이름은 로그에 그대로 남기지 않는다 (학생 말이 섞일 수 있음)")
+    void logsOnlyKnownToolNames() {
+        // given
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+
+        // when
+        try (ToolGateway.Session session = tools.open(ME)) {
+            // then
+            assertThat(AgentLoop.loggable("find_available_rooms", session)).isEqualTo("find_available_rooms");
+            assertThat(AgentLoop.loggable("홍길동 학생 예약 취소", session)).isEqualTo("unknown");
+        }
+    }
+
+    @Test
+    @DisplayName("카드를 만든 뒤 모델 답이 실패해도 카드는 화면에 돌려준다")
+    void keepsCardsWhenLlmFailsAfterTool() {
+        // given: 도구 결과 뒤 모델이 시간 초과
+        LlmClient llm = new LlmClient() {
+            int n;
+
+            @Override
+            public LlmReply chat(String system, List<LlmMessage> conversation, List<ToolSpec> tools) {
+                if (n++ == 0) {
+                    return tool("show_access_code", Map.of());
+                }
+                throw new LlmException("LLM_UNAVAILABLE", "응답 없음");
+            }
+        };
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(
+                "{\"reservationId\":7,\"owner\":true,\"cardShown\":true,\"message\":\"카드로 보여 줬음\"}", false)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        // then
+        assertThat(result.accessCodeCards()).containsExactly(new ChatResult.AccessCodeCard(7));
+        assertThat(result.reply()).contains("카드는 그대로 쓸 수 있어요");
+    }
+
+    @Test
+    @DisplayName("카드가 없을 때 모델이 실패하면 오류를 그대로 올린다")
+    void rethrowsWhenNoCards() {
+        // given
+        LlmClient llm = (system, conversation, tools) -> {
+            throw new LlmException("LLM_UNAVAILABLE", "응답 없음");
+        };
+
+        // when, then
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕"))
+                .isInstanceOf(LlmException.class);
     }
 }

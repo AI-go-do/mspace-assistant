@@ -10,6 +10,7 @@ import java.util.Locale;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.AccessCodeCard;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.Confirmation;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
@@ -62,7 +63,17 @@ public class AgentLoop {
         try (ToolGateway.Session session = tools.open(headers)) {
             String system = systemPrompt();
             while (true) {
-                LlmReply reply = llm.chat(system, conversation, session.tools());
+                LlmReply reply;
+                try {
+                    reply = llm.chat(system, conversation, session.tools());
+                } catch (LlmException e) {
+                    if (confirmations.isEmpty() && accessCodeCards.isEmpty()) {
+                        throw e;
+                    }
+                    // 카드는 이미 만들어졌다(확인 토큰 발급, 대표자 확인). 모델 답만 실패했으니 카드는 화면에 준다
+                    log.warn("agent llm failed after cards code={}", e.code());
+                    return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false);
+                }
                 if (!reply.wantsTools()) {
                     return new ChatResult(reply.text(), confirmations, accessCodeCards, calls, false);
                 }
@@ -75,7 +86,7 @@ public class AgentLoop {
                     calls++;
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
-                    log.info("agent tool={} ok={} {}ms", call.name(), !outcome.isError(),
+                    log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
                     outcome.confirmation().ifPresent(confirmations::add);
                     outcome.accessCodeCard().filter(c -> !accessCodeCards.contains(c)).ifPresent(accessCodeCards::add);
@@ -84,6 +95,16 @@ public class AgentLoop {
             }
         }
     }
+
+    /**
+     * 모델이 지어낸 도구 이름에는 학생 말이 섞일 수 있어 로그에 그대로 남기지 않는다.
+     * 도구 목록에 있는 이름만 남기고 나머지는 "unknown"으로 쓴다.
+     */
+    public static String loggable(String name, ToolGateway.Session session) {
+        return session.tools().stream().anyMatch(t -> t.name().equals(name)) ? name : "unknown";
+    }
+
+    static final String CARDS_ONLY_REPLY = "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요.";
 
     String systemPrompt() {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));

@@ -127,7 +127,9 @@ public class GeminiLlmClient implements LlmClient {
                         }
                         parts.add(part);
                     }
-                    contents.add(content("model", parts));
+                    if (!parts.isEmpty()) { // 빈 글의 비서 차례는 보내지 않는다 (빈 parts는 Gemini가 거절할 수 있음)
+                        contents.add(content("model", parts));
+                    }
                 }
                 case LlmMessage.ToolResult r -> throw new IllegalStateException("위에서 처리함");
             }
@@ -189,6 +191,9 @@ public class GeminiLlmClient implements LlmClient {
             } else if (part.text() != null && !Boolean.TRUE.equals(part.thought())) {
                 text.append(part.text());
             }
+        }
+        if (text.isEmpty() && calls.isEmpty()) {
+            throw unavailable(); // 글도 도구 호출도 없으면 빈 말풍선 대신 '응답 없음'으로
         }
         return new LlmReply(text.toString(), calls);
     }
