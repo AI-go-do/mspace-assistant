@@ -59,10 +59,10 @@ class CoreReservationCommandClient implements ReservationCommandPort {
      * (다시 누르면 처리된 경우 409가 와서 실패처럼 보인다).
      */
     private StatusChange change(UserCredential credential, long reservationId, String verb, String doneStatus) {
-        StatusChange body;
+        CoreStatus body;
         try {
             body = core.call("POST /api/reservations/{id}/" + verb, credential,
-                    rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), StatusChange.class);
+                    rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), CoreStatus.class);
         } catch (CoreApiException e) {
             if (e.status() >= 500) {
                 throw new CoreApiException("STATUS_CHANGE_UNKNOWN",
@@ -70,11 +70,10 @@ class CoreReservationCommandClient implements ReservationCommandPort {
             }
             throw e;
         }
-        // 여기까지 왔으면 2xx(CoreHttp가 2xx 아닌 응답은 BAD_RESPONSE로 바꾼다). 본문이 비었거나 status가 없으면 처리된 상태로 채운다
-        if (body == null || body.status() == null) {
-            return new StatusChange(reservationId, doneStatus);
-        }
-        return body;
+        // 여기까지 왔으면 2xx(CoreHttp가 2xx 아닌 응답은 BAD_RESPONSE로 바꾼다). 본문이 비었거나 status가 없으면 처리된 상태로 채운다.
+        // id는 본문에서 읽지 않고 우리가 보낸 예약 id를 쓴다 (본문에 id가 빠져도 '모름'이나 0이 되지 않게)
+        String status = body == null || body.status() == null || body.status().isBlank() ? doneStatus : body.status();
+        return new StatusChange(reservationId, status);
     }
 
     /**
@@ -97,12 +96,19 @@ class CoreReservationCommandClient implements ReservationCommandPort {
                         .body(body),
                 CoreCreated.class);
         CoreCreated c = response.getBody();
-        if (c == null || c.id() <= 0 || c.accessCode() == null || c.accessCode().isBlank()) {
-            // 2xx인데 본문이 비었거나 id·입실 번호가 없음: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내
+        if (c == null || c.id() <= 0 || c.roomId() <= 0 || c.headcount() <= 0
+                || c.startAt() == null || c.endAt() == null || c.status() == null || c.status().isBlank()
+                || c.accessCode() == null || c.accessCode().isBlank()) {
+            // 2xx인데 본문이 비었거나 필수 값이 빠짐: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내.
+            // 빈 값으로 성공 카드를 보여 주면 토큰은 이미 쓰여 학생이 바로잡을 길이 없다
             throw unknown();
         }
         return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
                 c.status(), c.headcount(), c.accessCode(), response.getStatusCode().value() == 200);
+    }
+
+    /** core 상태 변경 응답에서 쓰는 값은 status뿐이다 */
+    record CoreStatus(String status) {
     }
 
     record CreateRequest(int roomId, OffsetDateTime startAt, OffsetDateTime endAt,
