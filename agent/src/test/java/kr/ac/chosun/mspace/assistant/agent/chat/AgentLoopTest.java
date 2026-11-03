@@ -252,4 +252,46 @@ class AgentLoopTest {
                 .satisfies(o -> assertThat(o.json()).isEqualTo(FREE));
         assertThat(ProposalParser.parse("x", "not json", false, JSON).json()).isEqualTo("not json");
     }
+
+    @Test
+    @DisplayName("시나리오 '입실 번호 알려 줘'(대표자): 화면 카드만 만들고 모델 입력에는 번호가 없다")
+    void ownerAccessCodeBecomesCard() {
+        var llm = new ScriptedLlm().then(tool("show_access_code", Map.of())).then(say("화면 카드에서 확인해 주세요"));
+        // 혹시 mcp-server가 번호를 실어 보내도 지워지는지까지 본다
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(
+                "{\"reservationId\":7,\"owner\":true,\"cardShown\":true,\"accessCode\":\"482913\",\"message\":\"카드로 보여 줬음\"}",
+                false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        assertThat(result.accessCodeCards()).containsExactly(new ChatResult.AccessCodeCard(7));
+        assertThat(result.confirmations()).isEmpty();
+        assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.ToolResult.class,
+                r -> assertThat(r.json()).contains("\"cardShown\":true").doesNotContain("482913", "accessCode"));
+    }
+
+    @Test
+    @DisplayName("시나리오 '입실 번호 알려 줘'(참여자): 카드 없이 대표자에게 문의하라는 안내만")
+    void participantAccessCodeHasNoCard() {
+        var llm = new ScriptedLlm().then(tool("show_access_code", Map.of("reservationId", 9)))
+                .then(say("대표자가 아니라 입실 번호를 알 수 없어요. 대표자에게 문의하세요."));
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(
+                "{\"reservationId\":9,\"owner\":false,\"cardShown\":false,\"message\":\"대표자에게 문의하세요.\"}",
+                false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 뭐야?");
+
+        assertThat(result.accessCodeCards()).isEmpty();
+        assertThat(result.reply()).contains("대표자에게 문의하세요");
+    }
+
+    @Test
+    @DisplayName("지시문에 입실 번호를 지어내지 말라는 규칙이 있다")
+    void systemPromptForbidsInventingAccessCode() {
+        var llm = new ScriptedLlm().then(say("네"));
+
+        loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕");
+
+        assertThat(llm.lastSystem).contains("show_access_code", "번호를 지어내지 않는다");
+    }
 }
