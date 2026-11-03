@@ -6,73 +6,23 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
-import io.modelcontextprotocol.client.McpClient;
-import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
-import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
-import java.net.http.HttpRequest;
-import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Map;
-import org.junit.jupiter.api.AfterEach;
+import kr.ac.chosun.mspace.assistant.mcp.McpToolTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * M1 목표: MCP 서버가 뜨고, 읽기 도구 하나가 가짜 코어(WireMock)를 불러 응답한다.
  * 진짜 MCP 클라이언트(공식 Java SDK)로 Streamable HTTP를 거쳐 부른다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class MyReservationsToolTest {
-
-    @RegisterExtension
-    static WireMockExtension core = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort())
-            .build();
-
-    @DynamicPropertySource
-    static void coreUrl(DynamicPropertyRegistry registry) {
-        registry.add("mspace.core.base-url", core::baseUrl);
-        registry.add("mspace.core.timeout", () -> "1s");
-    }
-
-    @LocalServerPort
-    int port;
-
-    McpSyncClient client;
-
-    @AfterEach
-    void close() {
-        if (client != null) {
-            client.closeGracefully();
-        }
-    }
-
-    private McpSyncClient connect(Map<String, String> headers) {
-        HttpRequest.Builder request = HttpRequest.newBuilder();
-        headers.forEach(request::header);
-        var transport = HttpClientStreamableHttpTransport.builder("http://localhost:" + port)
-                .requestBuilder(request)
-                .build();
-        client = McpClient.sync(transport).requestTimeout(Duration.ofSeconds(5)).build();
-        client.initialize();
-        return client;
-    }
-
-    private static String text(CallToolResult result) {
-        return ((TextContent) result.content().getFirst()).text();
-    }
+class MyReservationsToolTest extends McpToolTestSupport {
 
     private static final String TWO_RESERVATIONS = """
             [
@@ -181,5 +131,32 @@ class MyReservationsToolTest {
 
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("예약 서버에 연결하지 못했어요");
+    }
+
+    @Test
+    @DisplayName("끝난 지 7일이 넘은 예약은 빼고, 7일 안에 끝난 예약과 끝나지 않은 예약은 남긴다")
+    void dropsFinishedOlderThanSevenDays() {
+        // given: 지금 기준 상대 시각으로 만든다 (날짜가 바뀌어도 테스트가 깨지지 않게)
+        OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).withNano(0);
+        String json = """
+                [
+                  {"id": 20, "room": {"id": 1, "name": "1번 방"}, "startAt": "%s", "endAt": "%s",
+                   "status": "CHECKED_OUT", "owner": true, "accessCode": null, "participants": []},
+                  {"id": 21, "room": {"id": 1, "name": "1번 방"}, "startAt": "%s", "endAt": "%s",
+                   "status": "CHECKED_OUT", "owner": true, "accessCode": null, "participants": []},
+                  {"id": 22, "room": {"id": 2, "name": "2번 방"}, "startAt": "%s", "endAt": "%s",
+                   "status": "BOOKED", "owner": true, "accessCode": null, "participants": []}
+                ]""".formatted(
+                now.minusDays(10).minusHours(1), now.minusDays(10),
+                now.minusDays(3).minusHours(1), now.minusDays(3),
+                now.minusDays(10).minusHours(1), now.minusDays(10));
+        core.stubFor(get("/api/reservations/me").willReturn(okJson(json)));
+
+        // when
+        String body = text(connect(Map.of("X-User-Id", "1"))
+                .callTool(new CallToolRequest("my_reservations", Map.of())));
+
+        // then
+        assertThat(body).doesNotContain("\"id\":20").contains("\"id\":21", "\"id\":22");
     }
 }
