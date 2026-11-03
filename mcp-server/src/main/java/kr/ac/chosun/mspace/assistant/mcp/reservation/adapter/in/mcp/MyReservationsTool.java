@@ -5,6 +5,7 @@ import java.util.List;
 import kr.ac.chosun.mspace.assistant.mcp.common.Credentials;
 import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.MyReservation;
+import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationStatus;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationQueryPort;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
@@ -42,7 +43,7 @@ class MyReservationsTool {
     /** 끝나지 않은 예약(BOOKED·IN_USE·알 수 없음)은 항상 남긴다. 끝난 예약은 끝 시각이 기준 이후일 때만 */
     static boolean keepForModel(MyReservation r, OffsetDateTime cutoff) {
         return switch (r.status()) {
-            case "CHECKED_OUT", "AUTO_CHECKED_OUT", "CANCELED", "NO_SHOW" ->
+            case CHECKED_OUT, AUTO_CHECKED_OUT, CANCELED, NO_SHOW ->
                     r.endAt() != null && r.endAt().isAfter(cutoff);
             default -> true;
         };
