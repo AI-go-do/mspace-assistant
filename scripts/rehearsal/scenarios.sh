@@ -27,7 +27,7 @@ echo '| 시나리오 | 판정 | 실제 |'; echo '|---|---|---|'
 tools_called() { tail -n 1 "$SENT_LOG" | python3 -c "import json,sys;d=json.loads(sys.stdin.read() or '{}');print(','.join(c['function']['name'] for m in d.get('messages',[]) for c in m.get('tool_calls',[])))"; }
 r=$(chat "$OWNER" "내일 오후 2시 빈방 있어?"); n=$(echo "$r" | j 'd.get("toolCalls")'); called=$(tools_called)
 [ "$n" = 1 ] && [ "$called" = find_available_rooms ] && row "내일 오후 2시 빈방" ok "$called 1번" || row "내일 오후 2시 빈방" no "도구 ${called:-없음}, $r"
-r=$(chat "$OWNER" "수업 끝나고 2시간 잡아 줘"); [ "$(echo "$r" | j 'd.get("toolCalls")')" = 0 ] \
+r=$(chat "$OWNER" "수업 끝나고 2시간 잡아 줘"); [ "$(echo "$r" | j 'd.get("toolCalls")')" = 0 ] && echo "$r" | grep -qF '끝나는 시각' \
   && row "수업 끝나고 2시간" ok "끝나는 시각을 되물음" || row "수업 끝나고 2시간" no "$r"
 r=$(chat "$OWNER" "내일 2시부터 2시간 2번 방 3명으로 예약해 줘"); tok=$(echo "$r" | j 'd["confirmations"][0]["token"] if d.get("confirmations") else ""')
 [ -n "$tok" ] && row "예약 제안 → 확인 카드" ok "$(echo "$r" | j 'd["confirmations"][0]["summary"]')" || row "예약 제안 → 확인 카드" no "$r"
@@ -52,7 +52,15 @@ r=$(chat "$OWNER" "무한 반복해"); [ "$(echo "$r" | j 'd.get("stoppedByLimit
 # 이번 실행에서 실제로 받은 값(학번·확인 토큰 2개·입실 번호)과 필드 이름(accessCode, "c_ 토큰 앞머리)을 글자 그대로(-F), 문자열 어디에 있든 찾는다. 다른 숫자에 우연히 걸리면 실패 쪽으로 틀리므로 안전하다.
 # grep 종료 코드: 0 찾음, 1 없음, 2 이상 읽기 오류. 읽기 오류·요청 0건·값을 못 받은 경우는 통과로 치지 않는다.
 gs=0; leaks=$(grep -cF -e "$P1" -e "$P2" -e "${tok1:-x}" -e "${tok2:-x}" -e "${code:-x}" -e "X-User-Id" -e "accessCode" -e "\"c_" "$SENT_LOG") || gs=$?
-reqs=$(wc -l < "$SENT_LOG" 2>/dev/null) || reqs=0
+# 줄 수가 아니라, user 메시지가 든 정상 요청만 센다. 한 줄이라도 깨졌으면 0으로 보고 실패시킨다.
+reqs=$(python3 -c '
+import json,sys
+n=0
+for line in open(sys.argv[1],encoding="utf-8"):
+    m=json.loads(line).get("messages")
+    if not isinstance(m,list) or not any(isinstance(x,dict) and x.get("role")=="user" for x in m): sys.exit(1)
+    n+=1
+print(n)' "$SENT_LOG" 2>/dev/null) || reqs=0
 if [ "$gs" -gt 1 ] || [ "${reqs:-0}" -eq 0 ]; then row "외부 AI로 나간 내용" no "로그를 읽지 못했거나 요청이 기록되지 않음"
 elif [ -z "${tok1:-}" ] || [ -z "${tok2:-}" ] || [ -z "${code:-}" ]; then row "외부 AI로 나간 내용" no "확인 토큰·입실 번호를 받지 못해 검사할 값이 없음"
 elif [ "${leaks:-0}" = 0 ]; then row "외부 AI로 나간 내용" ok "학번 2개·확인 토큰 2개·입실 번호 실제 값 0건 (${reqs}번 요청)"
