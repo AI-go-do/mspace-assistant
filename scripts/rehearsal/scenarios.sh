@@ -32,6 +32,7 @@ r=$(chat "$OWNER" "내일 2시부터 2시간 2번 방 3명으로 예약해 줘")
 r=$(confirm "$OTHER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_NOT_FOUND ] \
   && row "남이 확인 토큰 사용" ok "CONFIRMATION_NOT_FOUND" || row "남이 확인 토큰 사용" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); rid=$(echo "$r" | j 'd.get("reservationId","")')
+tok1=$tok; code=$(curl -s "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OWNER" | j 'd.get("accessCode") or ""' 2>/dev/null)
 [ "$(echo "$r" | j 'd.get("status")')" = BOOKED ] && row "본인이 [확인]" ok "예약 $rid BOOKED" || row "본인이 [확인]" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_USED ] \
   && row "같은 토큰 다시" ok "CONFIRMATION_USED" || row "같은 토큰 다시" no "$r"
@@ -40,14 +41,16 @@ r=$(chat "$OWNER" "내 입실 번호 알려 줘"); [ "$(echo "$r" | j 'len(d.get
 r=$(curl -s "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OTHER"); [ "$(echo "$r" | j 'd.get("code")')" = NOT_RESERVATION_OWNER ] \
   && row "입실 번호(참여자, 화면 API)" ok "NOT_RESERVATION_OWNER" || row "입실 번호(참여자, 화면 API)" no "$r"
 r=$(chat "$OWNER" "내 예약 취소해 줘"); tok=$(echo "$r" | j 'd["confirmations"][0]["token"] if d.get("confirmations") else ""')
-r=$(confirm "$OWNER" "$tok" '{}'); [ "$(echo "$r" | j 'd.get("status")')" = CANCELED ] \
+tok2=$tok; r=$(confirm "$OWNER" "$tok" '{}'); [ "$(echo "$r" | j 'd.get("status")')" = CANCELED ] \
   && row "내 예약 취소해 줘 → [확인]" ok "CANCELED" || row "내 예약 취소해 줘 → [확인]" no "$r"
 r=$(chat "$OWNER" "무한 반복해"); [ "$(echo "$r" | j 'd.get("stoppedByLimit")')" = True ] \
   && row "도구 호출 최대 횟수" ok "$(echo "$r" | j 'd.get("toolCalls")')번에서 멈춤" || row "도구 호출 최대 횟수" no "$r"
-# grep 종료 코드: 0 찾음, 1 없음, 2 이상 읽기 오류. 읽기 오류나 요청 0건은 통과로 치지 않는다.
-gs=0; leaks=$(grep -cE "$P1|$P2|\"c_|accessCode|X-User-Id" "$SENT_LOG") || gs=$?
+# 이번 실행에서 실제로 받은 값(학번·확인 토큰 2개·입실 번호)을 글자 그대로(-F), 낱말 단위(-w)로 찾는다.
+# grep 종료 코드: 0 찾음, 1 없음, 2 이상 읽기 오류. 읽기 오류·요청 0건·값을 못 받은 경우는 통과로 치지 않는다.
+gs=0; leaks=$(grep -cwF -e "$P1" -e "$P2" -e "${tok1:-x}" -e "${tok2:-x}" -e "${code:-x}" -e "X-User-Id" "$SENT_LOG") || gs=$?
 reqs=$(wc -l < "$SENT_LOG" 2>/dev/null) || reqs=0
 if [ "$gs" -gt 1 ] || [ "${reqs:-0}" -eq 0 ]; then row "외부 AI로 나간 내용" no "로그를 읽지 못했거나 요청이 기록되지 않음"
-elif [ "${leaks:-0}" = 0 ]; then row "외부 AI로 나간 내용" ok "학번·확인 토큰·accessCode 0건 (${reqs}번 요청)"
+elif [ -z "${tok1:-}" ] || [ -z "${tok2:-}" ] || [ -z "${code:-}" ]; then row "외부 AI로 나간 내용" no "확인 토큰·입실 번호를 받지 못해 검사할 값이 없음"
+elif [ "${leaks:-0}" = 0 ]; then row "외부 AI로 나간 내용" ok "학번 2개·확인 토큰 2개·입실 번호 실제 값 0건 (${reqs}번 요청)"
 else row "외부 AI로 나간 내용" no "$leaks줄에서 발견"; fi
 echo; echo "통과 $pass, 실패 $fail"; [ "$fail" = 0 ]
