@@ -11,6 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 import kr.ac.chosun.mspace.assistant.mcp.McpToolTestSupport;
 import org.junit.jupiter.api.DisplayName;
@@ -129,5 +131,32 @@ class MyReservationsToolTest extends McpToolTestSupport {
 
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("예약 서버에 연결하지 못했어요");
+    }
+
+    @Test
+    @DisplayName("끝난 지 7일이 넘은 예약은 빼고, 7일 안에 끝난 예약과 끝나지 않은 예약은 남긴다")
+    void dropsFinishedOlderThanSevenDays() {
+        // given: 지금 기준 상대 시각으로 만든다 (날짜가 바뀌어도 테스트가 깨지지 않게)
+        OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).withNano(0);
+        String json = """
+                [
+                  {"id": 20, "room": {"id": 1, "name": "1번 방"}, "startAt": "%s", "endAt": "%s",
+                   "status": "CHECKED_OUT", "owner": true, "accessCode": null, "participants": []},
+                  {"id": 21, "room": {"id": 1, "name": "1번 방"}, "startAt": "%s", "endAt": "%s",
+                   "status": "CHECKED_OUT", "owner": true, "accessCode": null, "participants": []},
+                  {"id": 22, "room": {"id": 2, "name": "2번 방"}, "startAt": "%s", "endAt": "%s",
+                   "status": "BOOKED", "owner": true, "accessCode": null, "participants": []}
+                ]""".formatted(
+                now.minusDays(10).minusHours(1), now.minusDays(10),
+                now.minusDays(3).minusHours(1), now.minusDays(3),
+                now.minusDays(10).minusHours(1), now.minusDays(10));
+        core.stubFor(get("/api/reservations/me").willReturn(okJson(json)));
+
+        // when
+        String body = text(connect(Map.of("X-User-Id", "1"))
+                .callTool(new CallToolRequest("my_reservations", Map.of())));
+
+        // then
+        assertThat(body).doesNotContain("\"id\":20").contains("\"id\":21", "\"id\":22");
     }
 }
