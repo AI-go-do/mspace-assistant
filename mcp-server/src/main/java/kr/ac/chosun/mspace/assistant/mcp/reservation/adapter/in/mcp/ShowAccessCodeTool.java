@@ -27,8 +27,9 @@ class ShowAccessCodeTool {
                     이 도구는 번호를 돌려주지 않는다. 번호는 학생 화면 카드에만 나온다. 번호를 추측하거나 지어내지 않는다.
                     결과의 message를 그대로 안내한다. cardShown이 true면 "화면 카드에서 확인해 주세요"라고 말한다.
                     대표자가 아니면 번호를 볼 수 없다는 message가 온다.
-                    reservationId는 생략할 수 있다. 생략했을 때 끝나지 않은 예약이 1건이면 그 예약으로 답하고,
-                    여러 건이면 choices(방·시간 목록)가 온다. 그때는 목록을 보여 주고 어느 예약인지 학생에게 물은 뒤
+                    reservationId는 생략할 수 있다. 생략하면 끝나지 않은 대표자 예약으로 바로 답한다(번호는 대표자만 받고
+                    대표자 예약은 동시에 1건). 참여자 예약만 있으면 대표자에게 번호를 받으라는 message가 온다.
+                    드물게 choices(방·시간 목록)가 오면 목록을 보여 주고 어느 예약인지 학생에게 물은 뒤
                     고른 reservationId를 넣어 다시 부른다. 마음대로 하나를 고르지 않는다.""",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     Answer showAccessCode(McpSyncRequestContext context,
