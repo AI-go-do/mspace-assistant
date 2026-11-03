@@ -252,4 +252,32 @@ class AgentLoopTest {
                 .satisfies(o -> assertThat(o.json()).isEqualTo(FREE));
         assertThat(ProposalParser.parse("x", "not json", false, JSON).json()).isEqualTo("not json");
     }
+
+    @Test
+    @DisplayName("학생이 채팅에 적은 6자리 입실 번호도 외부 AI로 보내기 전에 가린다")
+    void masksAccessCode() {
+        // given
+        var llm = new ScriptedLlm().then(say("화면 카드에서 확인해 주세요"));
+
+        // when
+        loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "입실 번호 482913 맞아? 1번 방 14:00 예약");
+
+        // then
+        String sent = llm.seen.getFirst().toString();
+        assertThat(sent).doesNotContain("482913").contains("[입실 번호]", "1번 방 14:00");
+    }
+
+    @Test
+    @DisplayName("모델이 지어낸 도구 이름은 로그에 그대로 남기지 않는다 (학생 말이 섞일 수 있음)")
+    void logsOnlyKnownToolNames() {
+        // given
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+
+        // when
+        try (ToolGateway.Session session = tools.open(ME)) {
+            // then
+            assertThat(AgentLoop.loggable("find_available_rooms", session)).isEqualTo("find_available_rooms");
+            assertThat(AgentLoop.loggable("홍길동 학생 예약 취소", session)).isEqualTo("unknown");
+        }
+    }
 }
