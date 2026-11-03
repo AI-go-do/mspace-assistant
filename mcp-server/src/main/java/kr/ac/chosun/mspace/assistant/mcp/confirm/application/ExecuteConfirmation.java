@@ -5,6 +5,7 @@ import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort.CreatedReservation;
+import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort.StatusChange;
 import org.springframework.stereotype.Service;
 
 /**
@@ -32,8 +33,9 @@ public class ExecuteConfirmation {
         PendingAction action = store.take(token, credential);
         return switch (action) {
             case PendingAction.Create c -> create(token, credential, c, participants);
-            case PendingAction.Cancel x -> throw notYet();
-            case PendingAction.Checkout x -> throw notYet();
+            case PendingAction.Cancel x -> changed("CANCEL", reservations.cancel(credential, x.reservationId()), "취소했어요.");
+            case PendingAction.Checkout x -> changed("CHECKOUT", reservations.checkout(credential, x.reservationId()),
+                    "퇴실했어요. 방이 바로 비었어요.");
         };
     }
 
@@ -52,8 +54,8 @@ public class ExecuteConfirmation {
                 "예약했어요.");
     }
 
-    private static CoreApiException notYet() {
-        return new CoreApiException("NOT_SUPPORTED", "아직 지원하지 않는 작업이에요.", 501);
+    private static Executed changed(String action, StatusChange change, String message) {
+        return new Executed(action, change.id(), change.status(), null, false, message);
     }
 
     /**
