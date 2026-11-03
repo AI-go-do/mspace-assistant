@@ -30,10 +30,12 @@ class CoreReservationClient implements ReservationQueryPort {
         return body == null ? List.of() : List.of(body).stream().map(CoreReservation::toMine).toList();
     }
 
-    /** 코어 응답 한 건. 모르는 필드는 무시한다. accessCode·참여자 이름은 여기서 버린다 */
+    /**
+     * 코어 응답 한 건. 여기 적힌 필드만 읽는다. accessCode(입실 번호)와 참여자 이름은 아예 읽지 않는다.
+     * 대표자 전용 값이라 비서 쪽에서는 쓸 일이 없다 (입실 번호는 화면 카드로만 보여 준다, 설계 3장).
+     */
     record CoreReservation(long id, CoreRoom room, OffsetDateTime startAt, OffsetDateTime endAt,
-                           String status, boolean owner, List<CoreParticipant> participants,
-                           String accessCode) {
+                           String status, boolean owner, List<CoreParticipant> participants) {
 
         MyReservation toMine() {
             int count = participants == null ? 0 : participants.size();
@@ -45,6 +47,7 @@ class CoreReservationClient implements ReservationQueryPort {
     record CoreRoom(int id, String name) {
     }
 
-    record CoreParticipant(String name, boolean owner) {
+    /** 참여자 수만 센다. 이름은 읽지 않는다 */
+    record CoreParticipant(boolean owner) {
     }
 }
