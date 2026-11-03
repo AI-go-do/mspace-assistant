@@ -89,7 +89,7 @@ import json,sys
 n=0
 for line in open(sys.argv[1],encoding="utf-8"):
     m=json.loads(line).get("messages")
-    if not isinstance(m,list) or not any(isinstance(x,dict) and x.get("role")=="user" for x in m): sys.exit(1)
+    if not isinstance(m,list) or not any(isinstance(x,dict) and x.get("role")=="user" and isinstance(x.get("content"),str) for x in m): sys.exit(1)
     n+=1
 print(n)' "$SENT_LOG" 2>/dev/null) || reqs=0
 if [ "$gs" -gt 1 ] || [ "${reqs:-0}" -eq 0 ]; then row "외부 AI로 나간 내용" no "로그를 읽지 못했거나 요청이 기록되지 않음"
