@@ -6,12 +6,12 @@
 표준 라이브러리만 쓴다. 실행: python3 -I fake_ollama.py [포트=18111]
 """
 import json, os, sys, datetime
-from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, HTTPServer
 LOG = os.environ.get("SENT_LOG", "sent.jsonl")
 def call(name, args): return {"message": {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": name, "arguments": args}}]}, "done": True}
 def say(t): return {"message": {"role": "assistant", "content": t}, "done": True}
-SEOUL = ZoneInfo("Asia/Seoul")
+# 서울은 서머타임이 없어 고정 +09:00과 같다. zoneinfo는 Windows 기본 python에 시간대 데이터가 없을 수 있어 쓰지 않는다
+SEOUL = datetime.timezone(datetime.timedelta(hours=9), "Asia/Seoul")
 def tomorrow():
     # core는 서울 날짜로 계산한다. 요청마다 서울 기준으로 계산해 자정을 넘기거나 UTC 기기에서도 하루 어긋나지 않게 한다
     return (datetime.datetime.now(SEOUL).date() + datetime.timedelta(days=1)).isoformat()

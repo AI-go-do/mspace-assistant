@@ -20,10 +20,10 @@ API 키·GPU 없이 **채팅 → agent → MCP 서버 → core** 전체 길을 �
 | 무엇 | 조건 |
 |---|---|
 | Java 21, Maven | 두 모듈 빌드 |
-| python3 (3.9 이상, 표준 라이브러리만) | 가짜 모델·결과 판정 (`zoneinfo`를 써요) |
+| python3 (3.9 이상, 표준 라이브러리만) | 가짜 모델·결과 판정. 서울 시각은 고정 `+09:00`이라 Windows에서도 시간대 데이터가 필요 없어요 |
 | core | `MSPACE_DEV_HEADER=true`로 띄워 임시 로그인 헤더 `X-User-Id`를 켜요. 테스트 계정·가짜 데이터만 |
-| mcp-server, agent | `SPRING_PROFILES_ACTIVE=local`. 기본 설정은 `X-User-Id`를 넘기지 않아요 (서버 배포용) |
-| `OWNER` | 테스트 계정. 끝나지 않은 예약이 있어도 스크립트가 시작·끝에 core에서 직접 정리해요(취소·퇴실) |
+| mcp-server, agent | agent에 `/api/agent/chat`·`/api/agent/confirmations/{id}`가 있어야 해요. PR #33·#34·#41이 `develop`에 합쳐진 뒤의 checkout으로 빌드하세요(이 브랜치만으로는 agent가 M1 뼈대예요). `SPRING_PROFILES_ACTIVE=local`. 기본 설정은 `X-User-Id`를 넘기지 않아요 (서버 배포용) |
+| `OWNER` | 테스트 계정. 끝나지 않은 예약이 있어도 스크립트가 시작·끝에 core에서 직접 정리해요(취소·퇴실). 정리에 실패하면 시작 때는 멈추고, 끝날 때는 실패로 끝나요 |
 | `OTHER`, `P1` | `P1`은 `OTHER` 계정의 학번이어야 해요. 그래야 "입실 번호(참여자)"에서 OTHER가 그 예약의 참여자가 돼요 |
 | `P2` | 다른 테스트 학번 |
 

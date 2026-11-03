@@ -14,17 +14,30 @@ row() { if [ "$2" = ok ]; then pass=$((pass+1)); printf '| %s | 통과 | %s |\n'
   local shown=$3; [ -n "$code" ] && shown=${shown//$code/[입실 번호]}; printf '| %s | **실패** | %s |\n' "$1" "$shown"; fi; }
 # OWNER의 끝나지 않은 예약(BOOKED는 취소, IN_USE는 퇴실)을 정리한다. 앞 실행이 중간에 멈춰 남긴 예약 때문에
 # 대표자 동시 1건 규칙(OWNER_HAS_ACTIVE_RESERVATION)에 걸리지 않게 한다
+# 조회·취소·퇴실 중 하나라도 실패하면 1을 돌려준다. 시작 정리에 실패하면 시나리오를 돌리지 않고, 끝 정리에 실패하면 실패로 끝낸다
 cleanup() {
-  curl -s --max-time 5 "$CORE/api/reservations/me" -H "X-User-Id: $OWNER" | python3 -c '
+  local out status ids id verb rc=0
+  out=$(curl -s --max-time 5 -w '\n%{http_code}' "$CORE/api/reservations/me" -H "X-User-Id: $OWNER") \
+    || { echo "예약 정리: core에 연결하지 못했어요 ($CORE)" >&2; return 1; }
+  status=${out##*$'\n'}
+  [ "$status" = 200 ] || { echo "예약 정리: 내 예약 조회가 $status 로 실패했어요" >&2; return 1; }
+  ids=$(printf '%s' "${out%$'\n'*}" | python3 -c '
 import json,sys
-try: rs=json.load(sys.stdin)
-except Exception: rs=[]
-rs=rs.get("reservations",rs) if isinstance(rs,dict) else rs
-for r in rs if isinstance(rs,list) else []:
-    if r.get("owner") and r.get("status") in ("BOOKED","IN_USE"): print(r["id"], "cancel" if r["status"]=="BOOKED" else "checkout")' 2>/dev/null |
-  while read -r id verb; do curl -s -o /dev/null --max-time 5 -X POST "$CORE/api/reservations/$id/$verb" -H "X-User-Id: $OWNER"; done
+rs=json.load(sys.stdin)
+rs=rs.get("reservations") if isinstance(rs,dict) else rs
+if not isinstance(rs,list): sys.exit(1)
+for r in rs:
+    if r.get("owner") and r.get("status") in ("BOOKED","IN_USE"): print(r["id"], "cancel" if r["status"]=="BOOKED" else "checkout")') \
+    || { echo "예약 정리: 내 예약 응답을 읽지 못했어요" >&2; return 1; }
+  while read -r id verb; do
+    [ -n "$id" ] || continue
+    status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -X POST "$CORE/api/reservations/$id/$verb" -H "X-User-Id: $OWNER")
+    case $status in 2??) ;; *) echo "예약 정리: 예약 $id $verb 이 ${status:-연결 실패} 로 실패했어요" >&2; rc=1 ;; esac
+  done <<< "$ids"
+  return $rc
 }
-trap cleanup EXIT
+on_exit() { local st=$?; cleanup || { echo "끝 정리 실패: OWNER 예약이 남았을 수 있어요" >&2; [ "$st" = 0 ] && st=1; }; exit "$st"; }
+trap on_exit EXIT
 chat() { curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
   -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1],"history":[]}))' "$2")"; }
 confirm() { curl -s -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
@@ -36,7 +49,7 @@ for svc in "$MCP" "$AGENT"; do
   for _ in $(seq 1 60); do curl -sf --max-time 2 "$svc/actuator/health" >/dev/null && break; sleep 1; done
   curl -sf --max-time 2 "$svc/actuator/health" >/dev/null || { echo "준비되지 않았어요: $svc" >&2; exit 1; }
 done
-cleanup
+cleanup || { echo "시작 정리에 실패해 시나리오를 돌리지 않아요" >&2; trap - EXIT; exit 1; }
 # 이번 실행에서 외부 AI로 나간 요청만 검사하도록 로그를 비운다.
 : > "$SENT_LOG" || { echo "SENT_LOG를 비울 수 없어요: $SENT_LOG" >&2; exit 1; }
 
