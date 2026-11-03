@@ -45,9 +45,9 @@ tok2=$tok; r=$(confirm "$OWNER" "$tok" '{}'); [ "$(echo "$r" | j 'd.get("status"
   && row "내 예약 취소해 줘 → [확인]" ok "CANCELED" || row "내 예약 취소해 줘 → [확인]" no "$r"
 r=$(chat "$OWNER" "무한 반복해"); [ "$(echo "$r" | j 'd.get("stoppedByLimit")')" = True ] \
   && row "도구 호출 최대 횟수" ok "$(echo "$r" | j 'd.get("toolCalls")')번에서 멈춤" || row "도구 호출 최대 횟수" no "$r"
-# 이번 실행에서 실제로 받은 값(학번·확인 토큰 2개·입실 번호)을 글자 그대로(-F), 문자열 어디에 있든 찾는다. 다른 숫자에 우연히 걸리면 실패 쪽으로 틀리므로 안전하다.
+# 이번 실행에서 실제로 받은 값(학번·확인 토큰 2개·입실 번호)과 필드 이름(accessCode, "c_ 토큰 앞머리)을 글자 그대로(-F), 문자열 어디에 있든 찾는다. 다른 숫자에 우연히 걸리면 실패 쪽으로 틀리므로 안전하다.
 # grep 종료 코드: 0 찾음, 1 없음, 2 이상 읽기 오류. 읽기 오류·요청 0건·값을 못 받은 경우는 통과로 치지 않는다.
-gs=0; leaks=$(grep -cF -e "$P1" -e "$P2" -e "${tok1:-x}" -e "${tok2:-x}" -e "${code:-x}" -e "X-User-Id" "$SENT_LOG") || gs=$?
+gs=0; leaks=$(grep -cF -e "$P1" -e "$P2" -e "${tok1:-x}" -e "${tok2:-x}" -e "${code:-x}" -e "X-User-Id" -e "accessCode" -e "\"c_" "$SENT_LOG") || gs=$?
 reqs=$(wc -l < "$SENT_LOG" 2>/dev/null) || reqs=0
 if [ "$gs" -gt 1 ] || [ "${reqs:-0}" -eq 0 ]; then row "외부 AI로 나간 내용" no "로그를 읽지 못했거나 요청이 기록되지 않음"
 elif [ -z "${tok1:-}" ] || [ -z "${tok2:-}" ] || [ -z "${code:-}" ]; then row "외부 AI로 나간 내용" no "확인 토큰·입실 번호를 받지 못해 검사할 값이 없음"
