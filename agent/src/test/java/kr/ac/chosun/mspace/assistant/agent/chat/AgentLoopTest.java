@@ -465,6 +465,24 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("오류 결과에 확인 토큰이 실려 와도 모델에 넘기지 않고 카드도 만들지 않는다")
+    void dropsConfirmTokenFromErrorResults() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(tool("create_reservation", Map.of("roomId", 2)))
+                .then(say("다시 해 볼게요"));
+        var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(
+                "{\"code\":\"RESERVATION_TIME_TAKEN\",\"confirmToken\":\"c_leak\"}", true)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then
+        assertThat(result.confirmations()).isEmpty();
+        assertThat(llm.seen.get(1).toString()).doesNotContain("c_leak").contains("RESERVATION_TIME_TAKEN");
+    }
+
+    @Test
     @DisplayName("모델이 지어낸 도구 이름은 로그에 그대로 남기지 않는다 (학생 말이 섞일 수 있음)")
     void logsOnlyKnownToolNames() {
         // given

@@ -46,7 +46,8 @@ public final class ProposalParser {
         boolean changed = stripAccessCodes(body);
         // 확인 토큰은 가리기 전에 떼어 둔다. 난수 토큰에 숫자 6개가 이어지면 "[입실 번호]"로 바뀌어 확인이 실패한다.
         // 토큰은 모델에 넘기지 않으니(카드로만 감) 가릴 필요도 없다
-        Object token = isError ? null : body.remove("confirmToken");
+        // 오류 결과에 실려 와도 모델로 보내지 않는다. 카드는 정상 결과에서만 만든다
+        Object token = body.remove("confirmToken");
         changed |= token != null;
         changed |= maskStrings(body);
         if (isError) {
