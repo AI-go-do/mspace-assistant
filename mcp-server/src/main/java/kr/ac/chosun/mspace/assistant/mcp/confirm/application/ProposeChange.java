@@ -71,9 +71,14 @@ public class ProposeChange {
     }
 
     private MyReservation mine(UserCredential credential, long reservationId) {
-        return reservations.findMine(credential).stream().filter(r -> r.id() == reservationId).findFirst()
+        MyReservation r = reservations.findMine(credential).stream().filter(m -> m.id() == reservationId).findFirst()
                 .orElseThrow(() -> new CoreApiException("RESERVATION_NOT_FOUND",
                         "찾을 수 없는 예약이에요. 내 예약에서 다시 골라 주세요.", 404));
+        // 시각·방 이름이 빠진 응답으로 확인안을 만들면 시작 시각 검사를 건너뛰거나 "null …" 문장이 나간다.
+        if (r.startAt() == null || r.endAt() == null || r.roomName() == null) {
+            throw new CoreApiException("CORE_ERROR", "예약 정보를 읽지 못했어요. 내 예약에서 확인해 주세요.", 502);
+        }
+        return r;
     }
 
     private static void requireOwner(MyReservation r, String verb) {

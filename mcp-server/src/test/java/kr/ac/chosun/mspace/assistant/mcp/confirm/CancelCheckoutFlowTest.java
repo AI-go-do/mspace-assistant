@@ -199,6 +199,25 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("core /me에 시각·방 이름이 빠진 예약은 확인안을 만들지 않고 오류로 안내한다")
+    void incompleteReservationIsRejected() {
+        // given: 시작 시각과 방이 빠진 예약
+        core.stubFor(get("/api/reservations/me").willReturn(okJson("""
+                [{"id": 11, "room": null, "startAt": null, "endAt": "2099-11-03T16:00:00+09:00",
+                  "status": "BOOKED", "owner": true, "accessCode": "333333", "participants": []}]""")));
+
+        // when
+        CallToolResult cancel = call(ME, "cancel_reservation", Map.of("reservationId", 11));
+        CallToolResult checkout = call(ME, "checkout_reservation", Map.of("reservationId", 11));
+
+        // then: 확인 토큰 없이 오류
+        assertThat(cancel.isError()).isTrue();
+        assertThat(text(cancel)).contains("예약 정보를 읽지 못했어요").doesNotContain("confirmToken");
+        assertThat(checkout.isError()).isTrue();
+        assertThat(text(checkout)).contains("예약 정보를 읽지 못했어요").doesNotContain("confirmToken");
+    }
+
+    @Test
     @DisplayName("사용 중인 예약은 취소 대신 퇴실을 안내한다")
     void inUseCannotCancel() {
         CallToolResult result = call(ME, "cancel_reservation", Map.of("reservationId", 8));
