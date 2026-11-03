@@ -27,8 +27,14 @@ mspace:
       - Authorization
       - X-User-Id
     timeout: 3s
+  # 쓰기 도구 확인 토큰. 짧게 두어 오래된 확인안이 실행되지 않게 한다
+  confirm:
+    ttl: 2m
 
 logging:
   level:
     # MCP 요청 본문(사용자 말이 들어 있을 수 있음)을 로그에 남기지 않게 SDK 로그는 경고 이상만
     io.modelcontextprotocol: WARN
+    # 확인 API 본문(참여자 학번)·core 응답(입실 번호)이 DEBUG 로그에 찍히지 않게 고정 (CLAUDE.md 4장)
+    org.springframework.web: INFO
+    org.springframework.http: INFO

@@ -6,11 +6,13 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -20,6 +22,12 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class CoreHttp {
 
+    /** 코어에 닿지 못함(꺼짐·타임아웃). 쓰기 요청이면 처리됐는지 모른다는 뜻이다 */
+    public static final String UNAVAILABLE = "CORE_UNAVAILABLE";
+
+    /** 응답은 왔지만 읽지 못함. 쓰기 요청이면 처리됐을 수 있다 */
+    public static final String BAD_RESPONSE = "CORE_BAD_RESPONSE";
+
     private static final Logger log = LoggerFactory.getLogger(CoreHttp.class);
 
     private final RestClient rest;
@@ -28,7 +36,7 @@ public class CoreHttp {
     CoreHttp(CoreProperties props, JsonMapper json) {
         var factory = new JdkClientHttpRequestFactory(
                 // HTTP/1.1 고정: 기본 HTTP/2는 http:// 주소에 h2c 업그레이드를 같이 요청하는데, 본문 있는 POST에서
-                // 가짜 core(WireMock)가 RST_STREAM으로 끊는 일이 났다 (모델 어댑터 TS-04와 같은 원인). core는 nginx 뒤 HTTP/1.1이라 영향 없음(확인 필요)
+                // 가짜 core(WireMock)가 RST_STREAM으로 끊는 일이 났다 (모델 어댑터 TS-05와 같은 원인). core는 nginx 뒤 HTTP/1.1이라 영향 없음(확인 필요)
                 HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(props.timeout()).build());
         factory.setReadTimeout(props.timeout());
         // Boot 4는 RestClient.Builder 자동 설정이 별도 모듈(spring-boot-restclient)이라 직접 만든다
@@ -43,22 +51,38 @@ public class CoreHttp {
      */
     public <T> T call(String label, UserCredential credential,
                       Function<RestClient, RestClient.RequestHeadersSpec<?>> request, Class<T> type) {
+        return callEntity(label, credential, request, type).getBody();
+    }
+
+    /** call과 같고, 상태 코드도 필요할 때 (예약 생성: 201 새로 만듦 / 200 같은 멱등 키 재전송) */
+    public <T> ResponseEntity<T> callEntity(String label, UserCredential credential,
+                                            Function<RestClient, RestClient.RequestHeadersSpec<?>> request,
+                                            Class<T> type) {
         long started = System.nanoTime();
         boolean ok = false;
         try {
-            T body = request.apply(rest)
+            ResponseEntity<T> entity = request.apply(rest)
                     .headers(h -> credential.headers().forEach(h::set))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw toException(res.getStatusCode(), readBody(res));
                     })
-                    .body(type);
+                    .toEntity(type);
+            if (!entity.getStatusCode().is2xxSuccessful()) {
+                // 3xx 등(HttpClient는 리다이렉트를 따라가지 않음): 코어가 아니라 앞단의 응답일 수 있어 '읽지 못함'으로 본다
+                log.warn("core 응답이 2xx가 아님 {} status={}", label, entity.getStatusCode().value());
+                throw new CoreApiException(BAD_RESPONSE, "예약 서버 응답을 확인하지 못했어요. 예약 상태를 먼저 확인해 주세요.", 502);
+            }
             ok = true;
-            return body;
+            return entity;
         } catch (ResourceAccessException e) {
             // 코어가 꺼졌거나 느림. 주소·원인은 로그에만
             log.warn("core 호출 실패 {} cause={}", label, e.getClass().getSimpleName());
-            throw new CoreApiException("CORE_UNAVAILABLE", "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+            throw new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
+        } catch (RestClientException e) {
+            // 응답은 왔는데 읽지 못함(본문 모양이 다름 등). 쓰기 요청이면 처리됐을 수 있다
+            log.warn("core 응답 해석 실패 {} cause={}", label, e.getClass().getSimpleName());
+            throw new CoreApiException(BAD_RESPONSE, "예약 서버 응답을 확인하지 못했어요. 예약 상태를 먼저 확인해 주세요.", 502);
         } finally {
             log.info("core {} ok={} {}ms", label, ok, (System.nanoTime() - started) / 1_000_000);
         }
@@ -66,18 +90,24 @@ public class CoreHttp {
 
     /** 코어 오류 본문 {code, message}를 그대로 살린다. 모양이 다르면 상태 코드로 대신 */
     private CoreApiException toException(HttpStatusCode status, byte[] body) {
+        // 게이트웨이 오류는 본문보다 먼저 본다: 앞단 프록시가 어떤 본문을 주든 core가 처리했는지 모르므로 '닿지 못함'
+        if (status.value() == 502 || status.value() == 503 || status.value() == 504) {
+            return new CoreApiException(UNAVAILABLE, "예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.", 503);
+        }
         try {
             CoreError error = json.readValue(body, CoreError.class);
             if (error.code() != null && error.message() != null) {
-                return new CoreApiException(error.code(), error.message());
+                return new CoreApiException(error.code(), error.message(), status.value());
             }
         } catch (RuntimeException ignored) {
             // 본문이 JSON이 아님 (프록시 오류 페이지 등)
         }
         return switch (status.value()) {
-            case 401 -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다");
-            case 403 -> new CoreApiException("FORBIDDEN", "이 기능을 사용할 권한이 없습니다");
-            default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.");
+            case 401 -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다", 401);
+            case 403 -> new CoreApiException("FORBIDDEN", "이 기능을 사용할 권한이 없습니다", 403);
+            // 본문을 못 읽어도 받은 상태 코드(400·409 등)는 그대로 둔다
+            default -> new CoreApiException("CORE_ERROR", "예약 서버에서 오류가 났어요. 잠시 후 다시 시도해 주세요.",
+                    status.value());
         };
     }
 
