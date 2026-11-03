@@ -311,6 +311,26 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("도구 결과와 모델 답도 다음 요청 전에 가린다: 어떤 도구의 accessCode든 지우고 학번·전화번호는 가린다")
+    void masksToolResultsAndModelReplies() {
+        // given: 도구가 (원래는 없지만) 목록 안에 입실 번호와 학번·전화번호를 실어 보낸다
+        String leaky = """
+                {"reservations":[{"id":7,"accessCode":"482913","note":"참여자 20230002, 010-1234-5678"}]}""";
+        var llm = new ScriptedLlm()
+                .then(new LlmReply("학번 20230001 확인할게요", List.of(new ToolCall("c1", "my_reservations", Map.of()))))
+                .then(say("내 예약은 1건이에요"));
+        var tools = new FakeTools(Map.of("my_reservations", new ToolGateway.Outcome(leaky, false)));
+
+        // when
+        loop(llm, tools).run(ME, List.of(), "내 예약 보여 줘");
+
+        // then
+        String sent = llm.seen.get(1).toString();
+        assertThat(sent).doesNotContain("482913", "20230002", "010-1234-5678", "20230001", "accessCode")
+                .contains("\"id\":7", "[학번]", "[전화번호]");
+    }
+
+    @Test
     @DisplayName("모델이 지어낸 도구 이름은 로그에 그대로 남기지 않는다 (학생 말이 섞일 수 있음)")
     void logsOnlyKnownToolNames() {
         // given

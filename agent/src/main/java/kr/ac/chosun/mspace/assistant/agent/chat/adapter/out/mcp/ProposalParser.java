@@ -40,9 +40,11 @@ public final class ProposalParser {
         if (ACCESS_CODE_TOOL.equals(tool)) {
             return accessCode(text, body, json);
         }
+        // 입실 번호는 화면 카드로만 보여 준다. 어떤 도구가 실어 보내도(목록 안쪽 포함) 모델에는 넘기지 않는다
+        boolean stripped = stripAccessCodes(body);
         Object token = body.remove("confirmToken");
         if (token == null) {
-            return new Outcome(text, false);
+            return new Outcome(stripped ? json.writeValueAsString(body) : text, false);
         }
         Object notes = body.get("notes");
         Object needs = body.get("needsParticipants");
@@ -57,11 +59,27 @@ public final class ProposalParser {
      * 혹시 mcp-server가 번호를 실어 보내도 모델에 넘기지 않게 accessCode는 지운다 (원래는 오지 않음).
      */
     private static Outcome accessCode(String text, Map<String, Object> body, JsonMapper json) {
-        boolean stripped = body.remove("accessCode") != null;
+        boolean stripped = stripAccessCodes(body);
         Optional<AccessCodeCard> card = Boolean.TRUE.equals(body.get("cardShown"))
                 && body.get("reservationId") instanceof Number id
                 ? Optional.of(new AccessCodeCard(id.longValue())) : Optional.empty();
         String forModel = stripped ? json.writeValueAsString(body) : text;
         return new Outcome(forModel, false, Optional.empty(), card);
+    }
+
+    /** accessCode 키를 안쪽 객체·목록까지 모두 지운다. 하나라도 지웠으면 true */
+    private static boolean stripAccessCodes(Object node) {
+        boolean stripped = false;
+        if (node instanceof Map<?, ?> map) {
+            stripped = map.remove("accessCode") != null;
+            for (Object value : map.values()) {
+                stripped |= stripAccessCodes(value);
+            }
+        } else if (node instanceof List<?> list) {
+            for (Object value : list) {
+                stripped |= stripAccessCodes(value);
+            }
+        }
+        return stripped;
     }
 }

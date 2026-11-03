@@ -81,7 +81,9 @@ public class AgentLoop {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
                     return new ChatResult(LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                 }
-                conversation.add(new LlmMessage.Assistant(reply.text(), reply.toolCalls()));
+                // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
+                // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
+                conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
                 for (ToolCall call : reply.toolCalls()) {
                     calls++;
                     long started = System.nanoTime();
@@ -90,7 +92,8 @@ public class AgentLoop {
                             (System.nanoTime() - started) / 1_000_000);
                     outcome.confirmation().ifPresent(confirmations::add);
                     outcome.accessCodeCard().filter(c -> !accessCodeCards.contains(c)).ifPresent(accessCodeCards::add);
-                    conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), outcome.json(), outcome.isError()));
+                    conversation.add(new LlmMessage.ToolResult(call.id(), call.name(),
+                            PrivacyMask.mask(outcome.json()), outcome.isError()));
                 }
             }
         }
