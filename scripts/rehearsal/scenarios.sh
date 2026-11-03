@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 시연 리허설: 채팅 → agent → MCP 서버 → core를 가짜 모델로 한 바퀴 돌리고 표로 판정한다.
 # 준비: core(X-User-Id 켜기)·mcp-server·agent(LLM_PROVIDER=ollama, OLLAMA_BASE_URL=가짜 모델)·fake_ollama.py
-# 사용: AGENT=http://localhost:18091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=sent.jsonl ./scenarios.sh
+# 사용: MCP=http://localhost:18090 AGENT=http://localhost:18091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=sent.jsonl ./scenarios.sh
 # OWNER는 끝나지 않은 예약이 없는 테스트 계정, P1·P2는 함께 쓸 테스트 학번. 실제 학생 정보는 쓰지 않는다.
 set -u
 AGENT=${AGENT:-http://localhost:18091}; OWNER=${OWNER:-4}; OTHER=${OTHER:-2}
@@ -13,9 +13,12 @@ chat() { curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-
 confirm() { curl -s -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
 j() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1"; }
 
-# agent가 뜰 때까지 최대 60초 기다린다. 안 뜨면 시나리오를 돌리지 않는다.
-for _ in $(seq 1 60); do curl -sf "$AGENT/actuator/health" >/dev/null && break; sleep 1; done
-curl -sf "$AGENT/actuator/health" >/dev/null || { echo "agent가 준비되지 않았어요: $AGENT" >&2; exit 1; }
+# MCP 서버와 agent가 뜰 때까지 각각 최대 60초 기다린다. 안 뜨면 시나리오를 돌리지 않는다.
+MCP=${MCP:-http://localhost:18090}
+for svc in "$MCP" "$AGENT"; do
+  for _ in $(seq 1 60); do curl -sf "$svc/actuator/health" >/dev/null && break; sleep 1; done
+  curl -sf "$svc/actuator/health" >/dev/null || { echo "준비되지 않았어요: $svc" >&2; exit 1; }
+done
 # 이번 실행에서 외부 AI로 나간 요청만 검사하도록 로그를 비운다.
 : > "$SENT_LOG" || { echo "SENT_LOG를 비울 수 없어요: $SENT_LOG" >&2; exit 1; }
 

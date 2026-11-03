@@ -27,8 +27,8 @@ SENT_LOG=/tmp/sent.jsonl python3 -I scripts/rehearsal/fake_ollama.py 18111 &
 CORE_BASE_URL=http://localhost:8080 SERVER_PORT=8090 java -jar mcp-server/target/*.jar &
 LLM_PROVIDER=ollama OLLAMA_BASE_URL=http://127.0.0.1:18111 MCP_SERVER_URL=http://localhost:8090 \
   SERVER_PORT=8091 java -jar agent/target/*.jar &
-# 4) 시나리오 (스크립트가 agent의 /actuator/health를 60초까지 기다리고, 안 뜨면 멈춰요)
-AGENT=http://localhost:8091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=/tmp/sent.jsonl \
+# 4) 시나리오 (스크립트가 MCP 서버와 agent의 /actuator/health를 각각 60초까지 기다리고, 안 뜨면 멈춰요)
+MCP=http://localhost:8090 AGENT=http://localhost:8091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=/tmp/sent.jsonl \
   scripts/rehearsal/scenarios.sh
 ```
 - `OWNER`는 끝나지 않은 예약이 없는 테스트 계정이어야 해요 (대표자 동시 1건 규칙)
