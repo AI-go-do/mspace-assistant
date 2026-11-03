@@ -18,6 +18,8 @@ API 키·GPU 없이 **채팅 → agent → MCP 서버 → core** 전체 길을 �
 
 ## 실행 (macOS 기준, Windows는 Git Bash)
 ```bash
+# 0) 두 모듈 빌드 (target/은 저장소에 없어요. Windows는 mvnw.cmd)
+./mvnw -q -DskipTests package
 # 1) core: 임시 로그인(X-User-Id)을 켜고 띄우기 (core 레포 README 참고, 테스트 계정만)
 # 2) 가짜 모델
 SENT_LOG=/tmp/sent.jsonl python3 -I scripts/rehearsal/fake_ollama.py 18111 &
@@ -25,12 +27,13 @@ SENT_LOG=/tmp/sent.jsonl python3 -I scripts/rehearsal/fake_ollama.py 18111 &
 CORE_BASE_URL=http://localhost:8080 SERVER_PORT=8090 java -jar mcp-server/target/*.jar &
 LLM_PROVIDER=ollama OLLAMA_BASE_URL=http://127.0.0.1:18111 MCP_SERVER_URL=http://localhost:8090 \
   SERVER_PORT=8091 java -jar agent/target/*.jar &
-# 4) 시나리오
+# 4) 시나리오 (스크립트가 agent의 /actuator/health를 60초까지 기다리고, 안 뜨면 멈춰요)
 AGENT=http://localhost:8091 OWNER=4 OTHER=2 P1=29990002 P2=29990003 SENT_LOG=/tmp/sent.jsonl \
   scripts/rehearsal/scenarios.sh
 ```
 - `OWNER`는 끝나지 않은 예약이 없는 테스트 계정이어야 해요 (대표자 동시 1건 규칙)
 - 실제 학생 정보는 쓰지 않아요. 시연은 테스트 계정·가짜 데이터로만 해요
+- 시작할 때 `SENT_LOG`를 비워서 이번 실행의 요청만 검사해요. 로그를 못 읽거나 요청이 0건이면 실패로 쳐요
 - 실패하면 표의 "실제" 칸에 받은 응답이 그대로 나와요
 
 ## 한계

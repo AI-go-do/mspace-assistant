@@ -13,6 +13,12 @@ chat() { curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-
 confirm() { curl -s -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
 j() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1"; }
 
+# agent가 뜰 때까지 최대 60초 기다린다. 안 뜨면 시나리오를 돌리지 않는다.
+for _ in $(seq 1 60); do curl -sf "$AGENT/actuator/health" >/dev/null && break; sleep 1; done
+curl -sf "$AGENT/actuator/health" >/dev/null || { echo "agent가 준비되지 않았어요: $AGENT" >&2; exit 1; }
+# 이번 실행에서 외부 AI로 나간 요청만 검사하도록 로그를 비운다.
+: > "$SENT_LOG" || { echo "SENT_LOG를 비울 수 없어요: $SENT_LOG" >&2; exit 1; }
+
 echo '| 시나리오 | 판정 | 실제 |'; echo '|---|---|---|'
 r=$(chat "$OWNER" "내일 오후 2시 빈방 있어?"); n=$(echo "$r" | j 'd.get("toolCalls")')
 [ "$n" = 1 ] && row "내일 오후 2시 빈방" ok "find_available_rooms 1번" || row "내일 오후 2시 빈방" no "$r"
@@ -35,6 +41,10 @@ r=$(confirm "$OWNER" "$tok" '{}'); [ "$(echo "$r" | j 'd.get("status")')" = CANC
   && row "내 예약 취소해 줘 → [확인]" ok "CANCELED" || row "내 예약 취소해 줘 → [확인]" no "$r"
 r=$(chat "$OWNER" "무한 반복해"); [ "$(echo "$r" | j 'd.get("stoppedByLimit")')" = True ] \
   && row "도구 호출 최대 횟수" ok "$(echo "$r" | j 'd.get("toolCalls")')번에서 멈춤" || row "도구 호출 최대 횟수" no "$r"
-leaks=$(grep -cE "$P1|$P2|\"c_|accessCode|X-User-Id" "$SENT_LOG" 2>/dev/null || true)
-[ "${leaks:-0}" = 0 ] && row "외부 AI로 나간 내용" ok "학번·확인 토큰·accessCode 0건 ($(wc -l < "$SENT_LOG")번 요청)" || row "외부 AI로 나간 내용" no "$leaks줄에서 발견"
+# grep 종료 코드: 0 찾음, 1 없음, 2 이상 읽기 오류. 읽기 오류나 요청 0건은 통과로 치지 않는다.
+gs=0; leaks=$(grep -cE "$P1|$P2|\"c_|accessCode|X-User-Id" "$SENT_LOG") || gs=$?
+reqs=$(wc -l < "$SENT_LOG" 2>/dev/null) || reqs=0
+if [ "$gs" -gt 1 ] || [ "${reqs:-0}" -eq 0 ]; then row "외부 AI로 나간 내용" no "로그를 읽지 못했거나 요청이 기록되지 않음"
+elif [ "${leaks:-0}" = 0 ]; then row "외부 AI로 나간 내용" ok "학번·확인 토큰·accessCode 0건 (${reqs}번 요청)"
+else row "외부 AI로 나간 내용" no "$leaks줄에서 발견"; fi
 echo; echo "통과 $pass, 실패 $fail"; [ "$fail" = 0 ]
