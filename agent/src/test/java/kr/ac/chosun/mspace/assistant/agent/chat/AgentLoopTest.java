@@ -209,6 +209,50 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("한 답에 도구가 여러 개여도, 도구를 부르기 전마다 시간 상한을 보고 넘었으면 남은 도구를 부르지 않는다")
+    void stopsBetweenToolCallsAtTimeLimit() {
+        // given: 시계를 읽을 때마다 20초가 흐르고, 모델이 한 번에 도구 3개를 부른다
+        var llm = new ScriptedLlm().then(new LlmReply("", List.of(
+                new ToolCall("c1", "create_reservation", Map.of("roomId", 2)),
+                new ToolCall("c2", "my_reservations", Map.of()),
+                new ToolCall("c3", "my_reservations", Map.of()))));
+        var tools = new FakeTools(Map.of(
+                "create_reservation", new ToolGateway.Outcome(PROPOSAL, false),
+                "my_reservations", new ToolGateway.Outcome("{\"reservations\":[]}", false)));
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0),
+                new SlowClock(java.time.Duration.ofSeconds(20)));
+
+        // when
+        ChatResult result = loop.run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then: 20초·40초에는 부르고, 60초(상한 45초 넘음)에는 멈춘다. 먼저 만든 카드는 그대로 간다
+        assertThat(tools.called).hasSize(2);
+        assertThat(result.stoppedByLimit()).isTrue();
+        assertThat(result.reply()).contains("시간이 너무 오래 걸려서");
+        assertThat(result.confirmations()).hasSize(1);
+        assertThat(llm.seen).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("확인 토큰에 숫자 6개가 이어져도 가리지 않고 원래 값으로 카드에 싣는다 (가리면 확인이 실패한다)")
+    void keepsConfirmTokenUnmasked() {
+        // given
+        String proposal = PROPOSAL.replace("c_secret", "c_Ab123456cD");
+        var llm = new ScriptedLlm()
+                .then(tool("create_reservation", Map.of("roomId", 2)))
+                .then(say("확인 카드를 보여 드렸어요"));
+        var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(proposal, false)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then
+        assertThat(result.confirmations()).singleElement()
+                .satisfies(c -> assertThat(c.token()).isEqualTo("c_Ab123456cD"));
+        assertThat(llm.seen.get(1).toString()).doesNotContain("c_Ab");
+    }
+
+    @Test
     @DisplayName("시나리오 '내 예약 취소해 줘': 내 예약 → 취소 제안 → 확인 카드. 모델은 확인 토큰을 보지 못한다")
     void cancelProposalBecomesCard() {
         var llm = new ScriptedLlm()

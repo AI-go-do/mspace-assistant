@@ -62,14 +62,14 @@ public class AgentLoop {
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
-        // 그래서 모델을 다시 부르기 전에 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다
+        // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
+        // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
         Instant deadline = clock.instant().plus(props.chatTimeout());
 
         try (ToolGateway.Session session = tools.open(headers)) {
             String system = systemPrompt();
             while (true) {
-                if (calls > 0 && !clock.instant().isBefore(deadline)) {
-                    log.warn("agent time limit reached calls={} limit={}s", calls, props.chatTimeout().toSeconds());
+                if (calls > 0 && pastDeadline(deadline, calls)) {
                     return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                 }
                 LlmReply reply;
@@ -94,6 +94,9 @@ public class AgentLoop {
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
                 conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
                 for (ToolCall call : reply.toolCalls()) {
+                    if (pastDeadline(deadline, calls)) {
+                        return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
+                    }
                     calls++;
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
@@ -107,6 +110,14 @@ public class AgentLoop {
                 }
             }
         }
+    }
+
+    private boolean pastDeadline(Instant deadline, int calls) {
+        if (clock.instant().isBefore(deadline)) {
+            return false;
+        }
+        log.warn("agent time limit reached calls={} limit={}s", calls, props.chatTimeout().toSeconds());
+        return true;
     }
 
     /**
