@@ -67,7 +67,10 @@ public class GeminiLlmClient implements LlmClient {
                     .body(body)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        throw res.getStatusCode().value() == 429
+                        // 키 오류(401·403)·모델 이름 오류(404)와 서버 장애(5xx)를 로그로 가른다. 본문은 남기지 않는다
+                        int status = res.getStatusCode().value();
+                        log.warn("llm gemini 오류 응답 status={}", status);
+                        throw status == 429
                                 ? new LlmException("LLM_RATE_LIMITED",
                                         "지금 질문이 많아요. 잠시 후 다시 시도하거나 예약 화면을 이용해 주세요.")
                                 : unavailable();
