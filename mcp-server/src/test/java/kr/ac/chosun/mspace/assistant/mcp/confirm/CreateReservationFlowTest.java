@@ -243,6 +243,23 @@ class CreateReservationFlowTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("core 201에 시작 시각·상태가 빠지면 성공으로 단정하지 않고 '예약 여부 모름'")
+    void missingTimeOrStatusIsUnknown() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations").willReturn(aResponse().withStatus(201)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"id\": 7, \"roomId\": 1, \"headcount\": 3, \"accessCode\": \"482913\"}")));
+        String token = propose();
+
+        // when
+        HttpResponse<String> response = confirm(token, "1", TWO_IDS);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.body()).contains("RESERVATION_UNKNOWN").doesNotContain("482913");
+    }
+
+    @Test
     @DisplayName("core 500은 저장 뒤에 났을 수 있으니 '다시 시도'가 아니라 '예약 여부 모름'으로, 다시 보내지 않는다")
     void serverErrorIsUnknown() throws Exception {
         // given
