@@ -122,4 +122,20 @@ class OllamaLlmClientTest {
         assertThat(thrown).isInstanceOfSatisfying(LlmException.class,
                 e -> assertThat(e.code()).isEqualTo("LLM_UNAVAILABLE"));
     }
+
+    @Test
+    @DisplayName("tool_calls에 null 원소가 섞여 있으면 건너뛰고 나머지를 읽는다")
+    void skipsNullToolCall() {
+        // given
+        ollama.stubFor(post("/api/chat").willReturn(okJson("""
+                {"message":{"role":"assistant","content":"","tool_calls":[null,
+                  {"function":{"name":"find_available_rooms","arguments":{"date":"2099-11-04"}}}]},"done":true}""")));
+
+        // when
+        LlmReply reply = client(Duration.ofSeconds(2)).chat("s", List.of(new LlmMessage.User("a")), List.of());
+
+        // then
+        assertThat(reply.toolCalls()).singleElement()
+                .satisfies(c -> assertThat(c.name()).isEqualTo("find_available_rooms"));
+    }
 }
