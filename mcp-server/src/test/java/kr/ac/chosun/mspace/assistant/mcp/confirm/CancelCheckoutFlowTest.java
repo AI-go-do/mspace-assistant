@@ -141,6 +141,22 @@ class CancelCheckoutFlowTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("취소 응답 본문에 id가 빠져도 보낸 예약 id로 안내한다 (reservationId 0 금지)")
+    void missingIdInCancelBodyUsesRequestId() throws Exception {
+        // given
+        core.stubFor(post("/api/reservations/7/cancel").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("{\"status\": \"CANCELED\"}")));
+        String token = token(call(ME, "cancel_reservation", Map.of("reservationId", 7)));
+
+        // when
+        HttpResponse<String> response = confirm(token);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("\"reservationId\":7").doesNotContain("\"reservationId\":0");
+    }
+
+    @Test
     @DisplayName("퇴실 응답 본문을 읽지 못해도 같은 '처리 여부 모름' 안내")
     void unreadableCheckoutIsUnknown() throws Exception {
         // given
