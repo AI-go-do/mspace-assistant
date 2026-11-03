@@ -39,7 +39,7 @@ public interface ToolGateway {
     /** mcp-server에 붙지 못함. message는 학생에게 보여 줄 문장 */
     class Unavailable extends RuntimeException {
         public Unavailable() {
-            super("예약 도구에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+            super("예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
         }
     }
 }

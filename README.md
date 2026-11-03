@@ -25,9 +25,10 @@ M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Bo
 ## 로컬 실행
 ```bash
 mvn -B verify                                   # 전체 테스트 (core·Gemini는 가짜 서버)
-CORE_BASE_URL=http://localhost:8080 mvn -pl mcp-server spring-boot:run
-GEMINI_API_KEY=... mvn -pl agent spring-boot:run  # 키는 .env에만. 커밋 금지
+# local 프로필: 로그인 전 임시 헤더 X-User-Id를 넘긴다 (core도 MSPACE_DEV_HEADER=true로 띄워요)
+SPRING_PROFILES_ACTIVE=local CORE_BASE_URL=http://localhost:8080 mvn -pl mcp-server spring-boot:run
+SPRING_PROFILES_ACTIVE=local GEMINI_API_KEY=... mvn -pl agent spring-boot:run  # 키는 .env에만. 커밋 금지
 curl -X POST localhost:8091/api/agent/chat -H 'X-User-Id: 1' -H 'Content-Type: application/json' \
      -d '{"message":"내일 오후 2시 빈방 있어?"}'
 ```
-- 사용자 인증은 core와 같이 임시 `X-User-Id` 헤더예요. JWT로 바뀌면 `mspace.agent.forward-headers`만 고쳐요
+- 사용자 인증은 기본으로 `Authorization`만 넘겨요. 로그인 전 임시 `X-User-Id` 헤더는 `local` 프로필(`application-local.yml`)에서만 켜요. 서버 배포에서는 켜지 않아요 (헤더 한 줄로 남의 예약에 닿을 수 있어서)
