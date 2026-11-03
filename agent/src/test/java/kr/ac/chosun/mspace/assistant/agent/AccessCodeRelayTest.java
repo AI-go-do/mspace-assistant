@@ -21,11 +21,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /** 입실 번호 카드 API: 학생 헤더로 mcp-server를 그대로 부르고, 모델은 거치지 않는다 */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("local") // 로그인 대신 X-User-Id 헤더로 학생을 구분한다
 class AccessCodeRelayTest {
 
     static final WireMockServer mcpServer = new WireMockServer(wireMockConfig().dynamicPort());

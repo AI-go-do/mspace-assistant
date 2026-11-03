@@ -12,9 +12,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.ActiveProfiles;
 
 /** 채팅 API 입력 검사: 잘못된 대화 기록은 모델·MCP를 부르기 전에 400 */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("local")
 class ChatControllerTest {
 
     @LocalServerPort
@@ -41,6 +43,20 @@ class ChatControllerTest {
         // then
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.body()).contains("INVALID_REQUEST");
+    }
+
+    @Test
+    @DisplayName("말이 1,000자를 넘으면 모델을 부르기 전에 400 INVALID_REQUEST")
+    void rejectsLongMessage() throws Exception {
+        // given
+        String body = "{\"message\":\"" + "가".repeat(1001) + "\"}";
+
+        // when
+        HttpResponse<String> response = chat(body);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("1000자");
     }
 
     @Test

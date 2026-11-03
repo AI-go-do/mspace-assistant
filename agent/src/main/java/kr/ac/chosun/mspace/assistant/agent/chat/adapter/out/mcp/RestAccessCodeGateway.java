@@ -8,7 +8,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway.
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
 
 /** mcp-server의 GET /api/reservations/{id}/access-code를 학생 헤더로 부른다. 본문(번호)은 로그에 남기지 않는다 */
@@ -35,7 +35,7 @@ class RestAccessCodeGateway implements AccessCodeGateway {
                     .headers(h -> user.values().forEach(h::set))
                     .exchange((req, res) -> new Relayed(res.getStatusCode().value(),
                             new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8)));
-        } catch (ResourceAccessException e) {
+        } catch (RestClientException e) { // 연결 실패·끊김·본문 읽기 실패 모두 503
             return new Relayed(503, UNAVAILABLE);
         }
     }

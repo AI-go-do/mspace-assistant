@@ -8,15 +8,15 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 /** mcp-server의 POST /api/confirmations/{token}을 학생 헤더로 부른다 */
 @Component
 class RestConfirmationGateway implements ConfirmationGateway {
 
     static final String UNAVAILABLE =
-            "{\"code\":\"TOOLS_UNAVAILABLE\",\"message\":\"예약 도구에 연결하지 못했어요. 내 예약에서 결과를 확인해 주세요.\"}";
+            "{\"code\":\"TOOLS_UNAVAILABLE\",\"message\":\"예약 서버에 연결하지 못했어요. 내 예약에서 결과를 확인해 주세요.\"}";
 
     private final RestClient mcpServer;
 
@@ -37,7 +37,8 @@ class RestConfirmationGateway implements ConfirmationGateway {
                     .body(body == null ? "{}" : body)
                     .exchange((req, res) -> new Relayed(res.getStatusCode().value(),
                             new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8)));
-        } catch (ResourceAccessException e) {
+        } catch (RestClientException e) {
+            // 연결 실패·끊김·본문 읽기 실패 모두 같은 503으로. 결과는 내 예약에서 확인하게 한다
             return new Relayed(503, UNAVAILABLE);
         }
     }

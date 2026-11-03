@@ -27,7 +27,7 @@ public interface ToolGateway {
     }
 
     /**
-     * @param json         모델에게 줄 결과 JSON. 확인 토큰은 들어 있지 않다
+     * @param json         모델에게 줄 결과 JSON. 확인 토큰·입실 번호는 없고, 학번·전화번호는 이미 가렸다 (게이트웨이 책임)
      * @param confirmation 쓰기 도구가 확인안을 냈으면 화면용 카드 (토큰 포함)
      * @param accessCodeCard show_access_code가 대표자라고 답했으면 화면용 입실 번호 카드 (번호 없음)
      */
@@ -46,7 +46,7 @@ public interface ToolGateway {
     /** mcp-server에 붙지 못함. message는 학생에게 보여 줄 문장 */
     class Unavailable extends RuntimeException {
         public Unavailable() {
-            super("예약 도구에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+            super("예약 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
         }
     }
 }
