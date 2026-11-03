@@ -37,7 +37,7 @@ class OllamaLlmClientTest {
             Map.of("type", "object", "properties", Map.of("date", Map.of("type", "string"))));
 
     OllamaLlmClient client(Duration timeout) {
-        return new OllamaLlmClient(new OllamaProperties(ollama.baseUrl(), "qwen2.5:7b", timeout));
+        return new OllamaLlmClient(new OllamaProperties(ollama.baseUrl(), "qwen2.5:7b", timeout, null));
     }
 
     @Test
@@ -77,6 +77,27 @@ class OllamaLlmClientTest {
                 .withRequestBody(matchingJsonPath("$.messages[2].tool_calls[0].function.name", equalTo("find_available_rooms")))
                 .withRequestBody(matchingJsonPath("$.messages[3].role", equalTo("tool")))
                 .withRequestBody(matchingJsonPath("$.messages[3].tool_name", equalTo("find_available_rooms"))));
+    }
+
+    @Test
+    @DisplayName("도구 설명·인자가 null이어도 500(NPE) 없이 빈 값으로 보낸다")
+    void nullDescriptionAndArguments() {
+        // given
+        ollama.stubFor(post("/api/chat").willReturn(okJson("{\"message\":{\"role\":\"assistant\",\"content\":\"네\"}}")));
+        var noDescription = new ToolSpec("usage_rules", null, null);
+        var call = new ToolCall("x", "usage_rules", null);
+
+        // when
+        LlmReply reply = client(Duration.ofSeconds(2)).chat("지시문", List.of(
+                new LlmMessage.User("규칙 알려 줘"),
+                new LlmMessage.Assistant(null, List.of(call)),
+                new LlmMessage.ToolResult("x", "usage_rules", "{}", false)), List.of(noDescription));
+
+        // then
+        assertThat(reply.text()).isEqualTo("네");
+        ollama.verify(postRequestedFor(urlEqualTo("/api/chat"))
+                .withRequestBody(matchingJsonPath("$.tools[0].function.description", equalTo("")))
+                .withRequestBody(matchingJsonPath("$.messages[2].tool_calls[0].function.name", equalTo("usage_rules"))));
     }
 
     @Test

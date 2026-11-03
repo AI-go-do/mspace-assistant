@@ -37,7 +37,7 @@ public class OllamaLlmClient implements LlmClient {
     public OllamaLlmClient(OllamaProperties props) {
         // Ollama는 http:// 라서 HTTP/1.1 고정 (TS-04와 같은 이유)
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1).connectTimeout(props.timeout()).build());
+                .version(HttpClient.Version.HTTP_1_1).connectTimeout(props.connectTimeout()).build());
         factory.setReadTimeout(props.timeout());
         this.rest = RestClient.builder().baseUrl(props.baseUrl()).requestFactory(factory).build();
         this.props = props;
@@ -80,31 +80,38 @@ public class OllamaLlmClient implements LlmClient {
 
     private static List<Map<String, Object>> messages(String system, List<LlmMessage> conversation) {
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", system));
+        messages.add(Map.of("role", "system", "content", orEmpty(system)));
         for (LlmMessage m : conversation) {
             switch (m) {
-                case LlmMessage.User u -> messages.add(Map.of("role", "user", "content", u.text()));
+                case LlmMessage.User u -> messages.add(Map.of("role", "user", "content", orEmpty(u.text())));
                 case LlmMessage.Assistant a -> {
                     Map<String, Object> msg = new LinkedHashMap<>();
                     msg.put("role", "assistant");
                     msg.put("content", a.text() == null ? "" : a.text());
                     if (!a.toolCalls().isEmpty()) {
                         msg.put("tool_calls", a.toolCalls().stream()
-                                .map(c -> Map.of("function", Map.of("name", c.name(), "arguments", c.arguments())))
+                                .map(c -> Map.of("function", Map.of("name", orEmpty(c.name()),
+                                        "arguments", c.arguments() == null ? Map.of() : c.arguments())))
                                 .toList());
                     }
                     messages.add(msg);
                 }
-                case LlmMessage.ToolResult r -> messages.add(Map.of("role", "tool", "tool_name", r.name(),
-                        "content", r.isError() ? "{\"error\":" + r.json() + "}" : r.json()));
+                case LlmMessage.ToolResult r -> messages.add(Map.of("role", "tool", "tool_name", orEmpty(r.name()),
+                        "content", r.isError() ? "{\"error\":" + r.json() + "}" : orEmpty(r.json())));
             }
         }
         return messages;
     }
 
     private static Map<String, Object> tool(ToolSpec spec) {
+        // Map.of는 null을 받지 않는다. 설명·스키마가 빠진 도구 하나 때문에 대화 전체가 500이 되지 않게 빈 값으로 둔다
         return Map.of("type", "function", "function", Map.of(
-                "name", spec.name(), "description", spec.description(), "parameters", spec.inputSchema()));
+                "name", orEmpty(spec.name()), "description", orEmpty(spec.description()),
+                "parameters", spec.inputSchema() == null ? Map.of("type", "object") : spec.inputSchema()));
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private static LlmReply toReply(ChatResponse response) {
