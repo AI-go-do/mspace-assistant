@@ -38,8 +38,24 @@ for r in rs:
 }
 on_exit() { local st=$?; cleanup || { echo "끝 정리 실패: OWNER 예약이 남았을 수 있어요" >&2; [ "$st" = 0 ] && st=1; }; exit "$st"; }
 trap on_exit EXIT
-chat() { curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
-  -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1],"history":[]}))' "$2")"; }
+# 채팅은 접수(202 + jobId) → 결과 조회(폴링). 예전 agent(바로 결과)도 그대로 받는다. 결과 JSON만 출력한다
+chat() {
+  local r id
+  r=$(curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
+    -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1],"history":[]}))' "$2")")
+  id=$(echo "$r" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("jobId","") if d.get("status")=="PENDING" else "")' 2>/dev/null)
+  [ -z "$id" ] && { echo "$r"; return; }
+  for _ in $(seq 1 90); do
+    sleep 1
+    r=$(curl -s "$AGENT/api/agent/chat/$id" -H "X-User-Id: $1")
+    case "$(echo "$r" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))' 2>/dev/null)" in
+      DONE) echo "$r" | python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin)["result"],ensure_ascii=False))'; return ;;
+      PENDING) ;;
+      *) echo "$r"; return ;;
+    esac
+  done
+  echo '{"code":"POLL_TIMEOUT"}'
+}
 confirm() { curl -s -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
 j() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1"; }
 
