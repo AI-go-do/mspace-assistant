@@ -111,6 +111,9 @@ jobs:
           ssh -i ~/.ssh/id_deploy -p "$PORT" -o BatchMode=yes "$SSH_USER@$HOST" bash -s -- "$TARGET" <<'REMOTE'
           set -euo pipefail
           T="$1"
+          # core·web·assistant 배포가 모두 같은 ~/infra를 쓴다. 레포가 달라 GitHub concurrency로는 못 막으니 서버에서 한 번에 하나만 돌게 잠근다
+          exec 9>"$HOME/.mspace-deploy.lock"
+          flock -w 600 9 || { echo "다른 배포가 10분 넘게 끝나지 않음"; exit 1; }
           cd ~/infra
           OLD=$(git rev-parse HEAD)                            # 새 nginx 설정이 틀리면 되돌릴 자리
           git pull --ff-only                                   # compose·nginx 설정도 최신으로
