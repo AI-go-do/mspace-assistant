@@ -118,6 +118,8 @@ jobs:
           # 서버에서 손으로 고치거나 새로 만든 파일이 있으면 아래 되돌리기(reset --hard)가 지우거나 덮어쓸 수 있다. 그럴 땐 배포를 멈춘다
           # (.env.*·backups/는 .gitignore에 있어 여기 안 잡히고, reset에도 안 지워진다)
           [ -z "$(git status --porcelain)" ] || { echo "~/infra에 커밋 안 된 수정·새 파일이 있음: git status로 확인한 뒤 다시 배포"; git status --short; exit 1; }
+          # dev·prod 모두 ~/infra의 main 하나를 쓴다. 다른 브랜치면 아래 reset이 그 브랜치를 옮길 수 있어서 멈춘다
+          [ "$(git rev-parse --abbrev-ref HEAD)" = main ] || { echo "~/infra가 main 브랜치가 아님: git checkout main 뒤 다시 배포"; exit 1; }
           # 되돌릴 자리는 'nginx 검사를 통과한 마지막 커밋'. 지난 배포가 검사 전에 끊겼으면 HEAD가 검사 안 된 커밋일 수 있어서
           GOOD="$HOME/.mspace-infra-good"
           C="docker compose -p mspace-$T --env-file .env.$T"
@@ -127,6 +129,7 @@ jobs:
             git rev-parse HEAD > "$GOOD"
           fi
           OLD=$(cat "$GOOD")
+          git merge-base --is-ancestor "$OLD" HEAD || { echo "기록된 검사 통과 커밋($OLD)이 main에 없음: $GOOD 를 지우고 다시 배포"; exit 1; }
           git pull --ff-only                                   # compose·nginx 설정도 최신으로
           # 새 nginx 설정을 이미지 받기 전에 먼저 일회용 컨테이너로 검사한다(포트 안 엶). 틀리면 infra만 되돌리고 멈춘다(지금 서비스는 그대로)
           $C run --rm --no-deps -T gateway nginx -t || { echo "nginx 설정 오류: infra를 이전 커밋으로 되돌림(.env 같은 추적 안 하는 파일은 그대로)"; git reset -q --hard "$OLD"; exit 1; }
