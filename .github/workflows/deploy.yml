@@ -120,9 +120,14 @@ jobs:
           [ -z "$(git status --porcelain)" ] || { echo "~/infra에 커밋 안 된 수정·새 파일이 있음: git status로 확인한 뒤 다시 배포"; git status --short; exit 1; }
           # 되돌릴 자리는 'nginx 검사를 통과한 마지막 커밋'. 지난 배포가 검사 전에 끊겼으면 HEAD가 검사 안 된 커밋일 수 있어서
           GOOD="$HOME/.mspace-infra-good"
-          OLD=$(cat "$GOOD" 2>/dev/null || git rev-parse HEAD)
-          git pull --ff-only                                   # compose·nginx 설정도 최신으로
           C="docker compose -p mspace-$T --env-file .env.$T"
+          # 기록이 없으면(첫 배포) pull 전에 지금 설정을 검사해 그 커밋을 기록한다. 지금 설정부터 틀리면 pull 없이 멈춘다
+          if [ ! -s "$GOOD" ]; then
+            $C run --rm --no-deps -T gateway nginx -t || { echo "지금 ~/infra의 nginx 설정부터 틀림: 손으로 고친 뒤 다시 배포"; exit 1; }
+            git rev-parse HEAD > "$GOOD"
+          fi
+          OLD=$(cat "$GOOD")
+          git pull --ff-only                                   # compose·nginx 설정도 최신으로
           $C pull mcp agent
           $C up -d --no-deps mcp agent                    # 다른 서비스(DB 등)는 건드리지 않는다
           # 입구 nginx(gateway)는 켤 때만 설정을 읽는다. git pull로 nginx 설정이 바뀌어도 그대로면 옛 설정으로 계속 돈다.
