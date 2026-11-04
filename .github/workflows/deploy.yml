@@ -117,15 +117,22 @@ jobs:
           $C pull mcp agent
           $C up -d --no-deps mcp agent                    # 다른 서비스(DB 등)는 건드리지 않는다
           # 입구 nginx(gateway)는 켤 때만 설정을 읽는다. git pull로 nginx 설정이 바뀌어도 그대로면 옛 설정으로 계속 돈다.
-          # compose에서 gateway 설정이 바뀌었으면 다시 만들고(up), 문법을 확인한 뒤(-t, 틀리면 옛 설정 그대로 두고 배포 실패)
+          # 먼저 일회용 컨테이너로 새 설정 문법을 확인한다(포트 안 엶). 틀리면 지금 gateway는 건드리지 않고 배포 실패.
+          # 통과하면 compose에서 gateway 설정이 바뀌었을 때만 다시 만들고(up), 한 번 더 확인한 뒤
           # 끊김 없이 다시 읽게 한다(reload). reload가 안 되면 다시 켠다
+          $C run --rm --no-deps -T gateway nginx -t
           $C up -d --no-deps gateway
           $C exec -T gateway nginx -t
           $C exec -T gateway nginx -s reload || $C restart gateway
           sleep 20
           $C ps mcp agent
-          for s in mcp agent; do                                # 켜진 채로 남아 있어야 성공
+          for s in mcp agent gateway; do                        # 켜진 채로 남아 있어야 성공
             [ "$($C ps -q --status running $s)" ] || { echo "$s 실행 안 됨"; $C logs --tail=50 $s; exit 1; }
           done
+          # gateway가 reload 뒤 실제로 길을 나누는지 입구로 한 번 불러 본다 (core health가 UP이면 gateway·core 둘 다 정상)
+          # .env는 compose 문법이라 bash로 통째로 읽으면(source) 비밀번호의 ; 같은 글자가 명령으로 실행될 수 있다. PORT 한 줄만 읽는다
+          PORT=$(grep -E '^PORT=' ".env.$T" | tail -n 1 | cut -d= -f2- | tr -d "\"' \r")
+          [[ "$PORT" =~ ^[0-9]+$ ]] || { echo ".env.$T의 PORT 값이 숫자가 아님: '$PORT'"; exit 1; }
+          curl -fsS "127.0.0.1:$PORT/actuator/health" | grep -q UP || { echo "입구(gateway) 확인 실패"; $C logs --tail=50 gateway; exit 1; }
           echo "배포 성공 ($T)"
           REMOTE
