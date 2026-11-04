@@ -116,6 +116,12 @@ jobs:
           C="docker compose -p mspace-$T --env-file .env.$T"
           $C pull mcp agent
           $C up -d --no-deps mcp agent                    # 다른 서비스(DB 등)는 건드리지 않는다
+          # 입구 nginx(gateway)는 켤 때만 설정을 읽는다. git pull로 nginx 설정이 바뀌어도 그대로면 옛 설정으로 계속 돈다.
+          # compose에서 gateway 설정이 바뀌었으면 다시 만들고(up), 문법을 확인한 뒤(-t, 틀리면 옛 설정 그대로 두고 배포 실패)
+          # 끊김 없이 다시 읽게 한다(reload). reload가 안 되면 다시 켠다
+          $C up -d --no-deps gateway
+          $C exec -T gateway nginx -t
+          $C exec -T gateway nginx -s reload || $C restart gateway
           sleep 20
           $C ps mcp agent
           for s in mcp agent; do                                # 켜진 채로 남아 있어야 성공
