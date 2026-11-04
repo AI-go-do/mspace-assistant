@@ -112,6 +112,7 @@ jobs:
           set -euo pipefail
           T="$1"
           cd ~/infra
+          OLD=$(git rev-parse HEAD)                            # 새 nginx 설정이 틀리면 되돌릴 자리
           git pull --ff-only                                   # compose·nginx 설정도 최신으로
           C="docker compose -p mspace-$T --env-file .env.$T"
           $C pull mcp agent
@@ -120,7 +121,7 @@ jobs:
           # 먼저 일회용 컨테이너로 새 설정 문법을 확인한다(포트 안 엶). 틀리면 지금 gateway는 건드리지 않고 배포 실패.
           # 통과하면 compose에서 gateway 설정이 바뀌었을 때만 다시 만들고(up), 한 번 더 확인한 뒤
           # 끊김 없이 다시 읽게 한다(reload). reload가 안 되면 다시 켠다
-          $C run --rm --no-deps -T gateway nginx -t
+          $C run --rm --no-deps -T gateway nginx -t || { echo "nginx 설정 오류: infra를 이전 커밋으로 되돌림(.env 같은 추적 안 하는 파일은 그대로)"; git reset -q --hard "$OLD"; exit 1; }
           $C up -d --no-deps gateway
           $C exec -T gateway nginx -t
           $C exec -T gateway nginx -s reload || $C restart gateway
