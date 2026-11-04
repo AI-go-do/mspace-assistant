@@ -1,12 +1,14 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AccessCodeGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
-import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
@@ -28,7 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 화면이 부르는 API.
  * <ul>
- *   <li>POST /api/agent/chat: 학생 말 → 에이전트 반복 → 답 + 확인 카드</li>
+ *   <li>POST /api/agent/chat: 학생 말을 접수하고 바로 202 + jobId. 에이전트 반복은 뒤에서 돈다</li>
+ *   <li>GET /api/agent/chat/{jobId}: 결과 조회(폴링). PENDING이면 pollAfterMs 뒤 다시 부른다. DONE이면 답 + 확인 카드</li>
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  * </ul>
@@ -40,13 +43,17 @@ class ChatController {
     private final ConfirmationGateway confirmations;
     private final AccessCodeGateway accessCodes;
     private final AgentProperties props;
+    private final ChatJobs jobs;
+    private final ChatJobProperties jobProps;
 
     ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
-                   AgentProperties props) {
+                   AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps) {
         this.agent = agent;
         this.confirmations = confirmations;
         this.accessCodes = accessCodes;
         this.props = props;
+        this.jobs = jobs;
+        this.jobProps = jobProps;
     }
 
     @PostMapping("/api/agent/chat")
@@ -78,8 +85,32 @@ class ChatController {
                 .<LlmMessage>map(t -> "assistant".equals(t.role()) ? new LlmMessage.Assistant(t.text(), List.of())
                         : new LlmMessage.User(t.text()))
                 .toList();
-        ChatResult result = agent.run(user, history, request.message());
-        return ResponseEntity.ok(result);
+        String message = request.message();
+        return switch (jobs.submit(user, () -> agent.run(user, history, message))) {
+            case ChatJobs.Submitted.Accepted a -> ResponseEntity.accepted()
+                    .location(URI.create("/api/agent/chat/" + a.jobId()))
+                    .cacheControl(CacheControl.noStore())
+                    .body(new Accepted(a.jobId(), ChatJobs.Status.PENDING, jobProps.pollAfter().toMillis()));
+            case ChatJobs.Submitted.Rejected r -> error(
+                    "CHAT_IN_PROGRESS".equals(r.code()) ? HttpStatus.CONFLICT : HttpStatus.SERVICE_UNAVAILABLE,
+                    r.code(), r.message());
+        };
+    }
+
+    /** 결과에는 확인 토큰이 들어 있어 접수한 학생만 보고(남의 jobId는 404), 캐시에 남지 않게 no-store */
+    @GetMapping("/api/agent/chat/{jobId}")
+    ResponseEntity<?> chatResult(@PathVariable String jobId, @RequestHeader HttpHeaders headers) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요.");
+        }
+        return jobs.find(jobId, user)
+                .<ResponseEntity<?>>map(view -> ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                        .body(view.status() == ChatJobs.Status.PENDING
+                                ? new Pending(view.jobId(), view.status(), jobProps.pollAfter().toMillis())
+                                : view))
+                .orElseGet(() -> error(HttpStatus.NOT_FOUND, "CHAT_JOB_NOT_FOUND",
+                        "대화 결과를 찾지 못했어요. 다시 보내 주세요."));
     }
 
     /** 확인 결과(입실 번호 포함)는 학생 화면으로만 간다. 모델에는 넘기지 않는다 */
@@ -135,5 +166,12 @@ class ChatController {
     }
 
     record Turn(String role, String text) {
+    }
+
+    /** pollAfterMs: 화면이 다음 조회까지 기다릴 시간 */
+    record Accepted(String jobId, ChatJobs.Status status, long pollAfterMs) {
+    }
+
+    record Pending(String jobId, ChatJobs.Status status, long pollAfterMs) {
     }
 }
