@@ -140,10 +140,9 @@ jobs:
           # .env는 compose 문법이라 bash로 통째로 읽으면(source) 비밀번호의 ; 같은 글자가 명령으로 실행될 수 있다. PORT 한 줄만 읽는다
           PORT=$(grep -E '^PORT=' ".env.$T" | tail -n 1 | cut -d= -f2- | tr -d "\"' \r")
           [[ "$PORT" =~ ^[0-9]+$ ]] || { echo ".env.$T의 PORT 값이 숫자가 아님: '$PORT'"; exit 1; }
-          $C pull mcp agent
+          $C pull mcp agent gateway                   # 이미지를 모두 받은 뒤에만 교체(받기 실패 시 아무것도 안 바뀜)
           $C up -d --no-deps mcp agent                    # 다른 서비스(DB 등)는 건드리지 않는다
           # 입구 API 게이트웨이(gateway)는 설정이나 이미지가 바뀌었을 때만 다시 만든다(바뀐 게 없으면 그대로)
-          $C pull gateway                                      # 같은 태그라도 새 이미지를 받는다
           $C up -d --no-deps gateway
           sleep 20
           $C ps mcp agent
