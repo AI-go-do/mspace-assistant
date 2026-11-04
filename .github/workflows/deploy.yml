@@ -115,8 +115,9 @@ jobs:
           exec 9>"$HOME/.mspace-deploy.lock"
           flock -w 300 9 || { echo "다른 배포가 5분 넘게 끝나지 않음(작업 제한 15분 안에 이 배포도 끝내야 함)"; exit 1; }
           cd ~/infra
-          # 서버에서 손으로 고친 파일이 있으면 아래 되돌리기(reset --hard)가 지워 버린다. 그럴 땐 배포를 멈춘다
-          git diff --quiet HEAD || { echo "~/infra에 커밋 안 된 수정이 있음: git status로 확인한 뒤 다시 배포"; exit 1; }
+          # 서버에서 손으로 고치거나 새로 만든 파일이 있으면 아래 되돌리기(reset --hard)가 지우거나 덮어쓸 수 있다. 그럴 땐 배포를 멈춘다
+          # (.env.*·backups/는 .gitignore에 있어 여기 안 잡히고, reset에도 안 지워진다)
+          [ -z "$(git status --porcelain)" ] || { echo "~/infra에 커밋 안 된 수정·새 파일이 있음: git status로 확인한 뒤 다시 배포"; git status --short; exit 1; }
           # 되돌릴 자리는 'nginx 검사를 통과한 마지막 커밋'. 지난 배포가 검사 전에 끊겼으면 HEAD가 검사 안 된 커밋일 수 있어서
           GOOD="$HOME/.mspace-infra-good"
           OLD=$(cat "$GOOD" 2>/dev/null || git rev-parse HEAD)
