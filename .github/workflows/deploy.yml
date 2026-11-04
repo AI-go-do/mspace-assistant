@@ -119,11 +119,10 @@ jobs:
           $C up -d --no-deps mcp agent                    # 다른 서비스(DB 등)는 건드리지 않는다
           # 입구 nginx(gateway)는 켤 때만 설정을 읽는다. git pull로 nginx 설정이 바뀌어도 그대로면 옛 설정으로 계속 돈다.
           # 먼저 일회용 컨테이너로 새 설정 문법을 확인한다(포트 안 엶). 틀리면 지금 gateway는 건드리지 않고 배포 실패.
-          # 통과하면 compose에서 gateway 설정이 바뀌었을 때만 다시 만들고(up), 한 번 더 확인한 뒤
+          # 통과하면 compose에서 gateway 설정이 바뀌었을 때만 다시 만들고(up)
           # 끊김 없이 다시 읽게 한다(reload). reload가 안 되면 다시 켠다
           $C run --rm --no-deps -T gateway nginx -t || { echo "nginx 설정 오류: infra를 이전 커밋으로 되돌림(.env 같은 추적 안 하는 파일은 그대로)"; git reset -q --hard "$OLD"; exit 1; }
           $C up -d --no-deps gateway
-          $C exec -T gateway nginx -t
           $C exec -T gateway nginx -s reload || $C restart gateway
           sleep 20
           $C ps mcp agent
