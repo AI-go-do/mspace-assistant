@@ -83,7 +83,7 @@ jobs:
     # 서버 준비가 끝나 DEPLOY_ENABLED를 켰을 때만, develop·main에서만 (손으로 다른 브랜치를 돌려도 배포 안 함)
     if: vars.DEPLOY_ENABLED == 'true' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
     # develop → 개발(mspace-dev), main → 시연(mspace-prod). 둘이 동시에 돌아도 서로 안 섞인다
@@ -113,9 +113,13 @@ jobs:
           T="$1"
           # core·web·assistant 배포가 모두 같은 ~/infra를 쓴다. 레포가 달라 GitHub concurrency로는 못 막으니 서버에서 한 번에 하나만 돌게 잠근다
           exec 9>"$HOME/.mspace-deploy.lock"
-          flock -w 300 9 || { echo "다른 배포가 5분 넘게 끝나지 않음(작업 제한 10분 안에 이 배포도 끝내야 함)"; exit 1; }
+          flock -w 300 9 || { echo "다른 배포가 5분 넘게 끝나지 않음(작업 제한 15분 안에 이 배포도 끝내야 함)"; exit 1; }
           cd ~/infra
-          OLD=$(git rev-parse HEAD)                            # 새 nginx 설정이 틀리면 되돌릴 자리
+          # 서버에서 손으로 고친 파일이 있으면 아래 되돌리기(reset --hard)가 지워 버린다. 그럴 땐 배포를 멈춘다
+          git diff --quiet HEAD || { echo "~/infra에 커밋 안 된 수정이 있음: git status로 확인한 뒤 다시 배포"; exit 1; }
+          # 되돌릴 자리는 'nginx 검사를 통과한 마지막 커밋'. 지난 배포가 검사 전에 끊겼으면 HEAD가 검사 안 된 커밋일 수 있어서
+          GOOD="$HOME/.mspace-infra-good"
+          OLD=$(cat "$GOOD" 2>/dev/null || git rev-parse HEAD)
           git pull --ff-only                                   # compose·nginx 설정도 최신으로
           C="docker compose -p mspace-$T --env-file .env.$T"
           $C pull mcp agent
@@ -125,6 +129,7 @@ jobs:
           # 통과하면 compose에서 gateway 설정이 바뀌었을 때만 다시 만들고(up)
           # 끊김 없이 다시 읽게 한다(reload). reload가 안 되면 다시 켠다
           $C run --rm --no-deps -T gateway nginx -t || { echo "nginx 설정 오류: infra를 이전 커밋으로 되돌림(.env 같은 추적 안 하는 파일은 그대로)"; git reset -q --hard "$OLD"; exit 1; }
+          git rev-parse HEAD > "$GOOD"                         # 이 커밋은 검사 통과
           $C up -d --no-deps gateway
           $C exec -T gateway nginx -s reload || $C restart gateway
           sleep 20
@@ -136,6 +141,6 @@ jobs:
           # .env는 compose 문법이라 bash로 통째로 읽으면(source) 비밀번호의 ; 같은 글자가 명령으로 실행될 수 있다. PORT 한 줄만 읽는다
           PORT=$(grep -E '^PORT=' ".env.$T" | tail -n 1 | cut -d= -f2- | tr -d "\"' \r")
           [[ "$PORT" =~ ^[0-9]+$ ]] || { echo ".env.$T의 PORT 값이 숫자가 아님: '$PORT'"; exit 1; }
-          curl -fsS "127.0.0.1:$PORT/actuator/health" | grep -q UP || { echo "입구(gateway) 확인 실패"; $C logs --tail=50 gateway; exit 1; }
+          curl -fsS --max-time 5 "127.0.0.1:$PORT/actuator/health" | grep -q UP || { echo "입구(gateway) 확인 실패"; $C logs --tail=50 gateway; exit 1; }
           echo "배포 성공 ($T)"
           REMOTE
