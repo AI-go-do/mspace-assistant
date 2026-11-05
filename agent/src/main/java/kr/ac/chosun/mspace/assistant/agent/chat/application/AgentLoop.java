@@ -118,7 +118,8 @@ public class AgentLoop {
         List<Confirmation> confirmations = new ArrayList<>();
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
-        Instant lookedUpAt = null; // 마지막으로 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
+        Instant lookedUpAt = null; // 마지막으로 예약 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
+        boolean usedSchedule = false; // my_schedule로 학생이 넣은 시간표를 봤는지. 꼬리말에 "입력한 시간표 기준"
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
         // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
@@ -142,7 +143,8 @@ public class AgentLoop {
                     return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false);
                 }
                 if (!reply.wantsTools()) {
-                    return new ChatResult(grounded(reply.text(), lookedUpAt), confirmations, accessCodeCards, calls, false);
+                    return new ChatResult(grounded(reply.text(), lookedUpAt, usedSchedule), confirmations, accessCodeCards,
+                            calls, false);
                 }
                 if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
@@ -165,7 +167,10 @@ public class AgentLoop {
                     calls++;
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
-                    if (!outcome.isError()) {
+                    if (!outcome.isError() && SCHEDULE_TOOL.equals(call.name())) {
+                        // 시간표가 없다는 답(NO_SCHEDULE)은 시간표를 본 근거가 아니다
+                        usedSchedule |= !outcome.json().contains("\"NO_SCHEDULE\"");
+                    } else if (!outcome.isError()) {
                         lookedUpAt = now;
                     }
                     log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
@@ -209,14 +214,29 @@ public class AgentLoop {
      * 코드가 근거를 보여 주는 것이라, 모델이 사과하거나 지어내도 학생은 조회 사실을 알 수 있다 (11/5 시연 피드백)
      */
     String grounded(String text, Instant lookedUpAt) {
-        if (lookedUpAt == null || text == null || text.isBlank()) {
-            return text;
-        }
-        ZonedDateTime at = lookedUpAt.atZone(SEOUL);
-        return text.stripTrailing() + GROUNDING_SUFFIX.formatted(at.getHour(), at.getMinute());
+        return grounded(text, lookedUpAt, false);
     }
 
+    /**
+     * 시간표를 본 답에는 "입력한 시간표 기준"을 붙인다 (재웅 기획서: 답의 근거). 예약 도구도 불렀으면 한 줄에 같이:
+     * "(예약 시스템 15:00 조회 · 입력한 시간표 기준)"
+     */
+    String grounded(String text, Instant lookedUpAt, boolean usedSchedule) {
+        if ((lookedUpAt == null && !usedSchedule) || text == null || text.isBlank()) {
+            return text;
+        }
+        if (lookedUpAt == null) {
+            return text.stripTrailing() + SCHEDULE_SUFFIX;
+        }
+        ZonedDateTime at = lookedUpAt.atZone(SEOUL);
+        String suffix = usedSchedule ? BOTH_SUFFIX : GROUNDING_SUFFIX;
+        return text.stripTrailing() + suffix.formatted(at.getHour(), at.getMinute());
+    }
+
+    static final String SCHEDULE_TOOL = "my_schedule";
     static final String GROUNDING_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 기준)";
+    static final String SCHEDULE_SUFFIX = "\n\n(입력한 시간표 기준)";
+    static final String BOTH_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 · 입력한 시간표 기준)";
 
     String systemPrompt() {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
@@ -237,7 +257,11 @@ public class AgentLoop {
                 - 학번·전화번호·이름을 묻지 않는다. 함께 쓰는 사람의 학번은 확인 화면에서 받는다.
                 - 도구 결과의 note·message 문장은 바꿔 말하지 않고 그대로 전하고, 할 수 있는 다음 행동을 하나 제안한다.
                   "빈방이 없다"와 "인원에 맞는 방이 없다"는 다른 이유다. 결과에 적힌 이유만 말한다.
-                - 수업 시간표는 아직 모른다. "수업 끝나고"처럼 말하면 끝나는 시각을 물어본다.
+                - "수업 끝나고", "마지막 수업 30분 전", "오늘 수업 뭐 있어"처럼 수업 시각이 필요하면 먼저 my_schedule을
+                  그날 날짜로 부른다. 끝나는 시각을 학생에게 되묻지 않는다. "수업 끝나고"는 결과의 searchFromAt을
+                  find_available_rooms의 from에 그대로 넣고, 시각을 직접 계산하지 않는다. code가 NO_SCHEDULE이면
+                  note를 그대로 전하고 수업 시각을 지어내지 않는다(학생이 시각을 직접 말하면 그 시각으로 찾는다).
+                  그날 수업이 없으면 그렇다고 말하고 원하는 시각을 묻는다.
                 - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
                 - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면
@@ -245,7 +269,8 @@ public class AgentLoop {
                 - 인원을 말하지 않았으면 headcount를 넣지 않는다. 방마다 인원 범위가 있어(1~4번 방 3~5명, 5번 방 5~8명)
                   2명 이하는 예약할 수 없다. 인원이 안 맞으면 그 이유를 그대로 말한다.
                 - "5시"처럼 오전·오후가 없으면 지금 이후의 가장 가까운 시각으로 보고, 답에 "오후 5시"처럼 적는다.
-                - 앞선 네 답 중 "(예약 시스템 HH:MM 조회 기준)" 꼬리말이 붙은 것은 그 시각에 도구로 조회한 결과다
+                - 앞선 네 답 중 "(예약 시스템 HH:MM 조회…)" 꼬리말이 붙은 것은 그 시각에 도구로 조회한 결과다.
+                  "(…입력한 시간표 기준)"은 학생이 넣은 시간표를 my_schedule로 본 결과다
                   (도구 호출 기록은 대화에 다시 실리지 않는다). "그걸 어떻게 알아?"처럼 물으면 그 시각에 예약 시스템을
                   조회했다고 답하고, 확인하지 않았다고 사과하지 않는다. 꼬리말이 없는 답은 조회한 것이 아니니,
                   근거를 묻거나 다시 확인해 달라면 그 자리에서 도구를 불러 답한다.

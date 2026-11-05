@@ -51,7 +51,8 @@
 | `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` | FR-RSV-007 |
 | `checkout_reservation` | **쓰기** | `POST /api/reservations/{id}/checkout` | FR-RSV-008 |
 | `continue_reservation` | **쓰기** | `POST /api/reservations/{id}/continue` (core #51). 30분 단위 최대 2시간, 1회, 끝나기 10분 전부터 | FR-RSV-105 |
-| `list_notices`, `class_changes`, `my_schedule` | 읽기 | 학사 정보 수집기 (나중) | FR-AGT-102 |
+| `my_schedule` | 읽기 | 없음. 학생이 화면에서 넣은 시간표(mcp-server 저장소, `SCHEDULE_STORE=redis`면 `agent:schedule:<학생 키>`). 넣기는 REST `PUT /api/agent/schedule`(모델 못 부름). **구현됨**(#63) | FR-AGT-102 |
+| `list_notices`, `class_changes` | 읽기 | 학사 정보 수집기 (나중) | FR-AGT-102 |
 
 - 도구별 입력·출력·오류는 [도구 명세](docs/도구-명세.md), 두 단계 확인은 [설계](docs/설계.md)에 있어요
 - API 형식의 기준은 [요구사항 명세](https://github.com/AI-go-do/docs/blob/main/requirements/requirements.md)와 core의 OpenAPI 자동 문서(`/swagger-ui`)예요. 여기서 따로 정의하지 않아요. 둘이 바뀌면 도구를 맞춰 고쳐요
@@ -101,5 +102,5 @@
 | ~~A-1~~ | MCP 서버 구현 방식 | **결정(11/2):** Spring AI 2.0.2 MCP 서버. 2.0.2가 Boot 4.1.2 기준으로 빌드됨, 실제 빌드·테스트로 확인 ([설계](docs/설계.md) 1장) |
 | A-2 | 기본 모델 | 시연은 Gemini, 학교 도입 제안 시 Ollama (데이터가 학교 밖으로 안 나감) |
 | A-3 | 사용자 화면 | 예약 코어 화면 안에 채팅 창을 붙일지, 별도 화면으로 둘지 (예약 코어 담당과 상의) |
-| A-4 | 학사 정보 수집 범위 | **방향(11/5 영준):** 대화 맥락 저장(#60)이 잘 되면 시간표를 바로 당겨요. 학생이 직접 넣는 방식(입력 또는 캡처 → 확인 카드 → 서버 기억)으로, 학사시스템 긁기는 안 해요. 설계 4장 참고 |
+| A-4 | 학사 정보 수집 범위 | **방향(11/5 영준):** 대화 맥락 저장(#60)이 잘 되면 시간표를 바로 당겨요. 학생이 직접 넣는 방식(입력 또는 캡처 → 확인 카드 → 서버 기억)으로, 학사시스템 긁기는 안 해요. **1단계 구현(#63):** 직접 입력 + `my_schedule`. 캡처 읽기는 다음 단계. 설계 5장 |
 | ~~A-5~~ | 참여자 학번 입력 위치 | **결정(11/2):** 모델 대화가 아니라 확인 카드에서 입력 (학번이 외부 AI로 안 나가게, [설계](docs/설계.md) 2.4) |
