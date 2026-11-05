@@ -43,6 +43,39 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         }
     }
 
+    @Override
+    public StatusChange cancel(UserCredential credential, long reservationId) {
+        return change(credential, reservationId, "cancel", "CANCELED");
+    }
+
+    @Override
+    public StatusChange checkout(UserCredential credential, long reservationId) {
+        return change(credential, reservationId, "checkout", "CHECKED_OUT");
+    }
+
+    /**
+     * 취소·퇴실은 멱등 키 없이 보낸다: core가 조건부 UPDATE라 두 번째는 409로 끝난다 (설계.md 2.3).
+     * 응답이 없거나 읽지 못하거나 core 5xx면 이미 처리됐을 수 있다. "다시 시도"가 아니라 내 예약부터 확인하게 안내한다
+     * (다시 누르면 처리된 경우 409가 와서 실패처럼 보인다).
+     */
+    private StatusChange change(UserCredential credential, long reservationId, String verb, String doneStatus) {
+        CoreStatus body;
+        try {
+            body = core.call("POST /api/reservations/{id}/" + verb, credential,
+                    rest -> rest.post().uri("/api/reservations/{id}/" + verb, reservationId), CoreStatus.class);
+        } catch (CoreApiException e) {
+            if (e.status() >= 500) {
+                throw new CoreApiException("STATUS_CHANGE_UNKNOWN",
+                        "처리됐는지 확인하지 못했어요. 다시 누르기 전에 내 예약에서 먼저 확인해 주세요.", 503);
+            }
+            throw e;
+        }
+        // 여기까지 왔으면 2xx(CoreHttp가 2xx 아닌 응답은 BAD_RESPONSE로 바꾼다). 본문이 비었거나 status가 없으면 처리된 상태로 채운다.
+        // id는 본문에서 읽지 않고 우리가 보낸 예약 id를 쓴다 (본문에 id가 빠져도 '모름'이나 0이 되지 않게)
+        String status = body == null || body.status() == null || body.status().isBlank() ? doneStatus : body.status();
+        return new StatusChange(reservationId, status);
+    }
+
     /**
      * 5xx(닿지 못함·읽지 못함·코어 500)는 저장한 뒤에 났을 수 있다. "다시 시도"로 안내하면 새 확인 토큰 = 새 멱등 키라
      * 중복 예약이 될 수 있어 '모름'으로 바꾼다. 4xx(409 겹침 등)는 처리 안 된 것이 확실해서 그대로 둔다
@@ -72,6 +105,10 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         }
         return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
                 c.status(), c.headcount(), c.accessCode(), response.getStatusCode().value() == 200);
+    }
+
+    /** core 상태 변경 응답에서 쓰는 값은 status뿐이다 */
+    record CoreStatus(String status) {
     }
 
     record CreateRequest(int roomId, OffsetDateTime startAt, OffsetDateTime endAt,
