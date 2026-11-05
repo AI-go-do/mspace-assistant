@@ -36,6 +36,8 @@ mspace:
     forward-headers:
       - Authorization
     timeout: 3s
+    # core가 다른 서버에 있어 공용 구간을 지나면 true (#44). 같은 호스트의 compose(http://core:8080)·localhost는 false로 둔다
+    require-https: ${CORE_REQUIRE_HTTPS:false}
   # 쓰기 도구 확인 토큰. 짧게 두어 오래된 확인안이 실행되지 않게 한다
   confirm:
     ttl: 2m

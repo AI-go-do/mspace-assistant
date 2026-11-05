@@ -36,6 +36,7 @@ AGENT=http://localhost:8091 USER_ID=1 python3 -I scripts/measure/measure.py --on
 | 키 | 뜻 |
 |---|---|
 | `tools_any` | 이 중 하나는 불렀어야 함 |
+| `tools_all` | 이것들을 모두 불렀어야 함 (장면 C 앞부분: 시간표 → 빈방) |
 | `tools_none` | 이 도구는 부르면 안 됨 (예: "내일 2시"에 `room_status`) |
 | `no_tool` | 도구를 하나도 안 불러야 함 (인사, 범위 밖) |
 | `confirm_tool` | 확인 카드의 도구 이름 |

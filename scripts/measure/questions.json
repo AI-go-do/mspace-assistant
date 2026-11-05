@@ -181,12 +181,13 @@
       "text": "내일 수업 끝나고 빈방 잡아 줘",
       "expect": [
         {
-          "tools_any": [
-            "my_schedule"
+          "tools_all": [
+            "my_schedule",
+            "find_available_rooms"
           ]
         }
       ],
-      "note": "장면 C: 시간표가 있으면 my_schedule → find_available_rooms. 내일 빈방이 없으면 모레로 이어서 보는지는 결과 표의 tools 수(4)로 본다"
+      "note": "장면 C 앞부분: 시간표를 보고(my_schedule) 빈방까지 찾아야(find_available_rooms) 통과. 둘 다 불러야 해요. '내일 없으면 모레' 넘어감은 내일이 꽉 찬 날에만 생기니 자동 판정 밖이에요 — 그날은 결과 표 why의 도구 목록(my_schedule,find_available_rooms,my_schedule,find_available_rooms)으로 회차마다 봐요"
     }
   ]
 }
