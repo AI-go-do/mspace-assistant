@@ -21,7 +21,9 @@ class ReadTimetableImageTest {
 
     final ImageReader reader = mock(ImageReader.class);
     final ReadTimetableImage service = new ReadTimetableImage(reader, JsonMapper.builder().build());
-    final byte[] png = new byte[] {(byte) 0x89, 'P', 'N', 'G'};
+    final byte[] png = new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0};
+    final byte[] jpeg = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0};
+    final byte[] webp = new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8'};
 
     @Test
     @DisplayName("정상: 모델이 준 JSON을 classes 초안으로 바꾸고, 지시문에 이름·학번 금지가 들어간다")
@@ -46,7 +48,7 @@ class ReadTimetableImageTest {
     }
 
     @Test
-    @DisplayName("모델 답 중 요일·시각이 틀린 줄과 중복은 버리고 dropped로 센다. 코드 펜스도 벗긴다")
+    @DisplayName("모델 답 중 요일·시각이 틀린 줄과 중복은 버리고 모두 dropped로 센다. 코드 펜스도 벗긴다")
     void dropsInvalidRows() {
         // given
         when(reader.read(anyString(), anyString(), any())).thenReturn("""
@@ -62,12 +64,12 @@ class ReadTimetableImageTest {
                 ```""");
 
         // when
-        ReadTimetableImage.Draft draft = service.read("image/jpeg", png);
+        ReadTimetableImage.Draft draft = service.read("image/jpeg", jpeg);
 
         // then
         assertThat(draft.classes()).containsExactly(new ReadTimetableImage.ClassDraft("FRI", "10:00", "11:00", "알고리즘"));
-        assertThat(draft.dropped()).isEqualTo(4);
-        assertThat(draft.note()).contains("4개");
+        assertThat(draft.dropped()).isEqualTo(5);  // 틀린 줄 4 + 중복 1
+        assertThat(draft.note()).contains("5개");
     }
 
     @Test
@@ -75,7 +77,7 @@ class ReadTimetableImageTest {
     void notJson() {
         when(reader.read(anyString(), anyString(), any())).thenReturn("죄송해요, 시간표가 보이지 않아요.");
 
-        ReadTimetableImage.Draft draft = service.read("image/webp", png);
+        ReadTimetableImage.Draft draft = service.read("image/webp", webp);
 
         assertThat(draft.classes()).isEmpty();
         assertThat(draft.note()).contains("직접 입력");
@@ -88,7 +90,30 @@ class ReadTimetableImageTest {
         assertThatThrownBy(() -> service.read("image/png", new byte[0])).isInstanceOf(ReadTimetableImage.InvalidImage.class);
         assertThatThrownBy(() -> service.read("image/png", new byte[ReadTimetableImage.MAX_BYTES + 1]))
                 .isInstanceOf(ReadTimetableImage.InvalidImage.class).hasMessageContaining("5MB");
+        // 선언은 PNG인데 실제 바이트가 아님(PDF 머리말) → 외부 AI로 보내지 않는다
+        assertThatThrownBy(() -> service.read("image/png", "%PDF-1.4 ...".getBytes()))
+                .isInstanceOf(ReadTimetableImage.InvalidImage.class).hasMessageContaining("사진 파일이 아니에요");
+        assertThatThrownBy(() -> service.read("image/webp", png)).isInstanceOf(ReadTimetableImage.InvalidImage.class);
         verifyNoInteractions(reader);
+    }
+
+    @Test
+    @DisplayName("과목 40개·과목명 30자 한도(mcp-server PUT과 같음): 넘는 줄은 dropped, 긴 이름은 자른다")
+    void limitsMatchPut() {
+        StringBuilder sb = new StringBuilder("{\"classes\":[");
+        for (int i = 0; i < 41; i++) {
+            sb.append(i > 0 ? "," : "").append("{\"dayOfWeek\":\"MON\",\"startTime\":\"").append(String.format("%02d:00", i % 24))
+                    .append("\",\"endTime\":\"").append(String.format("%02d:30", i % 24)).append("\",\"name\":\"과목").append(i)
+                    .append(i == 0 ? "가".repeat(40) : "").append("\"}");
+        }
+        sb.append("]}");
+        when(reader.read(anyString(), anyString(), any())).thenReturn(sb.toString());
+
+        ReadTimetableImage.Draft draft = service.read("image/png", png);
+
+        assertThat(draft.classes()).hasSize(ReadTimetableImage.MAX_CLASSES);
+        assertThat(draft.classes().getFirst().name()).hasSize(ReadTimetableImage.MAX_NAME);
+        assertThat(draft.dropped()).isEqualTo(1);
     }
 
     @Test

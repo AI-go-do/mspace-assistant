@@ -24,8 +24,9 @@ public class ReadTimetableImage {
 
     static final Set<String> MIME_TYPES = Set.of("image/png", "image/jpeg", "image/webp");
     static final int MAX_BYTES = 5 * 1024 * 1024;
-    static final int MAX_CLASSES = 60;
-    static final int MAX_NAME = 40;
+    /** mcp-server PUT 검사(max-classes 40, max-name-chars 30)와 같게. 초안이 통과하고 저장이 거절되면 학생이 원인을 모른다 */
+    static final int MAX_CLASSES = 40;
+    static final int MAX_NAME = 30;
 
     private static final Set<String> DAYS = Set.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
@@ -63,8 +64,34 @@ public class ReadTimetableImage {
         if (image.length > MAX_BYTES) {
             throw new InvalidImage("사진은 5MB까지 올릴 수 있어요.");
         }
-        String text = reader.read(INSTRUCTION, mimeType.toLowerCase(Locale.ROOT), image);
+        String mime = mimeType.toLowerCase(Locale.ROOT);
+        if (!looksLike(mime, image)) {
+            throw new InvalidImage("사진 파일이 아니에요. PNG, JPEG, WebP 사진을 올려 주세요.");
+        }
+        String text = reader.read(INSTRUCTION, mime, image);
         return parse(text);
+    }
+
+    /** 선언된 형식과 실제 바이트(매직 넘버)가 맞는지. 아무 바이트나 외부 AI로 보내지 않기 위해 */
+    static boolean looksLike(String mime, byte[] b) {
+        return switch (mime) {
+            case "image/png" -> startsWith(b, 0, new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A});
+            case "image/jpeg" -> startsWith(b, 0, new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF});
+            case "image/webp" -> startsWith(b, 0, new byte[] {'R', 'I', 'F', 'F'}) && startsWith(b, 8, new byte[] {'W', 'E', 'B', 'P'});
+            default -> false;
+        };
+    }
+
+    private static boolean startsWith(byte[] b, int offset, byte[] prefix) {
+        if (b.length < offset + prefix.length) {
+            return false;
+        }
+        for (int i = 0; i < prefix.length; i++) {
+            if (b[offset + i] != prefix[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     Draft parse(String text) {
@@ -80,9 +107,9 @@ public class ReadTimetableImage {
         if (classes.isArray()) {
             for (JsonNode c : classes) {
                 ClassDraft d = normalize(c);
-                if (d == null) {
-                    dropped++;
-                } else if (out.size() < MAX_CLASSES && !out.contains(d)) {
+                if (d == null || out.contains(d) || out.size() >= MAX_CLASSES) {
+                    dropped++;  // 틀린 줄·중복·한도 초과 모두 "읽지 못한 칸"으로 알린다
+                } else {
                     out.add(d);
                 }
             }

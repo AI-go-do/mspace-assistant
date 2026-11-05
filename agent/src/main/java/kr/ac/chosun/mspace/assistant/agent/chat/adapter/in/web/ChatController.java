@@ -193,10 +193,14 @@ class ChatController {
      * 응답 {classes:[…], dropped, note}. classes는 PUT /api/agent/schedule 본문과 같은 모양이라 확인 카드에서 고쳐 그대로 보낸다
      */
     @PostMapping(value = "/api/agent/schedule/parse", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<?> parseSchedule(@RequestHeader HttpHeaders headers, @RequestPart("image") MultipartFile image) {
+    ResponseEntity<?> parseSchedule(@RequestHeader HttpHeaders headers,
+                                    @RequestPart(value = "image", required = false) MultipartFile image) {
         UserHeaders user = user(headers);
         if (user.isEmpty()) {
             return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
+        }
+        if (image == null || image.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_IMAGE", "시간표 사진을 올려 주세요.");
         }
         byte[] bytes;
         try {

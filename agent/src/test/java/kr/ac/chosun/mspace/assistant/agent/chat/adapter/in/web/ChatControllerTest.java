@@ -263,7 +263,17 @@ class ChatControllerTest {
 
         mvc.perform(multipart("/api/agent/schedule/parse").file(pdf))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        // image 파트가 없어도 로그인 검사가 먼저, 로그인했으면 400 INVALID_IMAGE
+        mvc.perform(multipart("/api/agent/schedule/parse"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(multipart("/api/agent/schedule/parse").header("Authorization", "Bearer owner"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_IMAGE"));
         verifyNoMoreInteractions(timetable);
+
+        // 5MB 초과(multipart 해석 단계 예외)는 전역 advice가 400 INVALID_IMAGE로
+        var tooLarge = new UploadErrorAdvice().tooLarge(new org.springframework.web.multipart.MaxUploadSizeExceededException(5L * 1024 * 1024));
+        org.assertj.core.api.Assertions.assertThat(tooLarge.getStatusCode().value()).isEqualTo(400);
+        org.assertj.core.api.Assertions.assertThat(tooLarge.getBody()).containsEntry("code", "INVALID_IMAGE");
 
         when(timetable.read(eq("application/pdf"), any())).thenThrow(new ReadTimetableImage.InvalidImage("PNG, JPEG, WebP 사진만 읽을 수 있어요."));
         mvc.perform(multipart("/api/agent/schedule/parse").file(pdf).header("Authorization", "Bearer owner"))
