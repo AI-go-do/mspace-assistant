@@ -147,6 +147,8 @@ jobs:
           git rev-parse HEAD > "$GOOD"                         # 이 커밋은 검사 통과
           # .env는 compose 문법이라 bash로 통째로 읽으면(source) 비밀번호의 ; 같은 글자가 명령으로 실행될 수 있다. PORT 한 줄만 읽는다
           PORT=$(grep -E '^PORT=' ".env.$T" | tail -n 1 | cut -d= -f2- | tr -d "\"' \r")
+          # 게이트웨이가 받는 주소(BIND_ADDR). 비었거나 0.0.0.0이면 127.0.0.1로 확인한다 (학교 서버는 10.116.64.12)
+          ADDR=$( (grep -E '^BIND_ADDR=' ".env.$T" || true) | tail -n 1 | cut -d= -f2- | tr -d "\"' \r"); case "$ADDR" in ""|0.0.0.0) ADDR=127.0.0.1;; esac
           [[ "$PORT" =~ ^[0-9]+$ ]] || { echo ".env.$T의 PORT 값이 숫자가 아님: '$PORT'"; exit 1; }
           # 첫 배포는 서버에서 손으로 전체를 먼저 띄운다(--no-deps라 db·core를 새로 만들지 않고, 아래 입구 확인이 core를 거친다)
           for s in db core; do [ "$($C ps -q --status running $s)" ] || { echo "$s가 안 떠 있음: 첫 배포라면 서버 ~/infra에서 '$C up -d'로 전체를 먼저 띄운 뒤 다시 배포"; exit 1; }; done
@@ -162,7 +164,7 @@ jobs:
           # gateway가 실제로 길을 나누는지 입구로 한 번 불러 본다 (core health가 UP이면 gateway·core 둘 다 정상)
           # 게이트웨이(Spring)가 늦게 뜰 수 있어 최대 60초 동안 2초마다 다시 확인한다
           for i in $(seq 1 30); do
-            curl -fsS --max-time 5 "127.0.0.1:$PORT/actuator/health" | grep -q UP && { echo "배포 성공 ($T)"; exit 0; }
+            curl -fsS --max-time 5 "$ADDR:$PORT/actuator/health" | grep -q UP && { echo "배포 성공 ($T)"; exit 0; }
             sleep 2
           done
           echo "입구(gateway) 확인 실패"; $C logs --tail=50 gateway; exit 1
