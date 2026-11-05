@@ -294,14 +294,17 @@ class ChatControllerTest {
                 new DailyBriefing.Reservations(List.of(), null), new DailyBriefing.Rooms(List.of("2번 방"), "10:00", null),
                 "11월 6일 금요일 브리핑이에요. …", List.of("OPEN_SCHEDULE")));
 
-        // when · then
-        mvc.perform(get("/api/agent/briefing").header("Authorization", "Bearer owner"))
-                .andExpect(status().isOk())
+        // when
+        var ok = mvc.perform(get("/api/agent/briefing").header("Authorization", "Bearer owner"));
+        var anonymous = mvc.perform(get("/api/agent/briefing"));
+
+        // then
+        ok.andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.text").value("11월 6일 금요일 브리핑이에요. …"))
                 .andExpect(jsonPath("$.rooms.availableNames[0]").value("2번 방"))
                 .andExpect(jsonPath("$.hints[0]").value("OPEN_SCHEDULE"));
-        mvc.perform(get("/api/agent/briefing")).andExpect(status().isUnauthorized());
+        anonymous.andExpect(status().isUnauthorized());
         verify(dailyBriefing).today(any(UserHeaders.class));
         verifyNoMoreInteractions(dailyBriefing);
     }

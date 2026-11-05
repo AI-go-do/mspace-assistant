@@ -87,18 +87,21 @@ class DailyBriefingTest {
         assertThat(b.hints()).isEmpty();
         assertThat(b.text()).isEqualTo("11월 6일 금요일 브리핑이에요. 오늘 수업은 자료구조 09:00–10:15, 운영체제 13:00–14:50 두 개예요. "
                 + "마지막 수업은 14:50에 끝나요. 오늘 예약은 1번 방 15:30–17:30이고 대표자예요. 그 뒤로 1건이 더 있어요. "
-                + "지금 바로 쓸 수 있는 방은 2번 방, 3번 방 두 개이에요.");
+                + "지금 바로 쓸 수 있는 방은 2번 방, 3번 방 두 개예요.");
     }
 
     @Test
     @DisplayName("시간표 없음: 넣으라는 안내 + OPEN_SCHEDULE 신호. 예약 없음·빈 방 없음 문장")
     void noScheduleNoReservation() {
+        // given
         var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}",
                 "room_status", "{\"now\":\"2026-11-06T08:00:00+09:00\",\"availableCount\":0,\"rooms\":[{\"roomId\":1,\"roomName\":\"1번 방\",\"latestEndAt\":null}]}"),
                 new ArrayList<>());
 
+        // when
         DailyBriefing.Briefing b = briefing(tools).today(ME);
 
+        // then
         assertThat(b.hints()).containsExactly(ChatResult.HINT_OPEN_SCHEDULE);
         assertThat(b.schedule().classes()).isEmpty();
         assertThat(b.text()).isEqualTo("11월 6일 금요일 브리핑이에요. 아직 넣은 시간표가 없어요. 넣어 두면 수업 끝나는 시각에 맞춰 빈방을 찾아 드려요. "
@@ -108,10 +111,13 @@ class DailyBriefingTest {
     @Test
     @DisplayName("도구 하나가 실패해도 나머지는 보여 준다: 실패한 칸은 null + '불러오지 못했어요'")
     void partialFailure() {
+        // given
         var tools = fake(Map.of("my_schedule", FRIDAY, "room_status", STATUS), new ArrayList<>()); // my_reservations 실패
 
+        // when
         DailyBriefing.Briefing b = briefing(tools).today(ME);
 
+        // then
         assertThat(b.reservations().items()).isNull();
         assertThat(b.reservations().note()).isEqualTo("예약을 불러오지 못했어요.");
         assertThat(b.text()).contains("예약을 불러오지 못했어요.").contains("지금 바로 쓸 수 있는 방은 2번 방, 3번 방");
@@ -120,12 +126,34 @@ class DailyBriefingTest {
     @Test
     @DisplayName("오늘 예약이 없고 다음 예약이 다른 날이면 '다음 예약은 11월 9일(월) …'로 말한다")
     void nextReservationAnotherDay() {
+        // given
         String later = "{\"reservations\":[{\"id\":8,\"roomName\":\"3번 방\",\"startAt\":\"2026-11-09T10:00:00+09:00\","
                 + "\"endAt\":\"2026-11-09T11:00:00+09:00\",\"status\":\"BOOKED\",\"owner\":false,\"participantCount\":3}]}";
         var tools = fake(Map.of("my_schedule", FRIDAY, "my_reservations", later, "room_status", STATUS), new ArrayList<>());
 
+        // when
         DailyBriefing.Briefing b = briefing(tools).today(ME);
 
+        // then
         assertThat(b.text()).contains("다음 예약은 11월 9일(월) 3번 방 10:00–11:00이에요.");
+    }
+
+    @Test
+    @DisplayName("끝난 예약은 빼고, 자정 넘겨 지금 쓰는 예약은 오늘 예약, 오늘 것을 다른 날보다 먼저")
+    void endedOvernightAndOrder() {
+        // given: 어젯밤 끝난 BOOKED(상태 갱신 늦음), 앞에 온 내일 예약, 어젯밤 23:30 시작해 지금(08:00)도 쓰는 IN_USE
+        String rs = "{\"reservations\":["
+                + "{\"id\":1,\"roomName\":\"4번 방\",\"startAt\":\"2026-11-05T20:00:00+09:00\",\"endAt\":\"2026-11-05T22:00:00+09:00\",\"status\":\"BOOKED\",\"owner\":true},"
+                + "{\"id\":2,\"roomName\":\"3번 방\",\"startAt\":\"2026-11-07T10:00:00+09:00\",\"endAt\":\"2026-11-07T11:00:00+09:00\",\"status\":\"BOOKED\",\"owner\":true},"
+                + "{\"id\":3,\"roomName\":\"5번 방\",\"startAt\":\"2026-11-05T23:30:00+09:00\",\"endAt\":\"2026-11-06T09:00:00+09:00\",\"status\":\"IN_USE\",\"owner\":false}]}";
+        var tools = fake(Map.of("my_schedule", FRIDAY, "my_reservations", rs, "room_status", STATUS), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = briefing(tools).today(ME);
+
+        // then
+        assertThat(b.reservations().items()).extracting(DailyBriefing.ReservationItem::id).containsExactly(3L, 2L);
+        assertThat(b.reservations().items().getFirst().today()).isTrue();
+        assertThat(b.text()).contains("오늘 예약은 5번 방 23:30–09:00(사용 중)이에요. 그 뒤로 1건이 더 있어요.");
     }
 }

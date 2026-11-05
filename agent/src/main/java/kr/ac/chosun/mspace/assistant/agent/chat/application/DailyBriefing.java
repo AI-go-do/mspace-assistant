@@ -91,7 +91,7 @@ public class DailyBriefing {
         return new Schedule(classes, hhmm(node.path("lastClassEndAt").asString(null)), null);
     }
 
-    /** 끝나지 않은 예약(BOOKED·IN_USE)만, 시작이 빠른 순(도구가 이미 그렇게 준다) */
+    /** 끝나지 않은 예약(BOOKED·IN_USE, 종료 전)만, 오늘 것 먼저 */
     private static Reservations reservations(JsonNode node, ZonedDateTime now) {
         if (node == null) {
             return new Reservations(null, "예약을 불러오지 못했어요.");
@@ -102,11 +102,20 @@ public class DailyBriefing {
                 continue;
             }
             OffsetDateTime start = parse(r.path("startAt").asString(null));
-            boolean today = start != null && start.atZoneSameInstant(SEOUL).toLocalDate().equals(now.toLocalDate());
+            OffsetDateTime end = parse(r.path("endAt").asString(null));
+            if (end != null && !end.toInstant().isAfter(now.toInstant())) {
+                continue; // core 상태 갱신이 늦어도 끝난 예약은 안내하지 않는다
+            }
+            // 오늘 시작했거나, 전날 시작해 지금도 이어지는(자정 넘김) 예약은 오늘 예약
+            boolean today = start != null && (start.atZoneSameInstant(SEOUL).toLocalDate().equals(now.toLocalDate())
+                    || !start.toInstant().isAfter(now.toInstant()));
             items.add(new ReservationItem(r.path("id").asLong(0), r.path("roomName").asString(""),
                     r.path("startAt").asString(null), r.path("endAt").asString(null), r.path("status").asString(""),
                     r.path("owner").asBoolean(false), today));
         }
+        // 오늘 것 먼저, 그 안에서는 시작이 빠른 순 (도구는 끝나지 않은 예약끼리의 순서를 보장하지 않는다)
+        items.sort(java.util.Comparator.comparing((ReservationItem i) -> !i.today())
+                .thenComparing(i -> i.startAt() == null ? "" : i.startAt()));
         return new Reservations(items, null);
     }
 
@@ -171,7 +180,7 @@ public class DailyBriefing {
             sb.append("지금 바로 쓸 수 있는 방은 없어요.");
         } else {
             sb.append("지금 바로 쓸 수 있는 방은 ").append(String.join(", ", rooms.availableNames())).append(' ')
-                    .append(count(rooms.availableNames().size())).append("이에요.");
+                    .append(count(rooms.availableNames().size())).append("예요.");
         }
         return sb.toString().trim();
     }
