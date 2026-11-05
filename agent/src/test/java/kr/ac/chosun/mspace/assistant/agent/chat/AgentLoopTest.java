@@ -205,6 +205,7 @@ class AgentLoopTest {
         ChatResult result = loop(llm, tools).run(ME, List.of(), "계속 찾아 줘");
 
         assertThat(result.stoppedByLimit()).isTrue();
+        assertThat(result.suggestions()).as("멈춘 대화엔 빠른 답장 없음").isEmpty();
         assertThat(result.toolCalls()).isEqualTo(8);
         assertThat(tools.called).hasSize(8);
         assertThat(result.reply()).contains("너무 많아져서 멈췄어요");
@@ -425,6 +426,7 @@ class AgentLoopTest {
         assertThat(withoutSchedule.reply()).isEqualTo("아직 넣은 시간표가 없어요.");
         // 시간표가 없을 때는 화면이 [내 시간표] 버튼을 그리도록 신호를 준다 (설계 5장 ③)
         assertThat(withoutSchedule.hints()).containsExactly(ChatResult.HINT_OPEN_SCHEDULE);
+        assertThat(withoutSchedule.suggestions()).as("시간표 없음은 버튼(hints)으로, 빠른 답장은 비움").isEmpty();
     }
 
     /** 2026-11-03(화) 15:30부터 빈 칸이 하나도 없음 */

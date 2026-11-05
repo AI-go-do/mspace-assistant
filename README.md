@@ -32,7 +32,7 @@ SPRING_PROFILES_ACTIVE=local CORE_BASE_URL=http://localhost:8080 mvn -pl mcp-ser
 SPRING_PROFILES_ACTIVE=local GEMINI_API_KEY=... mvn -pl agent spring-boot:run  # 키는 .env에만. 커밋 금지
 curl -X POST localhost:8091/api/agent/chat -H 'X-User-Id: 1' -H 'Content-Type: application/json' \
      -d '{"message":"내일 오후 2시 빈방 있어?"}'     # → 202 {"jobId":"j_…","status":"PENDING","pollAfterMs":1000}
-curl localhost:8091/api/agent/chat/j_… -H 'X-User-Id: 1'  # PENDING이면 1초 뒤 다시. DONE이면 result에 답·확인 카드·tools·hints(OPEN_SCHEDULE: [내 시간표] 버튼)
+curl localhost:8091/api/agent/chat/j_… -H 'X-User-Id: 1'  # PENDING이면 1초 뒤 다시. DONE이면 result에 답·확인 카드·tools·hints(OPEN_SCHEDULE: [내 시간표] 버튼)·suggestions(답 아래 빠른 답장 버튼 글)
 ```
 - 채팅은 **접수 → 결과 조회(폴링)** 방식이에요 (5차 회의). 요청 하나가 바로 끝나서 nginx 제한 시간(60초)에 걸리지 않아요. 결과는 접수한 학생만 볼 수 있고(남의 jobId는 404), 끝난 뒤 5분 보관해요. 학생 한 명은 동시에 한 건만(`409 CHAT_IN_PROGRESS`), 서버가 바쁘면 `503 AGENT_BUSY`. 메모리 보관이라 agent는 한 대 기준이에요
 - 사용자 인증은 기본으로 `Authorization`만 넘겨요. 로그인 전 임시 `X-User-Id` 헤더는 `local` 프로필(`application-local.yml`)에서만 켜요. 서버 배포에서는 켜지 않아요 (헤더 한 줄로 남의 예약에 닿을 수 있어서)
