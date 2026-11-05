@@ -12,6 +12,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ScheduleGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>DELETE /api/agent/chat/history: 서버가 기억한 앞선 대화를 지운다 ("새 대화")</li>
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
+ *   <li>GET·PUT·DELETE /api/agent/schedule: 내 시간표 화면 → mcp-server /api/schedule/me로 그대로 넘김 (모델 없음)</li>
  * </ul>
  */
 @RestController
@@ -49,16 +52,19 @@ class ChatController {
     private final AgentLoop agent;
     private final ConfirmationGateway confirmations;
     private final AccessCodeGateway accessCodes;
+    private final ScheduleGateway schedules;
     private final AgentProperties props;
     private final ChatJobs jobs;
     private final ChatJobProperties jobProps;
     private final ConversationMemory memory;
 
     ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
-                   AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps, ConversationMemory memory) {
+                   ScheduleGateway schedules, AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps,
+                   ConversationMemory memory) {
         this.agent = agent;
         this.confirmations = confirmations;
         this.accessCodes = accessCodes;
+        this.schedules = schedules;
         this.props = props;
         this.jobs = jobs;
         this.jobProps = jobProps;
@@ -160,6 +166,36 @@ class ChatController {
             return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
         }
         ConfirmationGateway.Relayed relayed = accessCodes.accessCode(reservationId, user);
+        return ResponseEntity.status(relayed.status()).cacheControl(CacheControl.noStore())
+                .contentType(MediaType.APPLICATION_JSON).body(relayed.json());
+    }
+
+    /** 내 시간표 보기. 없으면 mcp-server의 404 NO_SCHEDULE 그대로 */
+    @GetMapping("/api/agent/schedule")
+    ResponseEntity<?> schedule(@RequestHeader HttpHeaders headers) {
+        return relaySchedule("GET", headers, null);
+    }
+
+    /** 내 시간표 통째로 바꾸기. 본문 {classes:[{dayOfWeek, startTime, endTime, name}]} 검사는 mcp-server가 한다 */
+    @PutMapping("/api/agent/schedule")
+    ResponseEntity<?> replaceSchedule(@RequestHeader HttpHeaders headers, @RequestBody(required = false) String body) {
+        return relaySchedule("PUT", headers, body == null ? "{}" : body);
+    }
+
+    @DeleteMapping("/api/agent/schedule")
+    ResponseEntity<?> deleteSchedule(@RequestHeader HttpHeaders headers) {
+        return relaySchedule("DELETE", headers, null);
+    }
+
+    private ResponseEntity<?> relaySchedule(String method, HttpHeaders headers, String body) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
+        }
+        ConfirmationGateway.Relayed relayed = schedules.relay(method, user, body);
+        if (relayed.status() == HttpStatus.NO_CONTENT.value()) {
+            return ResponseEntity.noContent().build();
+        }
         return ResponseEntity.status(relayed.status()).cacheControl(CacheControl.noStore())
                 .contentType(MediaType.APPLICATION_JSON).body(relayed.json());
     }

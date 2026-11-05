@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.TimeUnit;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AccessCodeGateway;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ScheduleGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
@@ -93,7 +94,7 @@ class ChatControllerTest {
         ChatJobs jobs = new ChatJobs(jobProps, Clock.systemUTC(), executor);
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
         ChatController controller = new ChatController(agent, mock(ConfirmationGateway.class),
-                mock(AccessCodeGateway.class), props, jobs, jobProps, memory);
+                mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
                 .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false));
