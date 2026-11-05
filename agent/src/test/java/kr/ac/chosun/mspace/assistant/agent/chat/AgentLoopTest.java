@@ -189,6 +189,7 @@ class AgentLoopTest {
                 .contains("확인하지 않았다고 사과하지 않는다")
                 .contains("\"잠시만 기다려 주세요\"")
                 .contains("note·message 문장은 바꿔 말하지 않고");
+        assertThat(llm.lastSystem).contains("room_status로 지금 비어 있는 방을 보고", "start_now_reservation으로 제안한다");
     }
 
     @Test

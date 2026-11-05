@@ -27,12 +27,20 @@ public class ExecuteConfirmation {
         // 입력이 틀렸으면 토큰을 쓰지 않고 돌려보낸다(학생이 학번만 고쳐 다시 누를 수 있게)
         List<String> participants = participantStudentIds == null ? List.of()
                 : participantStudentIds.stream().map(s -> s == null ? "" : s.strip()).toList();
-        if (store.peek(token, credential) instanceof PendingAction.Create c) {
-            checkParticipants(c, participants);
+        switch (store.peek(token, credential)) {
+            case PendingAction.Create c -> checkParticipants(c.headcount(), participants);
+            case PendingAction.StartNow s -> checkParticipants(s.headcount(), participants);
+            default -> {
+            }
         }
         PendingAction action = store.take(token, credential);
         return switch (action) {
             case PendingAction.Create c -> create(token, credential, c, participants);
+            case PendingAction.StartNow s -> {
+                CreatedReservation created = reservations.startNow(credential, s.roomId(), s.endAt(), participants, token);
+                yield new Executed("START_NOW", created.id(), created.status(), created.accessCode(), created.replayed(),
+                        "지금부터 %s까지 예약했어요. 10분 안에 입실해 주세요.".formatted(created.endAt().toLocalTime()));
+            }
             case PendingAction.Cancel x -> changed("CANCEL", reservations.cancel(credential, x.reservationId()), "취소했어요.");
             case PendingAction.Checkout x -> changed("CHECKOUT", reservations.checkout(credential, x.reservationId()),
                     "퇴실했어요. 방이 바로 비었어요.");
@@ -45,10 +53,10 @@ public class ExecuteConfirmation {
         };
     }
 
-    private static void checkParticipants(PendingAction.Create c, List<String> participants) {
-        if (participants.size() != c.headcount() - 1 || participants.stream().anyMatch(String::isEmpty)) {
+    private static void checkParticipants(int headcount, List<String> participants) {
+        if (participants.size() != headcount - 1 || participants.stream().anyMatch(String::isEmpty)) {
             throw new CoreApiException("INVALID_REQUEST",
-                    "함께 쓰는 " + (c.headcount() - 1) + "명의 학번을 모두 입력해 주세요.");
+                    "함께 쓰는 " + (headcount - 1) + "명의 학번을 모두 입력해 주세요.");
         }
     }
 

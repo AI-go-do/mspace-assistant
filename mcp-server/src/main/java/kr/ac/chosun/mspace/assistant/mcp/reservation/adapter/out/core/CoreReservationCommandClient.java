@@ -50,6 +50,41 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         }
     }
 
+    /** 지금 바로 쓰기도 예약 만들기와 같은 규칙: 응답이 안 오면 같은 멱등 키로 한 번만 다시 보내고, 5xx면 '모름'으로 안내 */
+    @Override
+    public CreatedReservation startNow(UserCredential credential, int roomId, OffsetDateTime endAt,
+                                       List<String> participantStudentIds, String idempotencyKey) {
+        var body = new StartNowRequest(roomId, endAt, participantStudentIds);
+        try {
+            return sendStartNow(credential, body, idempotencyKey);
+        } catch (CoreApiException first) {
+            if (!CoreHttp.UNAVAILABLE.equals(first.code())) {
+                throw unknownIfServerSide(first);
+            }
+            try {
+                return sendStartNow(credential, body, idempotencyKey);
+            } catch (CoreApiException second) {
+                throw unknownIfServerSide(second);
+            }
+        }
+    }
+
+    private CreatedReservation sendStartNow(UserCredential credential, StartNowRequest body, String idempotencyKey) {
+        ResponseEntity<CoreCreated> response = core.callEntity("POST /api/reservations/instant", credential,
+                rest -> rest.post().uri("/api/reservations/instant")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", idempotencyKey)
+                        .header(CREATED_VIA_HEADER, CREATED_VIA_AGENT)
+                        .body(body),
+                CoreCreated.class);
+        CoreCreated c = response.getBody();
+        if (!complete(c)) {
+            throw unknown();
+        }
+        return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
+                c.status(), c.headcount(), c.accessCode(), response.getStatusCode().value() == 200);
+    }
+
     /**
      * 연장도 새 예약을 만드는 쓰기라 예약 만들기와 같이 다룬다: 응답이 안 오면 같은 멱등 키로 한 번만 다시 보내고,
      * 5xx면 연장됐는지 모른다고 안내한다 (다시 누르면 새 토큰 = 새 키라 1회 제한 409가 날 수 있다)
@@ -173,6 +208,9 @@ class CoreReservationCommandClient implements ReservationCommandPort {
 
     /** core ContinueRequest 모양: 새 끝 시각만. 시작은 core가 누른 시각으로 정한다 */
     record ContinueRequest(OffsetDateTime endAt) {
+    }
+
+    record StartNowRequest(int roomId, OffsetDateTime endAt, List<String> participantStudentIds) {
     }
 
     record CreateRequest(int roomId, OffsetDateTime startAt, OffsetDateTime endAt,

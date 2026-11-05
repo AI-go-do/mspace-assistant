@@ -157,6 +157,44 @@ public class ProposeChange {
         return new Proposal(issued.token(), seoul(issued.expiresAt()), summary, notes, others);
     }
 
+    /**
+     * 지금 바로 쓰기 확인안 (FR-RSV-103). 시작은 [확인]을 누른 시각(core가 정함), 끝은 30분 칸, 지금 + 최대 2시간을 칸으로 올린
+     * 시각까지. 여기서 먼저 거르는 건 [확인] 뒤 실패를 줄이려는 것이고, 방이 지금 비었는지는 core가 실행할 때 본다(409면 안내).
+     */
+    public Proposal startNow(UserCredential credential, int roomId, OffsetDateTime endAt, int headcount) {
+        if (headcount < 1) {
+            throw new CoreApiException("INVALID_REQUEST", "인원은 1명 이상이어야 해요.");
+        }
+        OffsetDateTime now = clock.instant().atZone(SeoulTime.ZONE).toOffsetDateTime();
+        OffsetDateTime end = SeoulTime.of(endAt);
+        long slotSeconds = continuation.slotMinutes() * 60L;
+        if (end.getNano() != 0 || end.toEpochSecond() % slotSeconds != 0) {
+            throw new CoreApiException("RESERVATION_NOT_ON_SLOT", "끝 시각은 정각 또는 30분이어야 해요.", 400);
+        }
+        OffsetDateTime latest = ceilToSlot(now.plusMinutes(continuation.maxMinutes()), slotSeconds);
+        if (!end.isAfter(now) || end.isAfter(latest)) {
+            throw new CoreApiException("RESERVATION_INVALID_LENGTH",
+                    "지금 바로 쓰기는 지금부터 %s까지 고를 수 있어요.".formatted(latest.toLocalTime()), 400);
+        }
+        List<String> notes = new ArrayList<>();
+        notes.add("확인을 누른 시각부터 시작돼요. 10분 안에 키패드로 입실하지 않으면 노쇼가 돼요.");
+        int others = headcount - 1;
+        if (others > 0) {
+            notes.add("함께 쓰는 " + others + "명의 학번은 확인 화면에서 입력해요.");
+        }
+        String summary = "%d번 방을 지금부터 %s까지 %d명으로 바로 쓸까요?".formatted(roomId, end.toLocalTime(), headcount);
+        var issued = store.issue(credential, new PendingAction.StartNow(roomId, end, headcount));
+        return new Proposal(issued.token(), seoul(issued.expiresAt()), summary, notes, others);
+    }
+
+    /** 14:17 → 14:30 (core ReservationTime.ceilToSlot과 같은 규칙) */
+    static OffsetDateTime ceilToSlot(OffsetDateTime t, long slotSeconds) {
+        long s = t.toEpochSecond();
+        long rem = Math.floorMod(s, slotSeconds);
+        OffsetDateTime floored = t.truncatedTo(java.time.temporal.ChronoUnit.SECONDS).minusSeconds(rem);
+        return rem == 0 && t.getNano() == 0 ? floored : floored.plusSeconds(slotSeconds);
+    }
+
     /** 11월 3일(화) */
     static String day(OffsetDateTime t) {
         return "%d월 %d일(%s)".formatted(t.getMonthValue(), t.getDayOfMonth(),

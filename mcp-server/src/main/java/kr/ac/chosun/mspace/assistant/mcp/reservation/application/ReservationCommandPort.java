@@ -14,6 +14,15 @@ public interface ReservationCommandPort {
     CreatedReservation create(UserCredential credential, int roomId, OffsetDateTime startAt, OffsetDateTime endAt,
                               List<String> participantStudentIds, String idempotencyKey);
 
+    /**
+     * 지금 바로 쓰기 (FR-RSV-103, core POST /api/reservations/instant). 시작은 core가 요청 시각으로 정하고 바로 IN_USE 전 BOOKED,
+     * 10분 안에 입실해야 한다. 끝은 30분 칸·최대 2시간은 core가 최종 판단한다
+     *
+     * @param idempotencyKey 확인 토큰. 같은 키 재전송은 core가 처음 예약을 200으로 돌려준다
+     */
+    CreatedReservation startNow(UserCredential credential, int roomId, OffsetDateTime endAt,
+                                List<String> participantStudentIds, String idempotencyKey);
+
     /** 취소 (FR-RSV-007). 대표자·BOOKED·시작 전만. 어기면 core가 403/404/409로 막는다 */
     StatusChange cancel(UserCredential credential, long reservationId);
 
