@@ -97,7 +97,7 @@ class ChatControllerTest {
                 mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
-                .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false));
+                .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms")));
     }
 
     @Test

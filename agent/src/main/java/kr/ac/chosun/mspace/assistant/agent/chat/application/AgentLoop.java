@@ -118,6 +118,7 @@ public class AgentLoop {
         List<Confirmation> confirmations = new ArrayList<>();
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
+        List<String> toolNames = new ArrayList<>(); // 부른 순서대로. 결과의 tools (측정용)
         Instant lookedUpAt = null; // 마지막으로 예약 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
         boolean usedSchedule = false; // my_schedule로 학생이 넣은 시간표를 봤는지. 꼬리말에 "입력한 시간표 기준"
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
@@ -129,7 +130,7 @@ public class AgentLoop {
             String system = systemPrompt();
             while (true) {
                 if (calls > 0 && pastDeadline(deadline, calls)) {
-                    return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
+                    return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, List.copyOf(toolNames));
                 }
                 LlmReply reply;
                 try {
@@ -140,15 +141,15 @@ public class AgentLoop {
                     }
                     // 카드는 이미 만들어졌다(확인 토큰 발급, 대표자 확인). 모델 답만 실패했으니 카드는 화면에 준다
                     log.warn("agent llm failed after cards code={}", e.code());
-                    return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false);
+                    return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false, List.copyOf(toolNames));
                 }
                 if (!reply.wantsTools()) {
                     return new ChatResult(grounded(reply.text(), lookedUpAt, usedSchedule), confirmations, accessCodeCards,
-                            calls, false);
+                            calls, false, List.copyOf(toolNames));
                 }
                 if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
-                    return new ChatResult(LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
+                    return new ChatResult(LIMIT_REPLY, confirmations, accessCodeCards, calls, true, List.copyOf(toolNames));
                 }
                 // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
@@ -162,9 +163,10 @@ public class AgentLoop {
                         for (ToolCall rest : wanted.subList(i, wanted.size())) {
                             conversation.add(new LlmMessage.ToolResult(rest.id(), rest.name(), SKIPPED_RESULT, true));
                         }
-                        return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
+                        return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, List.copyOf(toolNames));
                     }
                     calls++;
+                    toolNames.add(call.name());
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
                     if (!outcome.isError() && SCHEDULE_TOOL.equals(call.name())) {

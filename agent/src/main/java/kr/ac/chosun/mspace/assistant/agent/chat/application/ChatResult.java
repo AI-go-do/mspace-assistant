@@ -10,9 +10,10 @@ import java.util.List;
  * @param accessCodeCards 입실 번호 카드. 화면이 GET /api/agent/reservations/{id}/access-code로 번호를 받아 그린다
  * @param toolCalls     이번에 부른 도구 수 (측정용)
  * @param stoppedByLimit 도구 호출 최대 횟수를 넘어 멈췄으면 true
+ * @param tools         부른 도구 이름(부른 순서, 중복 포함). 측정(#9)이 "맞는 도구를 골랐는지" 보는 데 쓴다. 인자는 넣지 않는다
  */
 public record ChatResult(String reply, List<Confirmation> confirmations, List<AccessCodeCard> accessCodeCards,
-                         int toolCalls, boolean stoppedByLimit) {
+                         int toolCalls, boolean stoppedByLimit, List<String> tools) {
 
     /** needsParticipants: 확인 카드에서 받을 학번 수 */
     public record Confirmation(String tool, String token, String summary, List<String> notes, int needsParticipants,
