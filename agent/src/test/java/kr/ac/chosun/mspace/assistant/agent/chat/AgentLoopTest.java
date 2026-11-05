@@ -133,10 +133,62 @@ class AgentLoopTest {
 
         ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 오후 2시 빈방 있어?");
 
-        assertThat(result.reply()).isEqualTo("2번 방이 비어 있어요");
+        assertThat(result.reply()).isEqualTo("2번 방이 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
         assertThat(tools.called).containsExactly("find_available_rooms");
         assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.ToolResult.class,
                 r -> assertThat(r.json()).contains("\"roomId\":2"));
+    }
+
+    @Test
+    @DisplayName("도구를 부른 답에만 조회 시각 꼬리말이 붙는다. 도구 없는 답(인사)에는 안 붙는다 (TS-09)")
+    void groundsOnlyToolBackedReplies() {
+        var withTool = new ScriptedLlm()
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-03")))
+                .then(say("다 비어 있어요  "));
+        var plain = new ScriptedLlm().then(say("안녕하세요"));
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+
+        ChatResult grounded = loop(withTool, tools).run(ME, List.of(), "오늘 빈방");
+        ChatResult greeting = loop(plain, tools).run(ME, List.of(), "안녕");
+
+        assertThat(grounded.reply()).isEqualTo("다 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
+        assertThat(greeting.reply()).isEqualTo("안녕하세요");
+    }
+
+    @Test
+    @DisplayName("도구가 실패만 했으면 조회한 게 아니므로 꼬리말을 붙이지 않는다")
+    void noGroundingWhenOnlyFailedTools() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-03")))
+                .then(say("지금은 확인할 수 없어요"));
+        var tools = new FakeTools(Map.of("find_available_rooms",
+                new ToolGateway.Outcome("{\"message\":\"도구를 실행하지 못했어요.\"}", true)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "오늘 빈방");
+
+        // then
+        assertThat(result.reply()).isEqualTo("지금은 확인할 수 없어요");
+        assertThat(result.toolCalls()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("지시문: 가린 표시([학번]) 설명, 본인 예약만, 인원 모르면 headcount 생략, 앞선 답은 조회 결과, 미루는 말 금지 (TS-09·TS-10)")
+    void systemPromptCoversDemoFeedback() {
+        var llm = new ScriptedLlm().then(say("네"));
+
+        loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "20233121 예약 있어?");
+
+        assertThat(llm.lastSystem)
+                .contains("[학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시")
+                .contains("my_reservations는 로그인한 학생 본인의 예약만")
+                .contains("인원을 말하지 않았으면 headcount를 넣지 않는다")
+                .contains("꼬리말이 붙은 것은 그 시각에 도구로 조회한 결과")
+                .contains("꼬리말이 없는 답은 조회한 것이 아니니")
+                .contains("확인하지 않았다고 사과하지 않는다")
+                .contains("\"잠시만 기다려 주세요\"")
+                .contains("note·message 문장은 바꿔 말하지 않고");
     }
 
     @Test

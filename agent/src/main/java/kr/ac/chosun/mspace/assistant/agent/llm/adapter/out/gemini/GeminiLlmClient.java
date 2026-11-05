@@ -1,6 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.llm.adapter.out.gemini;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,6 +58,21 @@ public class GeminiLlmClient implements LlmClient {
         if (!tools.isEmpty()) {
             body.put("tools", List.of(Map.of("functionDeclarations", tools.stream().map(GeminiLlmClient::declaration).toList())));
         }
+        // 무료 등급은 5xx(모델 과부하)나 빈 응답이 가끔 온다(11/5 시연에서 "응답하지 않아요"가 갑자기 뜸).
+        // 그런 실패는 짧게 쉬고 한 번만 더 보낸다. 429(한도)·타임아웃·키 오류는 다시 보내도 같아서 바로 끝낸다
+        try {
+            return callOnce(body);
+        } catch (Transient first) {
+            sleep(RETRY_DELAY);
+            try {
+                return callOnce(body);
+            } catch (Transient second) {
+                throw unavailable();
+            }
+        }
+    }
+
+    private LlmReply callOnce(Map<String, Object> body) {
         long started = System.nanoTime();
         boolean ok = false;
         try {
@@ -70,10 +86,11 @@ public class GeminiLlmClient implements LlmClient {
                         // 키 오류(401·403)·모델 이름 오류(404)와 서버 장애(5xx)를 로그로 가른다. 본문은 남기지 않는다
                         int status = res.getStatusCode().value();
                         log.warn("llm gemini 오류 응답 status={}", status);
-                        throw status == 429
-                                ? new LlmException("LLM_RATE_LIMITED",
-                                        "지금 질문이 많아요. 잠시 후 다시 시도하거나 예약 화면을 이용해 주세요.")
-                                : unavailable();
+                        if (status == 429) {
+                            throw new LlmException("LLM_RATE_LIMITED",
+                                    "지금 질문이 많아요. 잠시 후 다시 시도하거나 예약 화면을 이용해 주세요.");
+                        }
+                        throw status >= 500 ? new Transient() : unavailable();
                     })
                     .body(GenerateResponse.class);
             LlmReply reply = toReply(response);
@@ -84,9 +101,26 @@ public class GeminiLlmClient implements LlmClient {
         } catch (RestClientException e) {
             // 응답은 왔는데 모양이 다름(본문 해석 실패 등). 원인은 로그에만, 사용자에게는 같은 안내
             log.warn("llm gemini 응답 해석 실패 cause={}", e.getClass().getSimpleName());
-            throw unavailable();
+            throw new Transient();
         } finally {
             log.info("llm gemini ok={} {}ms", ok, (System.nanoTime() - started) / 1_000_000);
+        }
+    }
+
+    /** 한 번 더 보내 볼 만한 실패: 5xx, 글도 도구 호출도 없는 응답, 해석 안 되는 본문 */
+    private static final class Transient extends RuntimeException {
+        Transient() {
+            super(null, null, false, false);
+        }
+    }
+
+    private static final Duration RETRY_DELAY = Duration.ofSeconds(1);
+
+    private static void sleep(Duration d) {
+        try {
+            Thread.sleep(d);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -178,14 +212,14 @@ public class GeminiLlmClient implements LlmClient {
         if (response == null || response.candidates() == null || response.candidates().isEmpty()
                 || response.candidates().getFirst() == null
                 || response.candidates().getFirst().content() == null) {
-            throw unavailable();
+            throw new Transient();
         }
         StringBuilder text = new StringBuilder();
         List<ToolCall> calls = new ArrayList<>();
         List<Part> parts = response.candidates().getFirst().content().parts();
         for (Part part : parts == null ? List.<Part>of() : parts) {
             if (part == null) {
-                throw unavailable(); // [null] 같은 깨진 응답이 NullPointerException으로 새지 않게
+                throw new Transient(); // [null] 같은 깨진 응답이 NullPointerException으로 새지 않게
             }
             if (part.functionCall() != null) {
                 FunctionCall f = part.functionCall();
@@ -196,7 +230,7 @@ public class GeminiLlmClient implements LlmClient {
             }
         }
         if (text.isEmpty() && calls.isEmpty()) {
-            throw unavailable(); // 글도 도구 호출도 없으면 빈 말풍선 대신 '응답 없음'으로
+            throw new Transient(); // 글도 도구 호출도 없으면 빈 말풍선 대신 한 번 더 보내고, 그래도 없으면 '응답 없음'
         }
         return new LlmReply(text.toString(), calls);
     }
