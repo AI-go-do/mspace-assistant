@@ -36,7 +36,20 @@ for r in rs:
   done <<< "$ids"
   return $rc
 }
-on_exit() { local st=$?; cleanup || { echo "끝 정리 실패: OWNER 예약이 남았을 수 있어요" >&2; [ "$st" = 0 ] && st=1; }; exit "$st"; }
+# 확인 요청이 시간 초과되면 서버에서는 계속 처리돼 정리 뒤에 예약이 생길 수 있다. 그 표시 파일
+CONFIRM_TIMEOUT_MARK=$(mktemp)
+rm -f "$CONFIRM_TIMEOUT_MARK"
+on_exit() {
+  local st=$?
+  cleanup || { echo "끝 정리 실패: OWNER 예약이 남았을 수 있어요" >&2; [ "$st" = 0 ] && st=1; }
+  if [ -e "$CONFIRM_TIMEOUT_MARK" ]; then
+    # 늦게 끝난 확인이 만든 예약까지 지우려고 한 번 더 정리하고, 결과는 불확실로 보고 실패 처리한다
+    sleep 15; cleanup
+    echo "확인 요청이 시간 초과돼 정리 결과가 불확실해요. OWNER 예약을 직접 확인해 주세요" >&2
+    rm -f "$CONFIRM_TIMEOUT_MARK"; [ "$st" = 0 ] && st=1
+  fi
+  exit "$st"
+}
 trap on_exit EXIT
 # 채팅은 접수(202 + jobId) → 결과 조회(폴링). 예전 agent(바로 결과)도 그대로 받는다. 결과 JSON만 출력한다
 chat() {
@@ -52,13 +65,17 @@ chat() {
     r=$(curl -s --max-time 5 "$AGENT/api/agent/chat/$id" -H "X-User-Id: $1")
     case "$(echo "$r" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))' 2>/dev/null)" in
       DONE) echo "$r" | python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin)["result"],ensure_ascii=False))'; return ;;
-      PENDING) ;;
+      # 조회 한 번이 시간 초과(빈 응답)여도 전체 기한 안에서는 다시 묻는다
+      PENDING|"") ;;
       *) echo "$r"; return ;;
     esac
   done
   echo '{"code":"POLL_TIMEOUT"}'
 }
-confirm() { curl -s --max-time 10 -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
+confirm() {
+  curl -s --max-time 10 -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3" \
+    || { touch "$CONFIRM_TIMEOUT_MARK"; echo '{"code":"CONFIRM_TIMEOUT"}'; }
+}
 j() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1"; }
 
 # MCP 서버와 agent가 뜰 때까지 각각 최대 60초 기다린다. 안 뜨면 시나리오를 돌리지 않는다.
@@ -83,13 +100,13 @@ r=$(chat "$OWNER" "내일 2시부터 2시간 2번 방 3명으로 예약해 줘")
 r=$(confirm "$OTHER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_NOT_FOUND ] \
   && row "남이 확인 토큰 사용" ok "CONFIRMATION_NOT_FOUND" || row "남이 확인 토큰 사용" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); rid=$(echo "$r" | j 'd.get("reservationId","")')
-tok1=$tok; code=$(curl -s "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OWNER" | j 'd.get("accessCode") or ""' 2>/dev/null)
+tok1=$tok; code=$(curl -s --max-time 5 "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OWNER" | j 'd.get("accessCode") or ""' 2>/dev/null)
 [ "$(echo "$r" | j 'd.get("status")')" = BOOKED ] && row "본인이 [확인]" ok "예약 $rid BOOKED" || row "본인이 [확인]" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_USED ] \
   && row "같은 토큰 다시" ok "CONFIRMATION_USED" || row "같은 토큰 다시" no "$r"
 r=$(chat "$OWNER" "내 입실 번호 알려 줘"); [ -n "$code" ] && [ "$(echo "$r" | j 'len(d.get("accessCodeCards",[]))')" = 1 ] && ! echo "$r" | grep -qF -e 'accessCode"' -e "$code" \
   && row "입실 번호(대표자)" ok "화면 카드만, 답에 번호 없음" || row "입실 번호(대표자)" no "$r"
-r=$(curl -s "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OTHER"); [ "$(echo "$r" | j 'd.get("code")')" = NOT_RESERVATION_OWNER ] \
+r=$(curl -s --max-time 5 "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OTHER"); [ "$(echo "$r" | j 'd.get("code")')" = NOT_RESERVATION_OWNER ] \
   && row "입실 번호(참여자, 화면 API)" ok "NOT_RESERVATION_OWNER" || row "입실 번호(참여자, 화면 API)" no "$r"
 r=$(chat "$OWNER" "내 예약 취소해 줘"); tok=$(echo "$r" | j 'd["confirmations"][0]["token"] if d.get("confirmations") else ""')
 tok2=$tok; r=$(confirm "$OWNER" "$tok" '{}'); [ "$(echo "$r" | j 'd.get("status")')" = CANCELED ] \
