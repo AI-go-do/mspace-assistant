@@ -120,6 +120,33 @@ class ChatControllerTest {
     }
 
     @Test
+    @DisplayName("실패한 작업을 조회하면 FAILED와 오류 code·message가 온다 (내부 예외 문구는 내보내지 않는다)")
+    void failedJobThenPoll() throws Exception {
+        // given
+        when(agent.run(any(UserHeaders.class), anyList(), anyString()))
+                .thenThrow(new IllegalStateException("internal"));
+        var accepted = mvc.perform(post("/api/agent/chat").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        String jobId = JsonMapper.builder().build().readTree(accepted.getResponse().getContentAsString())
+                .get("jobId").asString();
+
+        // when
+        executor.runAll();
+
+        // then
+        var polled = mvc.perform(get("/api/agent/chat/" + jobId).header("Authorization", "Bearer owner"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.error.code").value("AGENT_FAILED"))
+                .andExpect(jsonPath("$.error.message").value("답을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."))
+                .andReturn();
+        assertThat(polled.getResponse().getContentAsString()).doesNotContain("internal");
+    }
+
+    @Test
     @DisplayName("남의 토큰으로 결과를 조회하면 404, 로그인 없이 보내면 401")
     void ownerOnly() throws Exception {
         // given
