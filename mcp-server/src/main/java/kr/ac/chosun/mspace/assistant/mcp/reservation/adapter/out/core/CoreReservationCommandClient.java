@@ -15,6 +15,13 @@ import org.springframework.stereotype.Component;
 @Component
 class CoreReservationCommandClient implements ReservationCommandPort {
 
+    /**
+     * 비서가 만든 예약 표시 (core #45, NFR-COM-008). core가 reservation.created_via = AGENT로 저장해
+     * 웹·비서 예약 건수를 따로 센다. 통계용 표시라 권한과는 상관없다 (권한은 학생 본인 토큰으로 core가 본다)
+     */
+    static final String CREATED_VIA_HEADER = "X-Created-Via";
+    static final String CREATED_VIA_AGENT = "AGENT";
+
     private final CoreHttp core;
 
     CoreReservationCommandClient(CoreHttp core) {
@@ -93,6 +100,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
                 rest -> rest.post().uri("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", idempotencyKey)
+                        .header(CREATED_VIA_HEADER, CREATED_VIA_AGENT)
                         .body(body),
                 CoreCreated.class);
         CoreCreated c = response.getBody();

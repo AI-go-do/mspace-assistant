@@ -102,7 +102,7 @@ class CreateReservationFlowTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("확인하면 예약 API를 멱등 키(=확인 토큰)와 학번으로 부르고, 입실 번호는 화면용 응답에만")
+    @DisplayName("확인하면 예약 API를 멱등 키(=확인 토큰)·비서 표시(X-Created-Via: AGENT)·학번으로 부르고, 입실 번호는 화면용 응답에만")
     void confirmCreates() throws Exception {
         // given
         core.stubFor(post("/api/reservations").willReturn(aResponse().withStatus(201)
@@ -117,6 +117,7 @@ class CreateReservationFlowTest extends McpToolTestSupport {
         assertThat(response.body()).contains("\"reservationId\":7", "\"accessCode\":\"482913\"", "\"replayed\":false");
         core.verify(postRequestedFor(urlEqualTo("/api/reservations"))
                 .withHeader("Idempotency-Key", equalTo(token))
+                .withHeader("X-Created-Via", equalTo("AGENT"))
                 .withHeader("X-User-Id", equalTo("1"))
                 .withRequestBody(equalToJson("""
                         {"roomId": 1, "startAt": "2026-11-03T14:00:00+09:00", "endAt": "2026-11-03T16:00:00+09:00",
