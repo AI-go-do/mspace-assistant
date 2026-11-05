@@ -85,7 +85,27 @@ class UsageRulesToolTest extends McpToolTestSupport {
                         {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
                           "checkinOpenBeforeMinutes":10,"instantNoShowMinutes":10,
                           "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
-                         "conduct":[],"reminders":{"checkin":"a","checkout":"b"}}""")));
+                         "conduct":[{"key":"FOOD","title":"음식","rule":"r","penalty":"p"}],
+                         "reminders":{"checkin":"a","checkout":"b"}}""")));
+
+        // when
+        CallToolResult result = call(USER, "usage_rules", Map.of());
+
+        // then
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
+    }
+
+    @Test
+    @DisplayName("숫자는 다 있어도 이용 수칙(conduct)이 빠지면 규칙 없이 답하지 않고 오류로 알린다")
+    void missingConductIsError() {
+        // given: conduct가 없는 응답
+        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("""
+                        {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
+                          "checkinOpenBeforeMinutes":10,"noShowMinutes":15,"instantNoShowMinutes":10,
+                          "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
+                         "reminders":{"checkin":"a","checkout":"b"}}""")));
 
         // when
         CallToolResult result = call(USER, "usage_rules", Map.of());

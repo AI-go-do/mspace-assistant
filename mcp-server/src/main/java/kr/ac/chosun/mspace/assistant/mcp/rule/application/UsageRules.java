@@ -26,8 +26,8 @@ public record UsageRules(Reservation reservation, List<Conduct> conduct, Reminde
     }
 
     /**
-     * 숫자가 하나라도 빠졌는지. 숫자를 int로 받으면 빠진 값이 0이 되어 "0분 안에 입실" 같은 틀린 안내가 나가므로
-     * Integer로 받고 여기서 걸러 낸다.
+     * 숫자·수칙·안내가 하나라도 빠졌는지. 숫자를 int로 받으면 빠진 값이 0이 되어 "0분 안에 입실" 같은 틀린 안내가
+     * 나가므로 Integer로 받고 여기서 걸러 낸다. 수칙(conduct)이 비면 "음식 돼?" 같은 질문에 규칙 없이 답하게 되어 같이 막는다.
      */
     public boolean complete() {
         if (reservation == null) {
@@ -37,7 +37,9 @@ public record UsageRules(Reservation reservation, List<Conduct> conduct, Reminde
         Extension e = r.extension();
         return allPresent(r.bookingWindowDays(), r.slotMinutes(), r.maxMinutes(), r.checkinOpenBeforeMinutes(),
                 r.noShowMinutes(), r.instantNoShowMinutes())
-                && e != null && allPresent(e.maxCount(), e.openBeforeMinutes(), e.maxMinutes(), e.chainGapMinutes());
+                && e != null && allPresent(e.maxCount(), e.openBeforeMinutes(), e.maxMinutes(), e.chainGapMinutes())
+                && conduct != null && !conduct.isEmpty()
+                && reminders != null && reminders.checkin() != null && reminders.checkout() != null;
     }
 
     private static boolean allPresent(Integer... values) {
