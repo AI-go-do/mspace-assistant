@@ -3,11 +3,13 @@ package kr.ac.chosun.mspace.assistant.agent.chat.application;
 import java.time.Clock;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.ImageReader;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({AgentProperties.class, ChatJobProperties.class, MemoryProperties.class})
@@ -20,6 +22,12 @@ class AgentConfig {
     }
 
     /** 앱이 꺼질 때 돌던 채팅 스레드도 멈춘다 (close) */
+    /** 시간표 캡처 읽기 (설계 5장). 모델 선택(gemini/ollama)은 LlmConfig의 ImageReader 빈이 정한다 */
+    @Bean
+    ReadTimetableImage readTimetableImage(ImageReader reader, JsonMapper json) {
+        return new ReadTimetableImage(reader, json);
+    }
+
     @Bean
     ChatJobs chatJobs(ChatJobProperties props, Clock clock) {
         return new ChatJobs(props, clock);

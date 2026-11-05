@@ -12,6 +12,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ReadTimetableImage;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ScheduleGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
@@ -30,7 +31,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 화면이 부르는 API.
@@ -41,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  *   <li>GET·PUT·DELETE /api/agent/schedule: 내 시간표 화면 → mcp-server /api/schedule/me로 그대로 넘김 (모델 없음)</li>
+ *   <li>POST /api/agent/schedule/parse: 시간표 캡처(multipart image)를 모델이 읽어 classes 초안으로. 저장은 안 함 → 화면이 확인 카드 → PUT</li>
  * </ul>
  */
 @RestController
@@ -57,10 +61,11 @@ class ChatController {
     private final ChatJobs jobs;
     private final ChatJobProperties jobProps;
     private final ConversationMemory memory;
+    private final ReadTimetableImage timetableImage;
 
     ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
                    ScheduleGateway schedules, AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps,
-                   ConversationMemory memory) {
+                   ConversationMemory memory, ReadTimetableImage timetableImage) {
         this.agent = agent;
         this.confirmations = confirmations;
         this.accessCodes = accessCodes;
@@ -69,6 +74,7 @@ class ChatController {
         this.jobs = jobs;
         this.jobProps = jobProps;
         this.memory = memory;
+        this.timetableImage = timetableImage;
     }
 
     @PostMapping("/api/agent/chat")
@@ -182,6 +188,26 @@ class ChatController {
         return relaySchedule("PUT", headers, body == null ? "{}" : body);
     }
 
+    /**
+     * 시간표 캡처 읽기. 그림은 모델 요청에만 실리고 저장·로그에 남지 않는다.
+     * 응답 {classes:[…], dropped, note}. classes는 PUT /api/agent/schedule 본문과 같은 모양이라 확인 카드에서 고쳐 그대로 보낸다
+     */
+    @PostMapping(value = "/api/agent/schedule/parse", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<?> parseSchedule(@RequestHeader HttpHeaders headers, @RequestPart("image") MultipartFile image) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
+        }
+        byte[] bytes;
+        try {
+            bytes = image.getBytes();
+        } catch (java.io.IOException e) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_IMAGE", "사진을 읽지 못했어요. 다시 올려 주세요.");
+        }
+        ReadTimetableImage.Draft draft = timetableImage.read(image.getContentType(), bytes);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(draft);
+    }
+
     @DeleteMapping("/api/agent/schedule")
     ResponseEntity<?> deleteSchedule(@RequestHeader HttpHeaders headers) {
         return relaySchedule("DELETE", headers, null);
@@ -198,6 +224,11 @@ class ChatController {
         }
         return ResponseEntity.status(relayed.status()).cacheControl(CacheControl.noStore())
                 .contentType(MediaType.APPLICATION_JSON).body(relayed.json());
+    }
+
+    @ExceptionHandler(ReadTimetableImage.InvalidImage.class)
+    ResponseEntity<?> badImage(ReadTimetableImage.InvalidImage e) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_IMAGE", e.getMessage());
     }
 
     @ExceptionHandler(LlmException.class)

@@ -8,6 +8,11 @@ spring:
       connect-timeout: 2s
       timeout: 2s
 
+spring.servlet.multipart:
+  # 시간표 캡처 읽기(POST /api/agent/schedule/parse). 5MB 넘으면 400
+  max-file-size: 5MB
+  max-request-size: 6MB
+
 server:
   port: ${SERVER_PORT:8091}
 

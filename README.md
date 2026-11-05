@@ -2,7 +2,7 @@
 
 "내일 수업 끝나고 빈방 잡아 줘"를 실제 예약으로 바꾸는 M-SPACE 예약 시스템의 AI 비서예요.
 
-- **MCP 서버:** 빈방 찾기, 예약·취소·반납, 내 예약, 방 현황, 내 시간표(학생이 직접 넣음, #63)를 도구로 열어요(나중에 학과 공지, 휴강·보강)
+- **MCP 서버:** 빈방 찾기, 예약·취소·반납, 내 예약, 방 현황, 내 시간표(학생이 직접 넣거나 캡처를 Gemini가 읽어 초안으로, #63)를 도구로 열어요(나중에 학과 공지, 휴강·보강)
 - **에이전트:** 도구 결과를 모델에 돌려주고 다시 묻는 반복으로 여러 도구를 이어 불러요
 - **안전장치:** AI 모델을 믿지 않아요. 권한은 예약 코어가 검사하고, 예약·취소 같은 쓰기 작업은 사용자가 확인한 뒤에만 실행해요
 - **모델 교체:** 어댑터 구조로 Gemini와 로컬 Ollama를 바꿔 끼워요 (`LLM_PROVIDER=gemini|ollama`)
@@ -20,7 +20,7 @@ M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Bo
 | 모듈 | 포트 | 열어 둔 것 |
 |---|---|---|
 | `mcp-server` | 8090 | MCP `/mcp` (도구 7개 중 읽기 2·쓰기 3 구현), 확인 실행 `POST /api/confirmations/{token}` |
-| `agent` | 8091 | 채팅 접수 `POST /api/agent/chat`(202 + jobId) → 결과 조회 `GET /api/agent/chat/{jobId}`(폴링), 새 대화 `DELETE /api/agent/chat/history`, 확인 `POST /api/agent/confirmations/{token}`, 입실 번호 카드 `GET /api/agent/reservations/{id}/access-code` |
+| `agent` | 8091 | 채팅 접수 `POST /api/agent/chat`(202 + jobId) → 결과 조회 `GET /api/agent/chat/{jobId}`(폴링), 새 대화 `DELETE /api/agent/chat/history`, 확인 `POST /api/agent/confirmations/{token}`, 입실 번호 카드 `GET /api/agent/reservations/{id}/access-code`, 내 시간표 `GET·PUT·DELETE /api/agent/schedule`, 시간표 캡처 읽기 `POST /api/agent/schedule/parse`(초안만, 저장은 PUT) |
 
 ## 로컬 실행
 ```bash
