@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -206,5 +207,26 @@ class ChatControllerTest {
         // then: 토큰 모양이 아니면 헤더 해시 키로 지운다 (키에 토큰 원문이 없다)
         verify(memory).clear(argThat(key -> key.startsWith("h:") && !key.contains("owner")));
         verifyNoMoreInteractions(memory);
+    }
+
+    @Test
+    @DisplayName("채팅이 돌고 있는 동안은 지우지 못하고(409), 저장소에 닿지 못하면 503")
+    void clearHistoryConflictsAndFails() throws Exception {
+        // given: 접수만 하고 executor는 돌리지 않는다 → 진행 중
+        mvc.perform(post("/api/agent/chat").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isAccepted());
+
+        // when / then
+        mvc.perform(delete("/api/agent/chat/history").header("Authorization", "Bearer owner"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CHAT_IN_PROGRESS"));
+        verifyNoMoreInteractions(memory);
+
+        // given: 다른 학생, Redis가 죽어 있음
+        doThrow(new ConversationMemory.Unavailable()).when(memory).clear(anyString());
+        mvc.perform(delete("/api/agent/chat/history").header("Authorization", "Bearer other"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("MEMORY_UNAVAILABLE"));
     }
 }

@@ -125,12 +125,18 @@ class ChatController {
                         "대화 결과를 찾지 못했어요. 다시 보내 주세요."));
     }
 
-    /** "새 대화": 서버가 기억한 앞선 대화를 지운다. 화면도 자기 history를 비운다 */
+    /**
+     * "새 대화": 서버가 기억한 앞선 대화를 지운다. 화면도 자기 history를 비운다.
+     * 이 학생의 채팅이 아직 돌고 있으면 409: 끝날 때 옛 대화를 다시 저장해 지운 것이 되살아나기 때문이다
+     */
     @DeleteMapping("/api/agent/chat/history")
     ResponseEntity<?> clearHistory(@RequestHeader HttpHeaders headers) {
         UserHeaders user = user(headers);
         if (user.isEmpty()) {
             return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요.");
+        }
+        if (jobs.hasRunning(user)) {
+            return error(HttpStatus.CONFLICT, "CHAT_IN_PROGRESS", "앞의 질문에 아직 답하는 중이에요. 답이 온 뒤에 지워 주세요.");
         }
         memory.clear(MemberKey.of(user));
         return ResponseEntity.noContent().build();
@@ -162,6 +168,11 @@ class ChatController {
     ResponseEntity<?> llmFailed(LlmException e) {
         HttpStatus status = "LLM_RATE_LIMITED".equals(e.code()) ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.SERVICE_UNAVAILABLE;
         return error(status, e.code(), e.getMessage());
+    }
+
+    @ExceptionHandler(ConversationMemory.Unavailable.class)
+    ResponseEntity<?> memoryFailed(ConversationMemory.Unavailable e) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "MEMORY_UNAVAILABLE", e.getMessage());
     }
 
     @ExceptionHandler(ToolGateway.Unavailable.class)

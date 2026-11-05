@@ -156,6 +156,33 @@ class ConversationMemoryTest {
         assertThat(AgentLoop.trim(all, 1, 20_000)).containsExactly(e, f);            // 차례 수 초과 → 도구 짝째로 버림
         assertThat(AgentLoop.trim(all, 20, 50)).containsExactly(e, f);               // 글자 수 초과
         assertThat(AgentLoop.trim(List.of(c, d, e, f), 20, 20_000)).containsExactly(e, f); // 학생 말로 시작하지 않는 앞부분은 버림
+        assertThat(AgentLoop.trim(all, 20, 2)).isEmpty();                            // 가장 최근 차례 하나도 상한을 넘으면 빈 목록
+    }
+
+    @Test
+    @DisplayName("시간 상한으로 실행하지 않은 도구 호출에도 결과를 붙여 기억에 짝이 깨진 호출이 남지 않는다")
+    void pairsSkippedToolCallsBeforeRemembering() {
+        // given: 시계가 호출마다 20초 가서, 두 번째 도구 호출 전에 45초 기한을 넘긴다
+        var clock = new AgentLoopTest.SlowClock(Duration.ofSeconds(20));
+        var memory = new InMemoryConversationMemory(MEMORY, clock);
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+        var llm = new ScriptedLlm().then(new LlmReply("", List.of(
+                new ToolCall("c1", "find_available_rooms", Map.of("date", "2026-11-03"), null),
+                new ToolCall("c2", "find_available_rooms", Map.of("date", "2026-11-04"), null),
+                new ToolCall("c3", "find_available_rooms", Map.of("date", "2026-11-05"), null))));
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), clock,
+                memory, MEMORY);
+
+        // when
+        var result = loop.run(ME, List.of(), "이번 주 빈방");
+        List<LlmMessage> remembered = memory.load(MemberKey.of(ME));
+
+        // then
+        assertThat(result.stoppedByLimit()).isTrue();
+        long calls = remembered.stream().filter(m -> m instanceof LlmMessage.Assistant a).mapToLong(m -> ((LlmMessage.Assistant) m).toolCalls().size()).sum();
+        long results = remembered.stream().filter(m -> m instanceof LlmMessage.ToolResult).count();
+        assertThat(calls).isEqualTo(3).isEqualTo(results);
+        assertThat(remembered.stream().filter(m -> m instanceof LlmMessage.ToolResult r && r.isError()).count()).isGreaterThanOrEqualTo(1);
     }
 
     @Test

@@ -21,8 +21,17 @@ public interface ConversationMemory {
     /** 대화 전체를 바꿔 저장한다. 호출자가 이미 길이를 줄였다 */
     void save(String memberKey, List<LlmMessage> conversation);
 
-    /** 학생이 "새 대화"를 눌렀을 때 */
+    /**
+     * 학생이 "새 대화"를 눌렀을 때. 지우지 못했으면 {@link Unavailable} — 지운 척 204를 주면 저장소가 돌아왔을 때 옛 대화가 되살아난다
+     */
     void clear(String memberKey);
+
+    /** 저장소에 닿지 못해 지우지 못함. 읽기·저장 실패는 기억 없이 넘어가지만, 지우기 실패는 학생에게 알린다 */
+    class Unavailable extends RuntimeException {
+        public Unavailable() {
+            super("대화 기록을 지우지 못했어요. 잠시 후 다시 시도해 주세요.");
+        }
+    }
 
     /** 저장하지 않는 구현 (설정으로 끌 때·테스트) */
     ConversationMemory NONE = new ConversationMemory() {

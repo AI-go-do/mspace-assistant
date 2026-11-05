@@ -69,7 +69,8 @@ public class AgentLoop {
                 trim(remembered.isEmpty() ? masked(history) : remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         ChatResult result = converse(headers, conversation);
-        conversation.add(new LlmMessage.Assistant(result.reply(), List.of()));
+        // 모델 답도 다음 요청에 외부 AI로 다시 가니 학생 말과 같은 규칙으로 가려 둔다
+        conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(result.reply()), List.of()));
         memory.save(key, trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));
         return result;
     }
@@ -94,7 +95,7 @@ public class AgentLoop {
     public static List<LlmMessage> trim(List<LlmMessage> conversation, int maxTurns, int maxChars) {
         int turns = 0;
         int chars = 0;
-        int start = 0;
+        int start = conversation.size(); // 상한 안에 드는 차례가 하나도 없으면 빈 목록 (가장 최근 차례 하나가 너무 커도 상한을 지킨다)
         for (int i = conversation.size() - 1; i >= 0; i--) {
             LlmMessage m = conversation.get(i);
             chars += switch (m) {
@@ -150,9 +151,15 @@ public class AgentLoop {
                 // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
                 conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
-                for (ToolCall call : reply.toolCalls()) {
+                List<ToolCall> wanted = reply.toolCalls();
+                for (int i = 0; i < wanted.size(); i++) {
+                    ToolCall call = wanted.get(i);
                     Instant now = clock.instant(); // 기한 검사와 꼬리말의 조회 시각에 같이 쓴다 (시계는 한 번만 읽는다)
                     if (pastDeadline(now, deadline, calls)) {
+                        // 실행하지 않은 호출에도 결과를 붙여 둔다. 짝이 안 맞는 호출이 기억에 남으면 다음 요청마다 모델이 400을 낸다
+                        for (ToolCall rest : wanted.subList(i, wanted.size())) {
+                            conversation.add(new LlmMessage.ToolResult(rest.id(), rest.name(), SKIPPED_RESULT, true));
+                        }
                         return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                     }
                     calls++;
@@ -193,6 +200,8 @@ public class AgentLoop {
         return session.tools().stream().anyMatch(t -> t.name().equals(name)) ? name : "unknown";
     }
 
+    /** 시간 상한으로 실행하지 않은 도구 호출의 결과 자리 (기억의 호출·결과 짝을 지킨다) */
+    static final String SKIPPED_RESULT = "{\"message\":\"시간이 오래 걸려 실행하지 않았어요\"}";
     static final String CARDS_ONLY_REPLY = "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요.";
 
     /**

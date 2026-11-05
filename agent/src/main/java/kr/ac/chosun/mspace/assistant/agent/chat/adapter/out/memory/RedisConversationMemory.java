@@ -13,7 +13,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  * Redis 보관 (MEMORY_STORE=redis). 키 {@code agent:conv:<학생 키>}, 값은 {@link ConversationJson}, SET ... EX ttl.
  * <ul>
  *   <li>같은 학생은 {@link kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs}가 한 번에 한 건만 받으니 덮어쓰기로 충분하다</li>
- *   <li>Redis가 죽어 있으면 기억 없이 답한다(경고 로그만). 기억은 보조이고 대화를 막을 이유가 아니다</li>
+ *   <li>Redis가 죽어 있으면 읽기·저장은 기억 없이 넘어간다(경고 로그만). 지우기만은 실패를 알린다(지운 척하면 옛 대화가 되살아남)</li>
  *   <li>agent가 여러 대여도 같은 Redis를 보면 대화가 이어진다 (ChatJobs는 아직 메모리라 1대 기준)</li>
  * </ul>
  */
@@ -55,6 +55,7 @@ public class RedisConversationMemory implements ConversationMemory {
             redis.delete(PREFIX + memberKey);
         } catch (DataAccessException e) {
             log.warn("conversation memory clear failed type={}", e.getClass().getSimpleName());
+            throw new Unavailable();
         }
     }
 }

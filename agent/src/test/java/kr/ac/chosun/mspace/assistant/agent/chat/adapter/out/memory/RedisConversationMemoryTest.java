@@ -1,6 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.List;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemoryProperties;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +49,7 @@ class RedisConversationMemoryTest {
     }
 
     @Test
-    @DisplayName("Redis가 죽어 있으면 기억 없이(빈 대화) 넘어가고 예외를 밖으로 내지 않는다")
+    @DisplayName("Redis가 죽어 있으면 읽기·저장은 기억 없이 넘어가고, 지우기만 Unavailable로 알린다")
     void degradesWhenRedisDown() {
         // given
         when(redis.opsForValue()).thenReturn(values);
@@ -58,6 +60,6 @@ class RedisConversationMemoryTest {
         // when / then
         assertThat(memory.load("m:1")).isEmpty();
         memory.save("m:1", List.of(new LlmMessage.User("안녕")));
-        memory.clear("m:1");
+        assertThatThrownBy(() -> memory.clear("m:1")).isInstanceOf(ConversationMemory.Unavailable.class);
     }
 }
