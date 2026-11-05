@@ -47,7 +47,7 @@ final class QuickReplies {
         }
         return switch (last.tool()) {
             case "find_available_rooms" -> r.path("rooms").isEmpty()
-                    ? List.of("내일 같은 시간 봐 줘", "지금 빈 방 있어?")
+                    ? List.of(nextDay(r.path("date").asString(null)) + " 같은 시간 봐 줘", "지금 빈 방 있어?")
                     : List.of("첫 번째로 나온 방 잡아 줘", "다른 시간도 볼게");
             case "my_reservations" -> reservations(r);
             case "room_status" -> r.path("availableCount").asInt(0) > 0
@@ -58,6 +58,16 @@ final class QuickReplies {
                     : r.path("classes").isEmpty() ? List.of("오후 2시부터 빈방 봐 줘") : List.of("수업 끝나고 2시간 잡아 줘");
             default -> List.of();
         };
+    }
+
+    /** 조회한 날의 다음 날을 "11월 7일"로. 날짜를 모르면 "다음 날" (같은 날을 다시 조회하지 않게) */
+    static String nextDay(String date) {
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(date).plusDays(1);
+            return d.getMonthValue() + "월 " + d.getDayOfMonth() + "일";
+        } catch (RuntimeException e) {
+            return "다음 날";
+        }
     }
 
     private static List<String> reservations(JsonNode r) {
