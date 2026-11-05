@@ -30,6 +30,11 @@ mspace:
   # 쓰기 도구 확인 토큰. 짧게 두어 오래된 확인안이 실행되지 않게 한다
   confirm:
     ttl: 2m
+  # 연장하기(FR-RSV-105). core 규칙과 같은 값. core가 최종 판정하고 여기서는 확인안 전에 먼저 거른다
+  continue:
+    open-before-minutes: 10
+    max-minutes: 120
+    slot-minutes: 30
 
 logging:
   level:

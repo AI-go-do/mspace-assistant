@@ -36,6 +36,12 @@ public class ExecuteConfirmation {
             case PendingAction.Cancel x -> changed("CANCEL", reservations.cancel(credential, x.reservationId()), "취소했어요.");
             case PendingAction.Checkout x -> changed("CHECKOUT", reservations.checkout(credential, x.reservationId()),
                     "퇴실했어요. 방이 바로 비었어요.");
+            case PendingAction.Continue x -> {
+                CreatedReservation created = reservations.continueUse(credential, x.reservationId(), x.newEndAt(), token);
+                // 연장하면 새 예약이 생기고 입실 번호도 새로 나온다. 번호는 학생 화면에만 (모델에는 에이전트가 뺀다)
+                yield new Executed("CONTINUE", created.id(), created.status(), created.accessCode(), created.replayed(),
+                        "%s까지 연장했어요. 입실 번호가 새로 나왔어요.".formatted(created.endAt().toLocalTime()));
+            }
         };
     }
 

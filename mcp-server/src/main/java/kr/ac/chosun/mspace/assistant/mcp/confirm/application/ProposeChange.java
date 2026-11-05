@@ -23,11 +23,14 @@ public class ProposeChange {
     private final ConfirmationStore store;
     private final ReservationQueryPort reservations;
     private final Clock clock;
+    private final ContinueProperties continuation;
 
-    public ProposeChange(ConfirmationStore store, ReservationQueryPort reservations, Clock clock) {
+    public ProposeChange(ConfirmationStore store, ReservationQueryPort reservations, Clock clock,
+                         ContinueProperties continuation) {
         this.store = store;
         this.reservations = reservations;
         this.clock = clock;
+        this.continuation = continuation;
     }
 
     /**
@@ -67,6 +70,41 @@ public class ProposeChange {
         }
         String summary = "%s 사용을 끝내고 퇴실할까요?".formatted(describe(r));
         var issued = store.issue(credential, new PendingAction.Checkout(reservationId));
+        return new Proposal(issued.token(), seoul(issued.expiresAt()), summary, notes, 0);
+    }
+
+    /**
+     * 연장 확인안 (FR-RSV-105). 끝 시각을 minutes만큼 늘린다. 대표자·사용 중·종료 직전·30분 단위는 여기서 먼저 거르고,
+     * 1회 제한과 다음 칸이 비었는지는 core가 실행할 때 본다(409면 지금 예약은 그대로 남는다).
+     */
+    public Proposal continueUse(UserCredential credential, long reservationId, int minutes) {
+        MyReservation r = mine(credential, reservationId);
+        requireOwner(r, "연장");
+        if (r.status() != ReservationStatus.IN_USE) {
+            throw new CoreApiException("RESERVATION_NOT_IN_USE",
+                    r.status() == ReservationStatus.BOOKED ? "입실한 뒤에 연장할 수 있어요."
+                            : "이미 끝난 예약이에요.", 409);
+        }
+        if (minutes <= 0 || minutes > continuation.maxMinutes() || minutes % continuation.slotMinutes() != 0) {
+            throw new CoreApiException("RESERVATION_INVALID_LENGTH",
+                    "연장은 %d분 단위로 최대 %d분까지 할 수 있어요.".formatted(
+                            continuation.slotMinutes(), continuation.maxMinutes()), 400);
+        }
+        java.time.Instant now = clock.instant();
+        java.time.Instant end = r.endAt().toInstant();
+        if (now.isBefore(end.minus(java.time.Duration.ofMinutes(continuation.openBeforeMinutes())))
+                || !now.isBefore(end)) {
+            throw new CoreApiException("RESERVATION_EXTENSION_NOT_OPEN",
+                    "연장은 끝나기 %d분 전부터 끝나기 전까지만 할 수 있어요. (지금 끝 시각 %s)".formatted(
+                            continuation.openBeforeMinutes(), r.endAt().toLocalTime()), 409);
+        }
+        OffsetDateTime newEnd = SeoulTime.of(r.endAt().plusMinutes(minutes));
+        List<String> notes = List.of(
+                "연장은 한 번만 할 수 있어요.",
+                "연장하면 입실 번호가 새로 나와요. 다시 들어갈 때는 새 번호를 써요.",
+                "다음 시간에 다른 예약이 있으면 연장되지 않고 지금 예약이 그대로 남아요.");
+        String summary = "%s 사용을 %s까지 %d분 연장할까요?".formatted(describe(r), newEnd.toLocalTime(), minutes);
+        var issued = store.issue(credential, new PendingAction.Continue(reservationId, newEnd));
         return new Proposal(issued.token(), seoul(issued.expiresAt()), summary, notes, 0);
     }
 

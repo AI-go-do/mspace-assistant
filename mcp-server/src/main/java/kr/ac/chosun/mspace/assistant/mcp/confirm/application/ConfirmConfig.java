@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(ConfirmProperties.class)
+@EnableConfigurationProperties({ConfirmProperties.class, ContinueProperties.class})
 class ConfirmConfig {
 
     /** 만료 계산용 시계. 테스트는 @Primary 시계로 바꿔 끼운다 */

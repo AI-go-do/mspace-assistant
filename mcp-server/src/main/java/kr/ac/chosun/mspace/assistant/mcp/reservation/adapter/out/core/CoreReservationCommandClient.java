@@ -50,6 +50,60 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         }
     }
 
+    /**
+     * 연장도 새 예약을 만드는 쓰기라 예약 만들기와 같이 다룬다: 응답이 안 오면 같은 멱등 키로 한 번만 다시 보내고,
+     * 5xx면 연장됐는지 모른다고 안내한다 (다시 누르면 새 토큰 = 새 키라 1회 제한 409가 날 수 있다)
+     */
+    @Override
+    public CreatedReservation continueUse(UserCredential credential, long reservationId, OffsetDateTime newEndAt,
+                                          String idempotencyKey) {
+        var body = new ContinueRequest(newEndAt);
+        try {
+            return sendContinue(credential, reservationId, body, idempotencyKey);
+        } catch (CoreApiException first) {
+            if (!CoreHttp.UNAVAILABLE.equals(first.code())) {
+                throw continueUnknownIfServerSide(first);
+            }
+            try {
+                return sendContinue(credential, reservationId, body, idempotencyKey);
+            } catch (CoreApiException second) {
+                throw continueUnknownIfServerSide(second);
+            }
+        }
+    }
+
+    private CreatedReservation sendContinue(UserCredential credential, long reservationId, ContinueRequest body,
+                                            String idempotencyKey) {
+        ResponseEntity<CoreCreated> response = core.callEntity("POST /api/reservations/{id}/continue", credential,
+                rest -> rest.post().uri("/api/reservations/{id}/continue", reservationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", idempotencyKey)
+                        .header(CREATED_VIA_HEADER, CREATED_VIA_AGENT)
+                        .body(body),
+                CoreCreated.class);
+        CoreCreated c = response.getBody();
+        if (!complete(c)) {
+            throw continueUnknown();
+        }
+        return new CreatedReservation(c.id(), c.roomId(), SeoulTime.of(c.startAt()), SeoulTime.of(c.endAt()),
+                c.status(), c.headcount(), c.accessCode(), response.getStatusCode().value() == 200);
+    }
+
+    private static CoreApiException continueUnknownIfServerSide(CoreApiException e) {
+        return e.status() >= 500 ? continueUnknown() : e;
+    }
+
+    private static CoreApiException continueUnknown() {
+        return new CoreApiException("CONTINUE_UNKNOWN", "연장됐는지 확인하지 못했어요. 다시 누르기 전에 내 예약에서 확인해 주세요.", 503);
+    }
+
+    /** 성공 카드에 필요한 값이 다 있나. 빠졌으면 처리됐을 수 있어 '실패'가 아니라 '모름'으로 안내한다 */
+    private static boolean complete(CoreCreated c) {
+        return c != null && c.id() > 0 && c.roomId() > 0 && c.headcount() > 0
+                && c.startAt() != null && c.endAt() != null && c.status() != null && !c.status().isBlank()
+                && c.accessCode() != null && !c.accessCode().isBlank();
+    }
+
     @Override
     public StatusChange cancel(UserCredential credential, long reservationId) {
         return change(credential, reservationId, "cancel", "CANCELED");
@@ -104,9 +158,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
                         .body(body),
                 CoreCreated.class);
         CoreCreated c = response.getBody();
-        if (c == null || c.id() <= 0 || c.roomId() <= 0 || c.headcount() <= 0
-                || c.startAt() == null || c.endAt() == null || c.status() == null || c.status().isBlank()
-                || c.accessCode() == null || c.accessCode().isBlank()) {
+        if (!complete(c)) {
             // 2xx인데 본문이 비었거나 필수 값이 빠짐: 만들어졌을 수 있으니 '실패'가 아니라 '모름'으로 안내.
             // 빈 값으로 성공 카드를 보여 주면 토큰은 이미 쓰여 학생이 바로잡을 길이 없다
             throw unknown();
@@ -117,6 +169,10 @@ class CoreReservationCommandClient implements ReservationCommandPort {
 
     /** core 상태 변경 응답에서 쓰는 값은 status뿐이다 */
     record CoreStatus(String status) {
+    }
+
+    /** core ContinueRequest 모양: 새 끝 시각만. 시작은 core가 누른 시각으로 정한다 */
+    record ContinueRequest(OffsetDateTime endAt) {
     }
 
     record CreateRequest(int roomId, OffsetDateTime startAt, OffsetDateTime endAt,
