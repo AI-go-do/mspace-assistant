@@ -3,6 +3,7 @@ package kr.ac.chosun.mspace.assistant.agent.chat.application;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.AccessCodeCard;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.Confirmation;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolSpec;
 
@@ -26,13 +27,19 @@ public interface ToolGateway {
     }
 
     /**
-     * @param json         모델에게 줄 결과 JSON. 확인 토큰은 들어 있지 않다
+     * @param json         모델에게 줄 결과 JSON. 확인 토큰·입실 번호는 없고, 학번·전화번호는 이미 가렸다 (게이트웨이 책임)
      * @param confirmation 쓰기 도구가 확인안을 냈으면 화면용 카드 (토큰 포함)
+     * @param accessCodeCard show_access_code가 대표자라고 답했으면 화면용 입실 번호 카드 (번호 없음)
      */
-    record Outcome(String json, boolean isError, Optional<Confirmation> confirmation) {
+    record Outcome(String json, boolean isError, Optional<Confirmation> confirmation,
+                   Optional<AccessCodeCard> accessCodeCard) {
 
         public Outcome(String json, boolean isError) {
-            this(json, isError, Optional.empty());
+            this(json, isError, Optional.empty(), Optional.empty());
+        }
+
+        public Outcome(String json, boolean isError, Optional<Confirmation> confirmation) {
+            this(json, isError, confirmation, Optional.empty());
         }
     }
 
