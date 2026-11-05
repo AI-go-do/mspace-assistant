@@ -41,7 +41,8 @@ mspace:
       workers: 4
       queue-capacity: 20
       result-ttl: 5m
-      pending-ttl: 3m
+      # 대기 최악: 대기열 20건 / 처리 4건 = 5바퀴 × 대화 기한 45초 = 225초. 그보다 길게 둬야 받은 접수를 잃지 않는다
+      pending-ttl: 5m
       poll-after: 1s
     # 입력 상한: 말 한 번 글자 수, 모델에 넘길 앞선 대화 수(최근 것만). 무료 할당량을 지킨다
     max-message-chars: 1000
