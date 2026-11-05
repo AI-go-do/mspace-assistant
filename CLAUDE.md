@@ -43,10 +43,11 @@
 | 도구 | 종류 | 예약 코어 API (요구사항 명세 v0.4 기준) | 요구사항 |
 |---|---|---|---|
 | `find_available_rooms` | 읽기 | `GET /api/rooms/availability?date=` (오늘~+6일, 방별 30분 칸 48개. 자정 넘김은 시작 날짜만 조회). **구현됨** | FR-ROOM-001 |
-| `room_status` | 읽기 | 방 현황 API (v0.2 FR-DEV-102에서 나옴, 경로 확인 필요) | FR-DEV-102 |
+| `room_status` | 읽기 | `GET /api/rooms/status` (core #62). 지금 비어 있는 방 + 바로 쓸 때 고를 수 있는 가장 늦은 끝(`latestEndAt`). **구현됨(#62)** | FR-DEV-102 |
 | `my_reservations` | 읽기 | `GET /api/reservations/me` (응답 모양 11/2 합의, core PR 11/3 예정). **구현됨** | FR-RSV-006 |
 | `usage_rules` | 읽기 | `GET /api/rules` (core #57, 로그인 없이도 열림). **구현됨** | FR-WEB-003 |
 | `create_reservation` | **쓰기** | `POST /api/reservations` | FR-RSV-001 |
+| `start_now_reservation` | **쓰기** | `POST /api/reservations/instant` (즉시 시작: 확인 누른 시각부터, 끝은 30분 칸·최대 2시간, 10분 안 입실). **구현됨(#62)** | FR-RSV-103 |
 | `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` | FR-RSV-007 |
 | `checkout_reservation` | **쓰기** | `POST /api/reservations/{id}/checkout` | FR-RSV-008 |
 | `continue_reservation` | **쓰기** | `POST /api/reservations/{id}/continue` (core #51). 30분 단위 최대 2시간, 1회, 끝나기 10분 전부터 | FR-RSV-105 |

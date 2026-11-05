@@ -9,6 +9,10 @@ public sealed interface PendingAction {
     record Create(int roomId, OffsetDateTime startAt, OffsetDateTime endAt, int headcount) implements PendingAction {
     }
 
+    /** 지금 바로 쓰기 (FR-RSV-103). 시작은 core가 [확인]을 누른 시각으로 정한다. 참여자 학번은 확인 카드에서 */
+    record StartNow(int roomId, OffsetDateTime endAt, int headcount) implements PendingAction {
+    }
+
     record Cancel(long reservationId) implements PendingAction {
     }
 

@@ -1,7 +1,10 @@
 package kr.ac.chosun.mspace.assistant.mcp.confirm.application;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
+import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort.CreatedReservation;
@@ -17,22 +20,35 @@ public class ExecuteConfirmation {
 
     private final ConfirmationStore store;
     private final ReservationCommandPort reservations;
+    private final Clock clock;
 
-    public ExecuteConfirmation(ConfirmationStore store, ReservationCommandPort reservations) {
+    public ExecuteConfirmation(ConfirmationStore store, ReservationCommandPort reservations, Clock clock) {
         this.store = store;
         this.reservations = reservations;
+        this.clock = clock;
     }
 
     public Executed execute(String token, UserCredential credential, List<String> participantStudentIds) {
         // 입력이 틀렸으면 토큰을 쓰지 않고 돌려보낸다(학생이 학번만 고쳐 다시 누를 수 있게)
         List<String> participants = participantStudentIds == null ? List.of()
                 : participantStudentIds.stream().map(s -> s == null ? "" : s.strip()).toList();
-        if (store.peek(token, credential) instanceof PendingAction.Create c) {
-            checkParticipants(c, participants);
+        switch (store.peek(token, credential)) {
+            case PendingAction.Create c -> checkParticipants(c.headcount(), participants);
+            case PendingAction.StartNow s -> {
+                checkParticipants(s.headcount(), participants);
+                checkStillAhead(s.endAt());
+            }
+            default -> {
+            }
         }
         PendingAction action = store.take(token, credential);
         return switch (action) {
             case PendingAction.Create c -> create(token, credential, c, participants);
+            case PendingAction.StartNow s -> {
+                CreatedReservation created = reservations.startNow(credential, s.roomId(), s.endAt(), participants, token);
+                yield new Executed("START_NOW", created.id(), created.status(), created.accessCode(), created.replayed(),
+                        "지금부터 %s까지 예약했어요. 10분 안에 입실해 주세요.".formatted(created.endAt().toLocalTime()));
+            }
             case PendingAction.Cancel x -> changed("CANCEL", reservations.cancel(credential, x.reservationId()), "취소했어요.");
             case PendingAction.Checkout x -> changed("CHECKOUT", reservations.checkout(credential, x.reservationId()),
                     "퇴실했어요. 방이 바로 비었어요.");
@@ -45,10 +61,19 @@ public class ExecuteConfirmation {
         };
     }
 
-    private static void checkParticipants(PendingAction.Create c, List<String> participants) {
-        if (participants.size() != c.headcount() - 1 || participants.stream().anyMatch(String::isEmpty)) {
+    /** 즉시 시작은 확인을 누른 시각부터라, 제안 뒤 끝 시각이 지나 버렸으면 토큰을 쓰지 않고 다시 제안하게 한다 */
+    private void checkStillAhead(OffsetDateTime endAt) {
+        OffsetDateTime now = clock.instant().atZone(SeoulTime.ZONE).toOffsetDateTime();
+        if (!endAt.isAfter(now)) {
+            throw new CoreApiException("RESERVATION_INVALID_LENGTH",
+                    "끝 시각 " + endAt.toLocalTime() + "이 이미 지났어요. 끝 시각을 다시 골라 주세요.");
+        }
+    }
+
+    private static void checkParticipants(int headcount, List<String> participants) {
+        if (participants.size() != headcount - 1 || participants.stream().anyMatch(String::isEmpty)) {
             throw new CoreApiException("INVALID_REQUEST",
-                    "함께 쓰는 " + (c.headcount() - 1) + "명의 학번을 모두 입력해 주세요.");
+                    "함께 쓰는 " + (headcount - 1) + "명의 학번을 모두 입력해 주세요.");
         }
     }
 
