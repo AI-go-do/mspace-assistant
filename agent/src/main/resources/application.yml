@@ -49,6 +49,13 @@ mspace:
     # 입력 상한: 말 한 번 글자 수, 모델에 넘길 앞선 대화 수(최근 것만). 무료 할당량을 지킨다
     max-message-chars: 1000
     max-history-turns: 20
+    # 대화 맥락을 서버가 기억한다 (11/5 멘토 제안). 가린 글·도구 호출·결과를 학생(토큰 sub)별로 보관.
+    # 기본은 메모리(agent 1대, 재시작하면 사라짐). Redis로 바꾸면 TTL은 Redis가 지운다
+    memory:
+      enabled: true
+      ttl: 24h
+      # 보관·모델에 넘길 대화 글자 수 상한 (도구 결과 포함). 넘으면 오래된 차례부터 버린다
+      max-chars: 20000
     # 지시문에 넣는 예약 규칙. core 설정(mspace.reservation)과 같은 값으로 둔다
     rules:
       slot-minutes: 30

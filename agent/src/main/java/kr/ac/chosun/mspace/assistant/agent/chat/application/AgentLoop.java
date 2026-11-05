@@ -17,6 +17,7 @@ import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -36,28 +37,83 @@ public class AgentLoop {
     private final ToolGateway tools;
     private final AgentProperties props;
     private final Clock clock;
+    private final ConversationMemory memory;
+    private final MemoryProperties memoryProps;
 
+    /** 기억 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock) {
+        this(llm, tools, props, clock, ConversationMemory.NONE, new MemoryProperties(false, null, 0));
+    }
+
+    @Autowired
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
+                     ConversationMemory memory, MemoryProperties memoryProps) {
         this.llm = llm;
         this.tools = tools;
         this.props = props;
         this.clock = clock;
+        this.memory = memory;
+        this.memoryProps = memoryProps;
     }
 
     /**
-     * @param history 앞선 대화(학생·비서의 글만). 도구 결과는 다시 보내지 않는다
+     * 서버가 기억한 대화가 있으면 그것을 잇고, 없을 때만 화면이 보낸 history를 쓴다 (서버 기억이 끊긴 뒤의 보조).
+     * 끝나면 이번 학생 말·도구 호출·결과·답을 함께 기억한다. 모델이 답을 못 만들면(예외) 이번 차례는 기억하지 않는다.
+     *
+     * @param history 화면이 보낸 앞선 대화(학생·비서의 글만)
      */
     public ChatResult run(UserHeaders headers, List<LlmMessage> history, String message) {
-        List<LlmMessage> conversation = new ArrayList<>();
+        String key = MemberKey.of(headers);
+        List<LlmMessage> remembered = memory.load(key);
+        List<LlmMessage> conversation = new ArrayList<>(
+                trim(remembered.isEmpty() ? masked(history) : remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
+        conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
+        ChatResult result = converse(headers, conversation);
+        conversation.add(new LlmMessage.Assistant(result.reply(), List.of()));
+        memory.save(key, trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));
+        return result;
+    }
+
+    /** 화면이 보낸 글은 학생이 고쳐 보낼 수 있어 비서 차례도 가린다 */
+    private static List<LlmMessage> masked(List<LlmMessage> history) {
+        List<LlmMessage> out = new ArrayList<>(history.size());
         for (LlmMessage m : history) {
-            // 비서 차례도 클라이언트가 보낸 글이라 가린다. 학생이 앞 대화를 고쳐 보낼 수 있다
-            conversation.add(switch (m) {
+            out.add(switch (m) {
                 case LlmMessage.User u -> new LlmMessage.User(PrivacyMask.mask(u.text()));
                 case LlmMessage.Assistant a -> new LlmMessage.Assistant(PrivacyMask.mask(a.text()), a.toolCalls());
                 case LlmMessage.ToolResult r -> r;
             });
         }
-        conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
+        return out;
+    }
+
+    /**
+     * 오래된 차례부터 버려 학생 차례 수와 글자 수를 상한 안에 둔다. 자르는 곳은 늘 학생 말 앞이라
+     * 도구 호출과 결과가 짝이 깨진 채 남지 않는다 (Gemini는 짝이 안 맞으면 400).
+     */
+    public static List<LlmMessage> trim(List<LlmMessage> conversation, int maxTurns, int maxChars) {
+        int turns = 0;
+        int chars = 0;
+        int start = 0;
+        for (int i = conversation.size() - 1; i >= 0; i--) {
+            LlmMessage m = conversation.get(i);
+            chars += switch (m) {
+                case LlmMessage.User u -> u.text().length();
+                case LlmMessage.Assistant a -> a.text() == null ? 0 : a.text().length();
+                case LlmMessage.ToolResult r -> r.json() == null ? 0 : r.json().length();
+            };
+            if (m instanceof LlmMessage.User) {
+                turns++;
+                if (turns > maxTurns || chars > maxChars) {
+                    break;
+                }
+                start = i;
+            }
+        }
+        return conversation.subList(start, conversation.size());
+    }
+
+    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation) {
         List<Confirmation> confirmations = new ArrayList<>();
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;

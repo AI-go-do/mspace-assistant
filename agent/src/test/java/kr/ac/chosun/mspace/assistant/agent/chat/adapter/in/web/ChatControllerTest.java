@@ -2,11 +2,15 @@ package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -23,6 +27,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -78,6 +83,7 @@ class ChatControllerTest {
 
     final ManualExecutor executor = new ManualExecutor();
     final AgentLoop agent = mock(AgentLoop.class);
+    final ConversationMemory memory = mock(ConversationMemory.class);
     MockMvc mvc;
 
     @BeforeEach
@@ -86,7 +92,7 @@ class ChatControllerTest {
         ChatJobs jobs = new ChatJobs(jobProps, Clock.systemUTC(), executor);
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
         ChatController controller = new ChatController(agent, mock(ConfirmationGateway.class),
-                mock(AccessCodeGateway.class), props, jobs, jobProps);
+                mock(AccessCodeGateway.class), props, jobs, jobProps, memory);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
                 .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false));
@@ -186,5 +192,19 @@ class ChatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\" \"}"))
                 .andExpect(status().isBadRequest());
         assertThat(executor.tasks).isEmpty();
+    }
+
+    @Test
+    @DisplayName("새 대화(DELETE history)는 로그인한 학생의 기억만 지우고 204, 로그인 없으면 401")
+    void clearHistory() throws Exception {
+        // when
+        mvc.perform(delete("/api/agent/chat/history").header("Authorization", "Bearer owner"))
+                .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/agent/chat/history"))
+                .andExpect(status().isUnauthorized());
+
+        // then: 토큰 모양이 아니면 헤더 해시 키로 지운다 (키에 토큰 원문이 없다)
+        verify(memory).clear(argThat(key -> key.startsWith("h:") && !key.contains("owner")));
+        verifyNoMoreInteractions(memory);
     }
 }
