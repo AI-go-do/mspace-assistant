@@ -94,6 +94,8 @@ def judge_one(exp, result):
     reply = result.get("reply") or ""
     if "tools_any" in exp and not any(t in tools for t in exp["tools_any"]):
         return False
+    if "tools_all" in exp and not all(t in tools for t in exp["tools_all"]):
+        return False
     if "tools_none" in exp and any(t in tools for t in exp["tools_none"]):
         return False
     if exp.get("no_tool") and tools:
@@ -195,11 +197,11 @@ def main():
              f"- 모델: {model}", f"- agent: {agent}", f"- 질문 {len(questions)}개 × {args.runs}회 = {total}건",
              f"- **성공률 {passed}/{total} = {100 * passed / total:.0f}%**",
              f"- 평균 응답 {sum(r['seconds'] for r in rows) / total:.1f}초, 평균 도구 호출 {sum(r['toolCalls'] or 0 for r in rows) / total:.1f}번",
-             "", "| 질문 | 묶음 | 통과/시도 | 평균 초 | 마지막 판정 근거 |", "|---|---|---|---|---|"]
+             "", "| 질문 | 묶음 | 통과/시도 | 평균 초 | 판정 근거(회차별, 다르면 //로 이어서) |", "|---|---|---|---|---|"]
     for qid, rs in by_q.items():
         q = next(x for x in questions if x["id"] == qid)
         lines.append(f"| {qid} {mask(q['text'])} | {q['group']} | {sum(r['ok'] for r in rs)}/{len(rs)} | "
-                     f"{sum(r['seconds'] for r in rs) / len(rs):.1f} | {rs[-1]['why']} |")
+                     f"{sum(r['seconds'] for r in rs) / len(rs):.1f} | {' // '.join(dict.fromkeys(r['why'] for r in rs))} |")  # 회차별 도구 목록이 다르면 모두 남김
     fails = [r for r in rows if not r["ok"]]
     if fails:
         lines += ["", "## 실패 상세 (답 앞 80자. 6자리 이상 숫자·전화번호 모양·이름 모양은 가림)", "", "| 회차 | 질문 | 근거 | 답 |", "|---|---|---|---|"]

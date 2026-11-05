@@ -6,7 +6,7 @@
 ## 무엇을 재나
 | 파일 | 하는 일 |
 |---|---|
-| `questions.json` | 질문 12개와 기대(어느 도구를 불러야 하는지, 확인 카드가 나와야 하는지, 답에 있어야 할 말). 기대가 여러 개면 하나만 맞아도 통과 |
+| `questions.json` | 질문 13개와 기대(어느 도구를 불러야 하는지, 확인 카드가 나와야 하는지, 답에 있어야 할 말). 기대가 여러 개면 하나만 맞아도 통과 |
 | `measure.py` | 질문마다 새 대화로 보내고(`DELETE /api/agent/chat/history`) 결과의 `tools`(부른 도구 이름)·`confirmations`·`reply`로 판정. Markdown 표를 `results/`에 남겨요 |
 
 - 대화 기록 지우기(`DELETE`)가 실패하면 앞 질문의 기억이 섞이니 측정을 멈춰요(409면 잠깐 기다려 다시 시도)
@@ -36,6 +36,7 @@ AGENT=http://localhost:8091 USER_ID=1 python3 -I scripts/measure/measure.py --on
 | 키 | 뜻 |
 |---|---|
 | `tools_any` | 이 중 하나는 불렀어야 함 |
+| `tools_all` | 이것들을 모두 불렀어야 함 (장면 C 앞부분: 시간표 → 빈방) |
 | `tools_none` | 이 도구는 부르면 안 됨 (예: "내일 2시"에 `room_status`) |
 | `no_tool` | 도구를 하나도 안 불러야 함 (인사, 범위 밖) |
 | `confirm_tool` | 확인 카드의 도구 이름 |

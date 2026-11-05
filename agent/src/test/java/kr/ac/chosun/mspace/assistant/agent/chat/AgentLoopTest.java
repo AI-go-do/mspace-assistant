@@ -421,7 +421,66 @@ class AgentLoopTest {
 
         // then
         assertThat(withSchedule.reply()).isEqualTo("오늘은 자료구조가 있어요\n\n(입력한 시간표 기준)");
+        assertThat(withSchedule.hints()).isEmpty();
         assertThat(withoutSchedule.reply()).isEqualTo("아직 넣은 시간표가 없어요.");
+        // 시간표가 없을 때는 화면이 [내 시간표] 버튼을 그리도록 신호를 준다 (설계 5장 ③)
+        assertThat(withoutSchedule.hints()).containsExactly(ChatResult.HINT_OPEN_SCHEDULE);
+    }
+
+    /** 2026-11-03(화) 15:30부터 빈 칸이 하나도 없음 */
+    static final String FULL = "{\"date\":\"2026-11-03\",\"rooms\":[],\"note\":\"이 시간대에 빈방이 없어요.\"}";
+    /** 2026-11-04(수) 마지막 수업 12:00 끝 → 12:30부터 */
+    static final String WEDNESDAY = """
+            {"date":"2026-11-04","dayOfWeek":"수","code":null,
+             "classes":[{"name":"운영체제","startAt":"2026-11-04T10:00:00+09:00","endAt":"2026-11-04T12:00:00+09:00"}],
+             "lastClassEndAt":"2026-11-04T12:00:00+09:00","searchFromAt":"2026-11-04T12:30:00+09:00",
+             "bufferMinutes":30,"note":null}""";
+    static final String FREE_WED = "{\"date\":\"2026-11-04\",\"rooms\":[{\"roomId\":3,\"free\":[{\"startAt\":\"2026-11-04T12:30:00+09:00\",\"endAt\":\"2026-11-04T15:00:00+09:00\"}]}],\"note\":null}";
+
+    @Test
+    @DisplayName("장면 C '수업 끝나고 빈방 잡아 줘' - 오늘 없으면 되묻지 않고 다음 날 시간표 → 빈방 순으로 이어서 본다")
+    void sceneCFallsBackToNextDay() {
+        // given: 모델이 지시문대로 화요일 → 없음 → 수요일 시간표 → 수요일 빈방 순으로 부른다
+        var llm = new ScriptedLlm()
+                .then(tool("my_schedule", Map.of("date", "2026-11-03")))
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-03", "from", "15:30")))
+                .then(tool("my_schedule", Map.of("date", "2026-11-04")))
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-04", "from", "12:30")))
+                .then(say("내일은 없어서 모레(수) 기준으로 찾았어요. 3번 방이 12:30부터 비어 있어요"));
+        var byCall = new ArrayDeque<>(List.of(TUESDAY, FULL, WEDNESDAY, FREE_WED));
+        var tools = new FakeTools(Map.of()) {
+            @Override
+            public Session open(UserHeaders headers) {
+                Session inner = super.open(headers);
+                return new Session() {
+                    @Override
+                    public List<ToolSpec> tools() {
+                        return List.of(new ToolSpec("my_schedule", "", Map.of()), new ToolSpec("find_available_rooms", "", Map.of()));
+                    }
+
+                    @Override
+                    public Outcome call(String name, Map<String, Object> arguments) {
+                        called.add(name);
+                        return ProposalParser.parse(name, byCall.poll(), false, JSON);
+                    }
+
+                    @Override
+                    public void close() {
+                        inner.close();
+                    }
+                };
+            }
+        };
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 수업 끝나고 빈방 잡아 줘");
+
+        // then
+        assertThat(llm.lastSystem).contains("다음 날을 이어서 본다", "사흘째까지 혼자 넘어가지 않는다");
+        assertThat(tools.called).containsExactly("my_schedule", "find_available_rooms", "my_schedule", "find_available_rooms");
+        assertThat(result.tools()).hasSize(4);
+        assertThat(result.hints()).isEmpty();
+        assertThat(result.reply()).startsWith("내일은 없어서").endsWith("(예약 시스템 15:00 조회 · 입력한 시간표 기준)");
     }
 
     @Test
