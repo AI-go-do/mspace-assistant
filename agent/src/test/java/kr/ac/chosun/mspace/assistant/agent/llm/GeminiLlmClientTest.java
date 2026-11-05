@@ -34,7 +34,7 @@ class GeminiLlmClientTest {
     @RegisterExtension
     static WireMockExtension gemini = WireMockExtension.newInstance().options(wireMockConfig().dynamicPort()).build();
 
-    static final String PATH = "/v1beta/models/gemini-2.5-flash:generateContent";
+    static final String PATH = "/v1beta/models/gemini-3.5-flash-lite:generateContent";
     static final ToolSpec FIND = new ToolSpec("find_available_rooms", "빈방 찾기",
             Map.of("type", "object", "properties", Map.of("date", Map.of("type", "string")), "required", List.of("date")));
 
