@@ -15,6 +15,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -22,6 +23,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * 도구 통합 테스트 공통부: 가짜 코어(WireMock) + 진짜 MCP 클라이언트(공식 Java SDK, Streamable HTTP).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("local") // 테스트는 로그인 대신 X-User-Id 헤더를 쓴다
 public abstract class McpToolTestSupport {
 
     /**

@@ -22,10 +22,9 @@ management:
 mspace:
   core:
     base-url: ${CORE_BASE_URL:http://localhost:8080}
-    # 로그인 붙기 전까지 core는 X-User-Id(로컬·테스트 전용)를 쓴다. JWT가 붙으면 Authorization만 남긴다
+    # 학생 본인 토큰만 넘긴다. X-User-Id(로그인 붙기 전 임시)는 local 프로필에서만 켠다 (application-local.yml)
     forward-headers:
       - Authorization
-      - X-User-Id
     timeout: 3s
   # 쓰기 도구 확인 토큰. 짧게 두어 오래된 확인안이 실행되지 않게 한다
   confirm:
