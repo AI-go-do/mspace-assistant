@@ -84,7 +84,7 @@ public class AgentLoop {
                     return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false);
                 }
                 if (!reply.wantsTools()) {
-                    return new ChatResult(reply.text(), confirmations, accessCodeCards, calls, false);
+                    return new ChatResult(grounded(reply.text(), calls), confirmations, accessCodeCards, calls, false);
                 }
                 if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
@@ -130,6 +130,18 @@ public class AgentLoop {
 
     static final String CARDS_ONLY_REPLY = "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요.";
 
+    /**
+     * 도구를 하나라도 불러 낸 답에는 조회 시각을 꼬리말로 붙인다. "그걸 어떻게 알아?"에 모델의 말이 아니라
+     * 코드가 근거를 보여 주는 것이라, 모델이 사과하거나 지어내도 학생은 조회 사실을 알 수 있다 (11/5 시연 피드백)
+     */
+    String grounded(String text, int calls) {
+        if (calls == 0 || text == null || text.isBlank()) {
+            return text;
+        }
+        ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
+        return text.stripTrailing() + "\n\n(예약 시스템 %02d:%02d 조회 기준)".formatted(now.getHour(), now.getMinute());
+    }
+
     String systemPrompt() {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
         AgentProperties.Rules rules = props.rules();
@@ -145,9 +157,21 @@ public class AgentLoop {
                 - 연장은 사용 중인 예약이 끝나기 10분 전부터, 30분 단위로 최대 2시간, 한 번만 된다. 몇 분 늘릴지 모르면 물어본다.
                 - 입실 번호는 show_access_code로만 안내한다. 번호는 화면 카드에만 나오고 너는 모른다. 번호를 지어내지 않는다.
                 - 학번·전화번호·이름을 묻지 않는다. 함께 쓰는 사람의 학번은 확인 화면에서 받는다.
-                - 도구가 오류를 주면 그 문장을 학생에게 전하고, 할 수 있는 다음 행동을 하나 제안한다.
+                - 도구 결과의 note·message 문장은 바꿔 말하지 않고 그대로 전하고, 할 수 있는 다음 행동을 하나 제안한다.
+                  "빈방이 없다"와 "인원에 맞는 방이 없다"는 다른 이유다. 결과에 적힌 이유만 말한다.
                 - 수업 시간표는 아직 모른다. "수업 끝나고"처럼 말하면 끝나는 시각을 물어본다.
                 - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
+                - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
+                  my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면
+                  본인 예약만 볼 수 있다고 답한다. 함께 쓸 사람의 학번은 확인 화면에서 넣는다고 안내한다.
+                - 인원을 말하지 않았으면 headcount를 넣지 않는다. 방마다 인원 범위가 있어(1~4번 방 3~5명, 5번 방 5~8명)
+                  2명 이하는 예약할 수 없다. 인원이 안 맞으면 그 이유를 그대로 말한다.
+                - "5시"처럼 오전·오후가 없으면 지금 이후의 가장 가까운 시각으로 보고, 답에 "오후 5시"처럼 적는다.
+                - 앞선 대화의 네 답은 모두 도구로 조회한 결과다(도구 호출 기록은 대화에 다시 실리지 않는다).
+                  "그걸 어떻게 알아?"처럼 물으면 예약 시스템을 조회한 결과라고 답하고, 확인하지 않았다고 사과하지 않는다.
+                  다시 확인해 달라면 그 자리에서 도구를 다시 부른다.
+                - "잠시만 기다려 주세요", "확인해 드릴게요"처럼 나중에 하겠다는 말은 하지 않는다. 네 답이 나가면
+                  대화 차례가 끝나므로, 할 일은 이번 답 안에서 도구를 불러 끝낸다.
                 """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays());
     }
 }

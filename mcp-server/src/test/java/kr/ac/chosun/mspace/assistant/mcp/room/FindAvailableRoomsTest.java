@@ -132,4 +132,20 @@ class FindAvailableRoomsTest {
         assertThat(result.rooms()).isEmpty();
         assertThat(result.note()).contains("조건에 맞는 빈방이 없어요");
     }
+
+    @Test
+    @DisplayName("인원 때문에 방이 하나도 안 남으면 note에 이유와 방별 인원을 적는다 (2명 → 빈 시간 문제로 오해하지 않게, TS-10)")
+    void headcountNote() {
+        // given: 다 비어 있지만 2명이 쓸 수 있는 방이 없다
+        var find = with(room(1, 3, 5, Set.of()), room(5, 5, 8, Set.of()));
+
+        // when
+        AvailableRooms result = find.find(DAY, LocalTime.of(17, 0), LocalTime.of(19, 0), 2, USER);
+
+        // then
+        assertThat(result.rooms()).isEmpty();
+        assertThat(result.note())
+                .startsWith("2명이 쓸 수 있는 방이 없어요. 1번 방 3~5명, 5번 방 5~8명.")
+                .doesNotContain("조건에 맞는 빈방이 없어요");
+    }
 }
