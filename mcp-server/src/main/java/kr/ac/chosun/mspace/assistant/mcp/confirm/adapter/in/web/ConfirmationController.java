@@ -1,11 +1,7 @@
 package kr.ac.chosun.mspace.assistant.mcp.confirm.adapter.in.web;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
-import kr.ac.chosun.mspace.assistant.mcp.common.CoreProperties;
-import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
+import kr.ac.chosun.mspace.assistant.mcp.common.adapter.in.web.ForwardedCredentials;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.ExecuteConfirmation;
 import kr.ac.chosun.mspace.assistant.mcp.confirm.application.ExecuteConfirmation.Executed;
 import org.springframework.http.HttpHeaders;
@@ -23,27 +19,19 @@ import org.springframework.web.bind.annotation.RestController;
 class ConfirmationController {
 
     private final ExecuteConfirmation execute;
-    private final CoreProperties core;
+    private final ForwardedCredentials credentials;
 
-    ConfirmationController(ExecuteConfirmation execute, CoreProperties core) {
+    ConfirmationController(ExecuteConfirmation execute, ForwardedCredentials credentials) {
         this.execute = execute;
-        this.core = core;
+        this.credentials = credentials;
     }
 
     /** 예: POST /api/confirmations/c_9f2… {"participantStudentIds":["20230002","20230003"]} */
     @PostMapping("/api/confirmations/{token}")
     Executed confirm(@PathVariable String token, @RequestHeader HttpHeaders headers,
                      @RequestBody(required = false) ConfirmRequest request) {
-        Map<String, String> forwarded = new LinkedHashMap<>();
-        for (String name : core.forwardHeaders()) {
-            String value = headers.getFirst(name);
-            if (value != null && !value.isBlank()) {
-                forwarded.put(name, value);
-            }
-        }
-        UserCredential credential = UserCredential.from(new UserCredential(forwarded))
-                .orElseThrow(() -> new CoreApiException("UNAUTHORIZED", "로그인이 필요합니다", 401));
-        return execute.execute(token, credential, request == null ? List.of() : request.participantStudentIds());
+        return execute.execute(token, credentials.require(headers),
+                request == null ? List.of() : request.participantStudentIds());
     }
 
     record ConfirmRequest(List<String> participantStudentIds) {
