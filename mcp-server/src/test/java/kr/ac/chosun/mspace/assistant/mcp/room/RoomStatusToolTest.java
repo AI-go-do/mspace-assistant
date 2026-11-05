@@ -27,9 +27,11 @@ class RoomStatusToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("도구 목록에 room_status가 읽기 전용, 입력 없음으로 보인다")
     void listsTool() {
+        // when
         Tool tool = connect(USER).listTools().tools().stream()
                 .filter(t -> t.name().equals("room_status")).findFirst().orElseThrow();
 
+        // then
         assertThat(tool.annotations().readOnlyHint()).isTrue();
         assertThat(tool.description()).contains("지금 바로 쓸 수 있는 방");
     }
@@ -67,6 +69,7 @@ class RoomStatusToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("바로 쓸 수 있는 방이 없으면 note로 알린다")
     void noneAvailable() {
+        // given: 하나뿐인 방이 예약돼 있다
         OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.SECONDS);
         core.stubFor(get("/api/rooms/status").willReturn(okJson("""
                 {"now": "%s", "availableCount": 0, "roomCount": 1, "rooms": [
@@ -74,9 +77,26 @@ class RoomStatusToolTest extends McpToolTestSupport {
                    "currentStartAt": "%s", "currentEndAt": "%s", "nextStartAt": null, "presence": "UNKNOWN"}
                 ]}""".formatted(now.format(ISO), now.minusMinutes(5).format(ISO), now.plusMinutes(55).format(ISO)))));
 
+        // when
         CallToolResult result = call(USER, "room_status", Map.of());
 
+        // then
         assertThat(result.isError()).isFalse();
         assertThat(text(result)).contains("\"availableCount\":0", "지금 바로 쓸 수 있는 방이 없어요");
+    }
+
+    @Test
+    @DisplayName("core가 2xx인데 본문이 비면 '빈 방 없음'이 아니라 CORE_BAD_RESPONSE 오류다")
+    void emptyBodyIsError() {
+        // given: 2xx인데 rooms가 없다
+        core.stubFor(get("/api/rooms/status").willReturn(okJson("""
+                {"now": null, "availableCount": 0, "roomCount": 0, "rooms": null}""")));
+
+        // when
+        CallToolResult result = call(USER, "room_status", Map.of());
+
+        // then
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("방 현황을 불러오지 못했어요").doesNotContain("지금 바로 쓸 수 있는 방이 없어요");
     }
 }

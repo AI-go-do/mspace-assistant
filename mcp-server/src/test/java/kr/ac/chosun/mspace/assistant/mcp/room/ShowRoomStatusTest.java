@@ -36,8 +36,11 @@ class ShowRoomStatusTest {
     @DisplayName("14:17에 비어 있는 방은 16:30까지(지금 + 2시간을 30분 칸으로 올림), 다음 예약이 15:00이면 15:00까지")
     void latestEnd() {
         // given
-        RoomsNow shown = status(room(1, "AVAILABLE", null), room(2, "AVAILABLE", OffsetDateTime.parse("2026-11-03T15:00:00+09:00")),
-                room(3, "IN_USE", null)).show(ME);
+        ShowRoomStatus show = status(room(1, "AVAILABLE", null), room(2, "AVAILABLE", OffsetDateTime.parse("2026-11-03T15:00:00+09:00")),
+                room(3, "IN_USE", null));
+
+        // when
+        RoomsNow shown = show.show(ME);
 
         // then
         assertThat(shown.rooms().get(0).latestEndAt()).isEqualTo(OffsetDateTime.parse("2026-11-03T16:30:00+09:00"));
@@ -50,8 +53,13 @@ class ShowRoomStatusTest {
     @Test
     @DisplayName("다음 예약이 지금 이전이거나 같으면 바로 쓸 수 없는 방으로 센다")
     void nextTooClose() {
-        RoomsNow shown = status(room(1, "AVAILABLE", NOW)).show(ME);
+        // given
+        ShowRoomStatus show = status(room(1, "AVAILABLE", NOW));
 
+        // when
+        RoomsNow shown = show.show(ME);
+
+        // then
         assertThat(shown.rooms().get(0).latestEndAt()).isNull();
         assertThat(shown.availableCount()).isZero();
         assertThat(shown.note()).contains("지금 바로 쓸 수 있는 방이 없어요");
@@ -60,9 +68,14 @@ class ShowRoomStatusTest {
     @Test
     @DisplayName("정각이면 올리지 않는다 (14:30 + 2시간 = 16:30)")
     void onSlotNotCeiled() {
+        // given
         var exact = new ShowRoomStatus(c -> new RoomsNow(OffsetDateTime.parse("2026-11-03T14:30:00+09:00"), 0,
                 List.of(room(1, "AVAILABLE", null)), null), new ContinueProperties(10, 120, 30), CLOCK);
 
-        assertThat(exact.show(ME).rooms().get(0).latestEndAt()).isEqualTo(OffsetDateTime.parse("2026-11-03T16:30:00+09:00"));
+        // when
+        RoomsNow shown = exact.show(ME);
+
+        // then
+        assertThat(shown.rooms().get(0).latestEndAt()).isEqualTo(OffsetDateTime.parse("2026-11-03T16:30:00+09:00"));
     }
 }

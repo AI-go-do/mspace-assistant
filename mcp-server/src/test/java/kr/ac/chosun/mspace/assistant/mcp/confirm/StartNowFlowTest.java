@@ -56,9 +56,11 @@ class StartNowFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("도구 목록: start_now_reservation은 쓰기 도구이고 입력에 시작 시각·학번이 없다")
     void listsTool() {
+        // when
         Tool tool = connect(ME).listTools().tools().stream()
                 .filter(t -> t.name().equals("start_now_reservation")).findFirst().orElseThrow();
 
+        // then
         assertThat(tool.annotations().readOnlyHint()).isFalse();
         assertThat(tool.inputSchema().toString()).doesNotContainIgnoringCase("student").doesNotContain("startAt");
     }
@@ -66,10 +68,13 @@ class StartNowFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("확인 없이 도구만 부르면 확인안만 나오고 즉시 시작 API는 불리지 않는다")
     void proposalDoesNotCallCore() {
+        // given
         OffsetDateTime end = validEnd();
 
+        // when
         CallToolResult result = call(ME, "start_now_reservation", Map.of("roomId", 2, "endAt", end.format(ISO), "headcount", 3));
 
+        // then
         assertThat(result.isError()).as(text(result)).isFalse();
         assertThat(text(result)).contains("2번 방을 지금부터 " + end.toLocalTime() + "까지 3명으로 바로 쓸까요?")
                 .contains("10분 안에", "2명의 학번은 확인 화면에서", "\"needsParticipants\":2");
@@ -79,12 +84,15 @@ class StartNowFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("끝 시각이 30분 칸이 아니거나 2시간을 넘으면 확인안을 만들지 않는다")
     void rejectsBadEnd() {
+        // given
         OffsetDateTime end = validEnd();
 
+        // when
         CallToolResult offSlot = call(ME, "start_now_reservation", Map.of("roomId", 2, "endAt", end.plusMinutes(10).format(ISO), "headcount", 3));
         CallToolResult tooLong = call(ME, "start_now_reservation", Map.of("roomId", 2, "endAt", end.plusHours(3).format(ISO), "headcount", 3));
         CallToolResult past = call(ME, "start_now_reservation", Map.of("roomId", 2, "endAt", end.minusHours(3).format(ISO), "headcount", 3));
 
+        // then
         assertThat(offSlot.isError()).isTrue();
         assertThat(text(offSlot)).contains("정각 또는 30분");
         assertThat(tooLong.isError()).isTrue();
@@ -95,6 +103,7 @@ class StartNowFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("확인하면 즉시 시작 API를 멱등 키·AGENT 표시·학번으로 부르고, 토큰 재사용은 409")
     void confirmStartsNow() throws Exception {
+        // given
         OffsetDateTime end = validEnd();
         core.stubFor(post("/api/reservations/instant").willReturn(aResponse().withStatus(201)
                 .withHeader("Content-Type", "application/json").withBody("""
@@ -102,9 +111,11 @@ class StartNowFlowTest extends McpToolTestSupport {
                         .formatted(end.minusMinutes(40).format(ISO), end.format(ISO)))));
         String token = token(call(ME, "start_now_reservation", Map.of("roomId", 2, "endAt", end.format(ISO), "headcount", 3)));
 
+        // when
         HttpResponse<String> response = confirm(token, "{\"participantStudentIds\":[\"20230002\",\"20230003\"]}");
         HttpResponse<String> again = confirm(token, "{\"participantStudentIds\":[\"20230002\",\"20230003\"]}");
 
+        // then
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"action\":\"START_NOW\"", "\"reservationId\":9", "\"accessCode\":\"482913\"",
                 "10분 안에 입실");
@@ -119,11 +130,14 @@ class StartNowFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("학번 수가 모자라면 토큰을 쓰지 않고 400, 고쳐서 다시 누를 수 있다")
     void participantsChecked() throws Exception {
+        // given
         OffsetDateTime end = validEnd();
         String token = token(call(ME, "start_now_reservation", Map.of("roomId", 2, "endAt", end.format(ISO), "headcount", 3)));
 
+        // when
         HttpResponse<String> response = confirm(token, "{\"participantStudentIds\":[\"20230002\"]}");
 
+        // then
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.body()).contains("2명의 학번");
         core.verify(0, postRequestedFor(urlEqualTo("/api/reservations/instant")));
