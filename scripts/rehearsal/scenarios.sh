@@ -40,14 +40,16 @@ on_exit() { local st=$?; cleanup || { echo "끝 정리 실패: OWNER 예약이 �
 trap on_exit EXIT
 # 채팅은 접수(202 + jobId) → 결과 조회(폴링). 예전 agent(바로 결과)도 그대로 받는다. 결과 JSON만 출력한다
 chat() {
-  local r id
-  r=$(curl -s -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
+  local r id deadline
+  # 요청마다 5초, 전체 폴링은 POLL_LIMIT초(기본 90)까지. agent가 응답 없이 붙잡아도 정리(trap)까지 간다
+  r=$(curl -s --max-time 5 -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
     -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1],"history":[]}))' "$2")")
   id=$(echo "$r" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("jobId","") if d.get("status")=="PENDING" else "")' 2>/dev/null)
   [ -z "$id" ] && { echo "$r"; return; }
-  for _ in $(seq 1 90); do
+  deadline=$((SECONDS + ${POLL_LIMIT:-90}))
+  while [ "$SECONDS" -lt "$deadline" ]; do
     sleep 1
-    r=$(curl -s "$AGENT/api/agent/chat/$id" -H "X-User-Id: $1")
+    r=$(curl -s --max-time 5 "$AGENT/api/agent/chat/$id" -H "X-User-Id: $1")
     case "$(echo "$r" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))' 2>/dev/null)" in
       DONE) echo "$r" | python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin)["result"],ensure_ascii=False))'; return ;;
       PENDING) ;;
@@ -56,7 +58,7 @@ chat() {
   done
   echo '{"code":"POLL_TIMEOUT"}'
 }
-confirm() { curl -s -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
+confirm() { curl -s --max-time 10 -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3"; }
 j() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1"; }
 
 # MCP 서버와 agent가 뜰 때까지 각각 최대 60초 기다린다. 안 뜨면 시나리오를 돌리지 않는다.
