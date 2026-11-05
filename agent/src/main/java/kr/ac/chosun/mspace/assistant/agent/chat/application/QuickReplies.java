@@ -27,6 +27,14 @@ final class QuickReplies {
      * @param hasCards   확인 카드나 입실 번호 카드가 있으면 true (카드가 다음 행동이라 버튼을 안 띄움)
      */
     static List<String> suggest(List<Seen> seen, boolean hasCards) {
+        return suggest(seen, hasCards, null);
+    }
+
+    /**
+     * @param lastAllowed 조회할 수 있는 마지막 날(오늘 + 미리 예약 일수 - 1). 다음 날이 이 날을 넘으면
+     *                    "같은 시간 봐 줘"를 안 띄운다(눌러도 범위 밖이라 실패). null이면 제한 없음
+     */
+    static List<String> suggest(List<Seen> seen, boolean hasCards, java.time.LocalDate lastAllowed) {
         if (hasCards) {
             return List.of();
         }
@@ -47,7 +55,7 @@ final class QuickReplies {
         }
         return switch (last.tool()) {
             case "find_available_rooms" -> r.path("rooms").isEmpty()
-                    ? List.of(nextDay(r.path("date").asString(null)) + " 같은 시간 봐 줘", "지금 빈 방 있어?")
+                    ? noRooms(r.path("date").asString(null), lastAllowed)
                     : List.of("첫 번째로 나온 방 잡아 줘", "다른 시간도 볼게");
             case "my_reservations" -> reservations(r);
             case "room_status" -> r.path("availableCount").asInt(0) > 0
@@ -58,6 +66,22 @@ final class QuickReplies {
                     : r.path("classes").isEmpty() ? List.of("오후 2시부터 빈방 봐 줘") : List.of("수업 끝나고 2시간 잡아 줘");
             default -> List.of();
         };
+    }
+
+    private static List<String> noRooms(String date, java.time.LocalDate lastAllowed) {
+        if (lastAllowed != null && !nextDayAllowed(date, lastAllowed)) {
+            return List.of("지금 빈 방 있어?");
+        }
+        return List.of(nextDay(date) + " 같은 시간 봐 줘", "지금 빈 방 있어?");
+    }
+
+    /** 다음 날이 조회 범위 안인지. 날짜를 모르면 "다음 날"이 어디인지 몰라 안 띄운다 */
+    private static boolean nextDayAllowed(String date, java.time.LocalDate lastAllowed) {
+        try {
+            return !java.time.LocalDate.parse(date).plusDays(1).isAfter(lastAllowed);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** 조회한 날의 다음 날을 "11월 7일"로. 날짜를 모르면 "다음 날" (같은 날을 다시 조회하지 않게) */

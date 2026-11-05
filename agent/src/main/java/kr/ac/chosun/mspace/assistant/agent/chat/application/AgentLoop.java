@@ -195,12 +195,17 @@ public class AgentLoop {
     }
 
     /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
-    private static ChatResult result(String reply, List<Confirmation> confirmations, List<AccessCodeCard> cards,
+    private ChatResult result(String reply, List<Confirmation> confirmations, List<AccessCodeCard> cards,
                                      int calls, boolean stopped, List<String> toolNames, List<String> hints,
                                      List<QuickReplies.Seen> seen) {
         List<String> suggestions = stopped ? List.of()
-                : QuickReplies.suggest(seen, !confirmations.isEmpty() || !cards.isEmpty());
+                : QuickReplies.suggest(seen, !confirmations.isEmpty() || !cards.isEmpty(), lastAllowedDay());
         return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints), suggestions);
+    }
+
+    /** 조회할 수 있는 마지막 날: 오늘(서울) + 미리 예약 일수 - 1 */
+    private java.time.LocalDate lastAllowedDay() {
+        return java.time.LocalDate.now(clock.withZone(SEOUL)).plusDays(props.rules().advanceDays() - 1L);
     }
 
     private boolean pastDeadline(Instant deadline, int calls) {

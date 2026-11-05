@@ -41,6 +41,26 @@ class QuickRepliesTest {
     }
 
     @Test
+    @DisplayName("빈방 없음: 다음 날이 조회 범위(오늘~+6일) 밖이면 '같은 시간 봐 줘'를 안 띄운다")
+    void roomsLastDay() {
+        // given: 11/3 기준 마지막 조회일 11/9
+        java.time.LocalDate lastAllowed = java.time.LocalDate.of(2026, 11, 9);
+        List<Seen> lastDay = List.of(ok("find_available_rooms", "{\"date\":\"2026-11-09\",\"rooms\":[]}"));
+        List<Seen> dayBefore = List.of(ok("find_available_rooms", "{\"date\":\"2026-11-08\",\"rooms\":[]}"));
+        List<Seen> noDate = List.of(ok("find_available_rooms", "{\"rooms\":[]}"));
+
+        // when
+        List<String> a = QuickReplies.suggest(lastDay, false, lastAllowed);
+        List<String> b = QuickReplies.suggest(dayBefore, false, lastAllowed);
+        List<String> c = QuickReplies.suggest(noDate, false, lastAllowed);
+
+        // then
+        assertThat(a).containsExactly("지금 빈 방 있어?");
+        assertThat(b).containsExactly("11월 9일 같은 시간 봐 줘", "지금 빈 방 있어?");
+        assertThat(c).containsExactly("지금 빈 방 있어?");
+    }
+
+    @Test
     @DisplayName("빈방 결과: 방이 있으면 '잡아 줘', 없으면 조회한 날의 다음 날(같은 날을 다시 조회하지 않게)")
     void rooms() {
         // given
