@@ -106,7 +106,7 @@ tok1=$tok; code=$(curl -s --max-time 5 "$AGENT/api/agent/reservations/$rid/acces
 [ "$(echo "$r" | j 'd.get("status")')" = BOOKED ] && row "본인이 [확인]" ok "예약 $rid BOOKED" || row "본인이 [확인]" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_USED ] \
   && row "같은 토큰 다시" ok "CONFIRMATION_USED" || row "같은 토큰 다시" no "$r"
-r=$(chat "$OWNER" "내 입실 번호 알려 줘"); [ -n "$code" ] && [ "$(echo "$r" | j 'len(d.get("accessCodeCards",[]))')" = 1 ] && ! echo "$r" | grep -qF -e 'accessCode"' -e "$code" \
+r=$(chat "$OWNER" "내 입실 번호 알려 줘"); [ -n "$code" ] && [ "$(echo "$r" | j '[c.get("reservationId") for c in d.get("accessCodeCards",[])]')" = "[$rid]" ] && ! echo "$r" | grep -qF -e 'accessCode"' -e "$code" \
   && row "입실 번호(대표자)" ok "화면 카드만, 답에 번호 없음" || row "입실 번호(대표자)" no "$r"
 r=$(curl -s --max-time 5 "$AGENT/api/agent/reservations/$rid/access-code" -H "X-User-Id: $OTHER"); [ "$(echo "$r" | j 'd.get("code")')" = NOT_RESERVATION_OWNER ] \
   && row "입실 번호(참여자, 화면 API)" ok "NOT_RESERVATION_OWNER" || row "입실 번호(참여자, 화면 API)" no "$r"
