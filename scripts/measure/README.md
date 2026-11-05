@@ -9,21 +9,24 @@
 | `questions.json` | 질문 12개와 기대(어느 도구를 불러야 하는지, 확인 카드가 나와야 하는지, 답에 있어야 할 말). 기대가 여러 개면 하나만 맞아도 통과 |
 | `measure.py` | 질문마다 새 대화로 보내고(`DELETE /api/agent/chat/history`) 결과의 `tools`(부른 도구 이름)·`confirmations`·`reply`로 판정. Markdown 표를 `results/`에 남겨요 |
 
+- 대화 기록 지우기(`DELETE`)가 실패하면 앞 질문의 기억이 섞이니 측정을 멈춰요(409면 잠깐 기다려 다시 시도)
 - 쓰기 도구는 **확인 카드까지만** 나와요. [확인]은 누르지 않으니 예약이 생기지 않아요
-- 결과 파일에는 질문·판정·도구 이름·걸린 시간·답 앞 80자(6자리 이상 숫자는 가림)만 남아요. 토큰은 안 남아요
+- 결과 파일에는 질문·판정·도구 이름·걸린 시간·답 앞 80자만 남아요. 질문·답에서 6자리 이상 숫자, 전화번호 모양, 이름 모양(○○○ 님)은 가려요. 토큰은 안 남아요. 그래도 `--questions`로 직접 만든 질문 파일에는 실제 이름·학번을 넣지 마세요(가리기는 모양 기준이라 완전하지 않아요)
 - 표준 라이브러리만 써요. `python3 -I`로 돌려요
 
 ## 실행
 ```bash
-# 서버(Gemini)에서: 로그인 토큰은 환경 변수로만. 채팅·파일·커밋에 붙이지 마세요
-AGENT=https://dev-mspace.java21.net TOKEN='<내 로그인 토큰>' MODEL_LABEL=gemini-3.5-flash-lite \
-  python3 -I scripts/measure/measure.py --runs 3
+# 서버(Gemini)에서: 로그인 토큰은 환경 변수로만. 명령줄에 직접 쓰면 셸 history에 남으니 read -s로 받아요
+read -rs -p "로그인 토큰: " TOKEN && export TOKEN
+export AGENT=https://dev-mspace.java21.net MODEL_LABEL=gemini-3.5-flash-lite
+python3 -I scripts/measure/measure.py --runs 3
+unset TOKEN   # 끝나면 지워요
 
-# 로컬(local 프로필, X-User-Id): 테스트 계정만
+# 로컬(local 프로필, X-User-Id): 테스트 계정만. http는 localhost만 허용(토큰 평문 전송 방지)
 AGENT=http://localhost:8091 USER_ID=1 MODEL_LABEL=gemini python3 -I scripts/measure/measure.py
 
-# 몇 개만
-python3 -I scripts/measure/measure.py --only Q01,Q05
+# 몇 개만 (인증 변수는 위처럼 먼저 export)
+AGENT=http://localhost:8091 USER_ID=1 python3 -I scripts/measure/measure.py --only Q01,Q05
 ```
 - 토큰은 앱에서 로그인한 뒤 브라우저 개발자 도구 → Application → Local Storage(또는 네트워크 탭의 `Authorization` 헤더)에서 복사해요 (확인 필요: front가 어디에 두는지는 재웅 front 코드 기준)
 - Gemini 무료 한도가 하루 500회라 12문항 × 3회 = 36회(도구 호출 포함 약 100회)면 충분해요

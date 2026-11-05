@@ -18,6 +18,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -51,6 +52,19 @@ def call(method, url, body=None, timeout=15):
             return e.code, {"code": "HTTP_" + str(e.code), "message": raw[:200]}
     except (urllib.error.URLError, TimeoutError) as e:
         return 0, {"code": "CONNECT_FAILED", "message": str(e)[:200]}
+
+
+def reset_history(agent):
+    """DELETE /api/agent/chat/history. 직전 작업 정리 중이면 409 CHAT_IN_PROGRESS가 날 수 있어 잠깐 기다려 다시 시도한다"""
+    for attempt in range(5):
+        status, body = call("DELETE", agent + "/api/agent/chat/history")
+        if status in (204, 200):
+            return
+        if status == 409:
+            time.sleep(1 + attempt)
+            continue
+        sys.exit(f"대화 기록을 지우지 못했어요 (status {status} {body.get('code')}). 측정을 멈춰요")
+    sys.exit("대화 기록을 지우지 못했어요 (계속 409 CHAT_IN_PROGRESS). 측정을 멈춰요")
 
 
 def chat(agent, text, poll_limit):
@@ -94,8 +108,9 @@ def judge_one(exp, result):
 
 
 def judge(question, result):
-    if "code" in result and "reply" not in result:
-        return False, "오류 " + str(result.get("code"))
+    if "reply" not in result:  # 오류 본문({code}), 실패 작업({status: FAILED, error: {code}}), 빈 결과 모두 실패
+        code = result.get("code") or (result.get("error") or {}).get("code") or result.get("status") or "응답 없음"
+        return False, "오류 " + str(code)
     ok = any(judge_one(e, result) for e in question["expect"])
     why = "도구 " + (",".join(result.get("tools") or []) or "없음")
     if result.get("confirmations"):
@@ -105,12 +120,33 @@ def judge(question, result):
     return ok, why
 
 
-MASK = re.compile(r"\d{6,}")  # 학번·입실 번호 모양은 답 요약에서 가린다
+# 결과 파일에 남는 글(질문·답)에서 가리는 것: 6자리 이상 숫자(학번·입실 번호), 구분자 있는 번호(010-1234-5678, 2020 1234),
+# 한글 이름 모양(2~4자 + 님/학생/씨). 기본 질문 세트에는 실제 정보가 없지만 --questions로 다른 파일을 쓸 수 있어서 모두 거친다
+MASKS = [(re.compile(r"\d{6,}"), "[숫자]"),
+         (re.compile(r"\d{2,4}[-\s]\d{3,4}[-\s]\d{4}"), "[번호]"),
+         (re.compile(r"\d{4}[-\s]\d{4}"), "[번호]"),
+         (re.compile(r"[가-힣]{2,4}\s?(님|학생|씨)"), "[이름]")]
+
+
+def mask(text):
+    for pattern, repl in MASKS:
+        text = pattern.sub(repl, text)
+    return text
 
 
 def snippet(result):
     text = (result.get("reply") or result.get("message") or "").replace("\n", " ")
-    return MASK.sub("[숫자]", text)[:80]
+    return mask(text)[:80]
+
+
+def check_agent_url(agent):
+    """토큰은 https로만 보낸다. http는 내 컴퓨터(localhost)일 때만"""
+    parsed = urllib.parse.urlparse(agent)
+    if parsed.scheme == "https":
+        return
+    if parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1"):
+        return
+    sys.exit(f"AGENT는 https:// 또는 http://localhost 만 돼요: {agent} (토큰이 평문으로 나가요)")
 
 
 def main():
@@ -129,6 +165,9 @@ def main():
     if args.only:
         keep = set(args.only.split(","))
         questions = [q for q in questions if q["id"] in keep]
+        if not questions:
+            sys.exit(f"--only에 맞는 질문이 없어요: {args.only}")
+    check_agent_url(agent)
 
     status, _ = call("GET", agent + "/actuator/health")
     if status != 200:
@@ -137,7 +176,7 @@ def main():
     rows = []
     for run in range(1, args.runs + 1):
         for q in questions:
-            call("DELETE", agent + "/api/agent/chat/history")  # 새 대화. 실패해도 진행(기억 없음 모드일 수 있음)
+            reset_history(agent)  # 새 대화. 앞 질문의 기억이 남으면 독립 측정이 아니라서 실패하면 멈춘다
             result, secs = chat(agent, q["text"], args.poll_limit)
             ok, why = judge(q, result)
             rows.append({"run": run, "id": q["id"], "group": q["group"], "text": q["text"], "ok": ok, "why": why,
@@ -159,11 +198,11 @@ def main():
              "", "| 질문 | 묶음 | 통과/시도 | 평균 초 | 마지막 판정 근거 |", "|---|---|---|---|---|"]
     for qid, rs in by_q.items():
         q = next(x for x in questions if x["id"] == qid)
-        lines.append(f"| {qid} {q['text']} | {q['group']} | {sum(r['ok'] for r in rs)}/{len(rs)} | "
+        lines.append(f"| {qid} {mask(q['text'])} | {q['group']} | {sum(r['ok'] for r in rs)}/{len(rs)} | "
                      f"{sum(r['seconds'] for r in rs) / len(rs):.1f} | {rs[-1]['why']} |")
     fails = [r for r in rows if not r["ok"]]
     if fails:
-        lines += ["", "## 실패 상세 (답 앞 80자, 6자리 이상 숫자는 가림)", "", "| 회차 | 질문 | 근거 | 답 |", "|---|---|---|---|"]
+        lines += ["", "## 실패 상세 (답 앞 80자. 6자리 이상 숫자·전화번호 모양·이름 모양은 가림)", "", "| 회차 | 질문 | 근거 | 답 |", "|---|---|---|---|"]
         lines += [f"| {r['run']} | {r['id']} | {r['why']} | {r['snippet']} |" for r in fails]
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
