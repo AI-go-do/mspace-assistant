@@ -20,6 +20,15 @@ public interface ReservationCommandPort {
     /** 퇴실 (FR-RSV-008). IN_USE·대표자만. core가 조건부 UPDATE라 두 번 눌러도 한 번만 처리된다 */
     StatusChange checkout(UserCredential credential, long reservationId);
 
+    /**
+     * 연장하기 (FR-RSV-105, core #51). core가 한 트랜잭션으로 지금 예약을 퇴실하고 새 예약(IN_USE, 새 입실 번호)을 만든다.
+     * 대표자·IN_USE·종료 10분 전–종료 전·1회만은 core가 최종 판단한다
+     *
+     * @param idempotencyKey 확인 토큰. 같은 키를 다시 보내면 core가 처음 연장 결과를 200으로 돌려준다
+     */
+    CreatedReservation continueUse(UserCredential credential, long reservationId, OffsetDateTime newEndAt,
+                                   String idempotencyKey);
+
     record StatusChange(long id, String status) {
     }
 

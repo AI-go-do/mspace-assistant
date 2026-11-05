@@ -14,4 +14,8 @@ public sealed interface PendingAction {
 
     record Checkout(long reservationId) implements PendingAction {
     }
+
+    /** 연장하기 (FR-RSV-105). 지금 예약을 퇴실하고 지금부터 newEndAt까지 새 예약을 IN_USE로 만든다 */
+    record Continue(long reservationId, OffsetDateTime newEndAt) implements PendingAction {
+    }
 }
