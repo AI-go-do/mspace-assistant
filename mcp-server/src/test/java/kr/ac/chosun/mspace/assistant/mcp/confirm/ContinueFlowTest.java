@@ -190,7 +190,7 @@ class ContinueFlowTest extends McpToolTestSupport {
 
         // then
         assertThat(response.statusCode()).isEqualTo(409);
-        assertThat(response.body()).contains("RESERVATION_EXTENSION_LIMIT");
+        assertThat(response.body()).contains("RESERVATION_EXTENSION_LIMIT").contains("연장은 한 번만 할 수 있습니다");
     }
 
     @Test
