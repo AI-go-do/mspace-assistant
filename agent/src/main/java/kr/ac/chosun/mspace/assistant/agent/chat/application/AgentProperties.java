@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param maxToolCalls   대화 한 번에 도구를 부를 수 있는 최대 횟수. 넘으면 멈추고 알린다 (CLAUDE.md 4장)
  * @param timeout        mcp-server 호출 최대 시간
  * @param rules          지시문에 넣는 예약 규칙 숫자. core 설정과 같은 값으로 둔다 (TEAM.md 4장: 숫자는 설정값)
- * @param chatTimeout    대화 한 번 전체 시간 상한. 넘으면 모델을 더 부르지 않고 멈춘다 (nginx 60초보다 짧게)
+ * @param chatTimeout    대화 한 번 전체 시간 상한. 넘으면 모델을 더 부르지 않고 멈춘다 (결과는 폴링으로 받는다)
  * @param maxMessageChars 학생 말 한 번의 최대 글자 수. 넘으면 400
  * @param maxHistoryTurns 모델에 넘길 앞선 대화 수. 넘으면 오래된 것부터 버린다
  */
