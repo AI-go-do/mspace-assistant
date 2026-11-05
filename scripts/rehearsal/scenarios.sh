@@ -98,7 +98,8 @@ r=$(chat "$OWNER" "내일 오후 2시 빈방 있어?"); n=$(echo "$r" | j 'd.get
 r=$(chat "$OWNER" "수업 끝나고 2시간 잡아 줘"); [ "$(echo "$r" | j 'd.get("toolCalls")')" = 0 ] && echo "$r" | grep -qF '끝나는 시각' \
   && row "수업 끝나고 2시간" ok "끝나는 시각을 되물음" || row "수업 끝나고 2시간" no "$r"
 r=$(chat "$OWNER" "내일 2시부터 2시간 2번 방 3명으로 예약해 줘"); tok=$(echo "$r" | j 'd["confirmations"][0]["token"] if d.get("confirmations") else ""')
-[ -n "$tok" ] && row "예약 제안 → 확인 카드" ok "$(echo "$r" | j 'd["confirmations"][0]["summary"]')" || row "예약 제안 → 확인 카드" no "$r"
+[ -n "$tok" ] && [ "$(echo "$r" | j 'd["confirmations"][0].get("needsParticipants")')" = 2 ] && [ -n "$(echo "$r" | j 'd["confirmations"][0].get("summary") or ""')" ] \
+  && row "예약 제안 → 확인 카드" ok "$(echo "$r" | j 'd["confirmations"][0]["summary"]')" || row "예약 제안 → 확인 카드" no "$r"
 r=$(confirm "$OTHER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); [ "$(echo "$r" | j 'd.get("code")')" = CONFIRMATION_NOT_FOUND ] \
   && row "남이 확인 토큰 사용" ok "CONFIRMATION_NOT_FOUND" || row "남이 확인 토큰 사용" no "$r"
 r=$(confirm "$OWNER" "$tok" "{\"participantStudentIds\":[\"$P1\",\"$P2\"]}"); rid=$(echo "$r" | j 'd.get("reservationId","")')
