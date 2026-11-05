@@ -126,6 +126,9 @@ public class ChatJobs implements AutoCloseable {
         return Optional.of(job.view().get());
     }
 
+    /** sweep()이 시작 전 접수를 만료시켰다는 표시. 실제 시각이 아니다 */
+    private static final Instant EXPIRED = Instant.EPOCH;
+
     private void run(String jobId, Job job, Supplier<ChatResult> work) {
         // 대기열에서 pendingTtl을 넘겨 이미 지워진 접수는 돌리지 않는다 (아무도 결과를 못 받는데 모델만 부르게 됨)
         if (jobs.get(jobId) != job || !job.startedAt().compareAndSet(null, clock.instant())) {
@@ -156,9 +159,12 @@ public class ChatJobs implements AutoCloseable {
         jobs.entrySet().removeIf(e -> {
             Job job = e.getValue();
             Instant doneAt = job.doneAt().get();
+            // 시작 못 한 접수는 startedAt을 EXPIRED로 바꾸는 데 성공했을 때만 지운다.
+            // run()도 같은 칸을 compareAndSet으로 잡으므로 "시작"과 "만료" 중 하나만 이긴다 (그 사이에 시작된 작업을 지우지 않게)
             boolean expired = doneAt != null
                     ? doneAt.plus(props.resultTtl()).isBefore(now)
-                    : job.startedAt().get() == null && job.createdAt().plus(props.pendingTtl()).isBefore(now);
+                    : job.createdAt().plus(props.pendingTtl()).isBefore(now)
+                            && job.startedAt().compareAndSet(null, EXPIRED);
             if (expired) {
                 runningByOwner.remove(job.owner(), e.getKey());
             }

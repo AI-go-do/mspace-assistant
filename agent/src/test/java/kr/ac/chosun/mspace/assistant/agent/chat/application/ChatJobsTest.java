@@ -28,7 +28,7 @@ class ChatJobsTest {
 
     /** 시간을 손으로 옮기는 시계 */
     static class MovableClock extends Clock {
-        Instant now = Instant.parse("2026-11-04T05:00:00Z");
+        volatile Instant now = Instant.parse("2026-11-04T05:00:00Z");
 
         @Override
         public ZoneId getZone() {
@@ -273,6 +273,39 @@ class ChatJobsTest {
         // then
         assertThat(duringRun.get()).isInstanceOf(ChatJobs.Submitted.Rejected.class);
         assertThat(jobs.find(first.jobId(), OWNER)).get().extracting(ChatJobs.View::status).isEqualTo(ChatJobs.Status.DONE);
+    }
+
+    @Test
+    @DisplayName("작업 시작과 만료 정리가 동시에 일어나도 둘 중 하나만 이겨서, 돌기 시작한 작업은 지워지지 않는다")
+    void startAndSweepRace() throws Exception {
+        ExecutorService racers = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < 300; round++) {
+                // given: 시작 전 접수가 보관 시간을 넘김
+                ManualExecutor executor = new ManualExecutor();
+                ChatJobs jobs = new ChatJobs(props, clock, executor);
+                AtomicInteger calls = new AtomicInteger();
+                var accepted = (ChatJobs.Submitted.Accepted) jobs.submit(OWNER, () -> {
+                    calls.incrementAndGet();
+                    return RESULT;
+                });
+                clock.now = clock.now.plus(Duration.ofMinutes(4));
+                CountDownLatch go = new CountDownLatch(1);
+
+                // when: 작업 스레드가 집는 것과 조회(정리)가 동시에
+                var run = racers.submit(() -> { go.await(); executor.runAll(); return null; });
+                var sweep = racers.submit(() -> { go.await(); return jobs.find(accepted.jobId(), OWNER); });
+                go.countDown();
+                run.get(5, TimeUnit.SECONDS);
+                sweep.get(5, TimeUnit.SECONDS);
+
+                // then: 모델을 불렀다면 결과가 남아 있고, 안 불렀다면 접수도 지워져 있다
+                assertThat(jobs.find(accepted.jobId(), OWNER).isPresent()).as("round %d", round)
+                        .isEqualTo(calls.get() == 1);
+            }
+        } finally {
+            racers.shutdownNow();
+        }
     }
 
     @Test
