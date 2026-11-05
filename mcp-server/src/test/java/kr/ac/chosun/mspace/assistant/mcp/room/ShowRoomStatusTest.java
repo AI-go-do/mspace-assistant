@@ -78,4 +78,20 @@ class ShowRoomStatusTest {
         // then
         assertThat(shown.rooms().get(0).latestEndAt()).isEqualTo(OffsetDateTime.parse("2026-11-03T16:30:00+09:00"));
     }
+
+    @Test
+    @DisplayName("다음 예약이 30분 칸이 아니면(14:40) 칸으로 내린 14:30까지. 내린 시각이 지금 이전이면(14:20 → 14:00) 바로 쓸 수 없다")
+    void nextFlooredToSlot() {
+        // given
+        ShowRoomStatus show = status(room(1, "AVAILABLE", OffsetDateTime.parse("2026-11-03T14:40:00+09:00")),
+                room(2, "AVAILABLE", OffsetDateTime.parse("2026-11-03T14:20:00+09:00")));
+
+        // when
+        RoomsNow shown = show.show(ME);
+
+        // then
+        assertThat(shown.rooms().get(0).latestEndAt()).isEqualTo(OffsetDateTime.parse("2026-11-03T14:30:00+09:00"));
+        assertThat(shown.rooms().get(1).latestEndAt()).isNull();
+        assertThat(shown.availableCount()).isEqualTo(1);
+    }
 }

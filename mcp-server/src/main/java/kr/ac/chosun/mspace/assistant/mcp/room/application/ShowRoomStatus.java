@@ -38,7 +38,8 @@ public class ShowRoomStatus {
         List<RoomsNow.RoomNow> rooms = core.rooms().stream().map(r -> {
             OffsetDateTime latest = null;
             if ("AVAILABLE".equals(r.status())) {
-                latest = r.nextStartAt() != null && r.nextStartAt().isBefore(latestByRule) ? SeoulTime.of(r.nextStartAt()) : latestByRule;
+                // 다음 예약 앞까지만, 그것도 30분 칸으로 내린 시각까지 (14:40 → 14:30). start_now_reservation이 칸이 아닌 끝을 거부하니까
+                latest = r.nextStartAt() != null && r.nextStartAt().isBefore(latestByRule) ? floorToSlot(SeoulTime.of(r.nextStartAt())) : latestByRule;
                 // 다음 예약이 너무 가까워 30분 칸 하나도 안 나오면 바로 쓸 수 없다
                 if (!latest.isAfter(now)) {
                     latest = null;
@@ -49,6 +50,13 @@ public class ShowRoomStatus {
         }).toList();
         long available = rooms.stream().filter(r -> r.latestEndAt() != null).count();
         return new RoomsNow(now, (int) available, rooms, available == 0 ? NONE_NOTE : AVAILABLE_NOTE);
+    }
+
+    /** 14:40 → 14:30, 14:30 → 14:30 */
+    OffsetDateTime floorToSlot(OffsetDateTime t) {
+        long slot = Duration.ofMinutes(rules.slotMinutes()).toSeconds();
+        long rem = Math.floorMod(t.toEpochSecond(), slot);
+        return t.truncatedTo(ChronoUnit.SECONDS).minusSeconds(rem);
     }
 
     /** 14:17 → 14:30, 14:30 → 14:30 */

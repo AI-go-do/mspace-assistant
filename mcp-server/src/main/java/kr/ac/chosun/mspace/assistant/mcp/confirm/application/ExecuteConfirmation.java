@@ -1,7 +1,10 @@
 package kr.ac.chosun.mspace.assistant.mcp.confirm.application;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import kr.ac.chosun.mspace.assistant.mcp.common.CoreApiException;
+import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationCommandPort.CreatedReservation;
@@ -17,10 +20,12 @@ public class ExecuteConfirmation {
 
     private final ConfirmationStore store;
     private final ReservationCommandPort reservations;
+    private final Clock clock;
 
-    public ExecuteConfirmation(ConfirmationStore store, ReservationCommandPort reservations) {
+    public ExecuteConfirmation(ConfirmationStore store, ReservationCommandPort reservations, Clock clock) {
         this.store = store;
         this.reservations = reservations;
+        this.clock = clock;
     }
 
     public Executed execute(String token, UserCredential credential, List<String> participantStudentIds) {
@@ -29,7 +34,10 @@ public class ExecuteConfirmation {
                 : participantStudentIds.stream().map(s -> s == null ? "" : s.strip()).toList();
         switch (store.peek(token, credential)) {
             case PendingAction.Create c -> checkParticipants(c.headcount(), participants);
-            case PendingAction.StartNow s -> checkParticipants(s.headcount(), participants);
+            case PendingAction.StartNow s -> {
+                checkParticipants(s.headcount(), participants);
+                checkStillAhead(s.endAt());
+            }
             default -> {
             }
         }
@@ -51,6 +59,15 @@ public class ExecuteConfirmation {
                         "%s까지 연장했어요. 입실 번호가 새로 나왔어요.".formatted(created.endAt().toLocalTime()));
             }
         };
+    }
+
+    /** 즉시 시작은 확인을 누른 시각부터라, 제안 뒤 끝 시각이 지나 버렸으면 토큰을 쓰지 않고 다시 제안하게 한다 */
+    private void checkStillAhead(OffsetDateTime endAt) {
+        OffsetDateTime now = clock.instant().atZone(SeoulTime.ZONE).toOffsetDateTime();
+        if (!endAt.isAfter(now)) {
+            throw new CoreApiException("RESERVATION_INVALID_LENGTH",
+                    "끝 시각 " + endAt.toLocalTime() + "이 이미 지났어요. 끝 시각을 다시 골라 주세요.");
+        }
     }
 
     private static void checkParticipants(int headcount, List<String> participants) {
