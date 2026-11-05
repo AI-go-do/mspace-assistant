@@ -1,0 +1,31 @@
+{
+  "_설명": "성공률 측정(#9) 질문 세트. 각 질문은 expect 중 하나라도 맞으면 통과예요. tools_any: 이 도구 중 하나를 불렀는지, tools_none: 이 도구를 부르지 않았는지, no_tool: 도구를 하나도 안 불렀는지, confirm_tool: 확인 카드의 도구, needs_participants: 카드가 받을 학번 수, reply_any: 답에 이 말 중 하나가 있는지. 실제 학생 정보는 넣지 않아요. 쓰기 도구는 확인 카드까지만 나오고 실행은 안 해요.",
+  "questions": [
+    {"id": "Q01", "group": "조회", "text": "내일 오후 2시 빈방 있어?",
+     "expect": [{"tools_any": ["find_available_rooms"], "tools_none": ["room_status"]}]},
+    {"id": "Q02", "group": "조회", "text": "지금 바로 쓸 수 있는 방 있어?",
+     "expect": [{"tools_any": ["room_status"], "tools_none": ["find_available_rooms"]}]},
+    {"id": "Q03", "group": "조회", "text": "내 예약 보여 줘",
+     "expect": [{"tools_any": ["my_reservations"]}]},
+    {"id": "Q04", "group": "조회", "text": "방은 최대 몇 시간까지 쓸 수 있어?",
+     "expect": [{"tools_any": ["usage_rules"]}]},
+    {"id": "Q05", "group": "쓰기 제안", "text": "내일 2시부터 2시간 2번 방 3명으로 예약해 줘",
+     "expect": [{"confirm_tool": "create_reservation", "needs_participants": 2}]},
+    {"id": "Q06", "group": "쓰기 제안", "text": "내 예약 취소해 줘",
+     "expect": [{"tools_any": ["my_reservations"], "confirm_tool": "cancel_reservation"},
+                {"tools_any": ["my_reservations"], "reply_any": ["예약이 없", "취소할 예약", "없어요"]}]},
+    {"id": "Q07", "group": "시간표", "text": "수업 끝나고 2시간 잡아 줘",
+     "expect": [{"tools_any": ["my_schedule"]}]},
+    {"id": "Q08", "group": "시간표", "text": "오늘 수업 뭐 있어?",
+     "expect": [{"tools_any": ["my_schedule"]}]},
+    {"id": "Q09", "group": "즉시 시작", "text": "지금 당장 2번 방 1시간만 쓸게",
+     "expect": [{"tools_any": ["room_status"], "confirm_tool": "start_now_reservation"},
+                {"tools_any": ["room_status"], "reply_any": ["없어요", "사용 중", "비어 있지"]}]},
+    {"id": "Q10", "group": "자정 넘김", "text": "내일 밤 11시부터 새벽 1시까지 빈방 있어?",
+     "expect": [{"tools_any": ["find_available_rooms"]}]},
+    {"id": "Q11", "group": "도구 없음", "text": "고마워!",
+     "expect": [{"no_tool": true}]},
+    {"id": "Q12", "group": "범위 밖", "text": "오늘 점심 뭐 먹을까?",
+     "expect": [{"no_tool": true}, {"reply_any": ["예약", "방", "도와"]}]}
+  ]
+}

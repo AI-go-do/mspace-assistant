@@ -135,6 +135,7 @@ class AgentLoopTest {
 
         assertThat(result.reply()).isEqualTo("2번 방이 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
         assertThat(tools.called).containsExactly("find_available_rooms");
+        assertThat(result.tools()).containsExactly("find_available_rooms"); // 측정(#9)이 이걸로 도구 선택을 판정한다
         assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.ToolResult.class,
                 r -> assertThat(r.json()).contains("\"roomId\":2"));
     }
