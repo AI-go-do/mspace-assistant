@@ -34,6 +34,7 @@ public class CoreHttp {
     private final JsonMapper json;
 
     CoreHttp(CoreProperties props, JsonMapper json) {
+        props.checkTransport(); // #44: 토큰이 평문 http로 나가는 설정이면 시작하지 않는다
         var factory = new JdkClientHttpRequestFactory(
                 // HTTP/1.1 고정: 기본 HTTP/2는 http:// 주소에 h2c 업그레이드를 같이 요청하는데, 본문 있는 POST에서
                 // 가짜 core(WireMock)가 RST_STREAM으로 끊는 일이 났다 (모델 어댑터 TS-05와 같은 원인). core는 nginx 뒤 HTTP/1.1이라 영향 없음(확인 필요)

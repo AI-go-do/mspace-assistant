@@ -28,7 +28,7 @@ M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Bo
 mvn -B verify                                   # 전체 테스트 (core·Gemini는 가짜 서버)
 # 아래 두 서버는 셸을 차지하니 터미널을 따로 열어 하나씩 띄우고, curl은 세 번째 터미널에서 실행해요
 # local 프로필: 로그인 전 임시 헤더 X-User-Id를 넘긴다 (core도 MSPACE_DEV_HEADER=true로 띄워요)
-SPRING_PROFILES_ACTIVE=local CORE_BASE_URL=http://localhost:8080 mvn -pl mcp-server spring-boot:run
+SPRING_PROFILES_ACTIVE=local CORE_BASE_URL=http://localhost:8080 mvn -pl mcp-server spring-boot:run  # core가 다른 서버면 https + CORE_REQUIRE_HTTPS=true (#44)
 SPRING_PROFILES_ACTIVE=local GEMINI_API_KEY=... mvn -pl agent spring-boot:run  # 키는 .env에만. 커밋 금지
 curl -X POST localhost:8091/api/agent/chat -H 'X-User-Id: 1' -H 'Content-Type: application/json' \
      -d '{"message":"내일 오후 2시 빈방 있어?"}'     # → 202 {"jobId":"j_…","status":"PENDING","pollAfterMs":1000}
