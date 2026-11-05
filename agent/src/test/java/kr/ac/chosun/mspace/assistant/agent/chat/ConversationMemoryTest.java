@@ -32,11 +32,11 @@ import org.junit.jupiter.api.Test;
 /** 서버가 대화 맥락을 기억하는 흐름 (설계 4장) */
 class ConversationMemoryTest {
 
-    static final MemoryProperties MEMORY = new MemoryProperties(true, Duration.ofHours(24), 0);
+    static final MemoryProperties MEMORY = new MemoryProperties(true, null, Duration.ofHours(24), 0);
 
     static AgentLoop loop(ScriptedLlm llm, ToolGateway tools, ConversationMemory memory, int maxTurns, int maxChars) {
         return new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, maxTurns), CLOCK,
-                memory, new MemoryProperties(true, Duration.ofHours(24), maxChars));
+                memory, new MemoryProperties(true, null, Duration.ofHours(24), maxChars));
     }
 
     @Test

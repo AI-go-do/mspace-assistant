@@ -1,6 +1,12 @@
 spring:
   application:
     name: mspace-assistant-agent
+  data:
+    redis:
+      # MEMORY_STORE=redis일 때만 쓴다. compose에서는 redis://redis:6379
+      url: ${REDIS_URL:redis://localhost:6379}
+      connect-timeout: 2s
+      timeout: 2s
 
 server:
   port: ${SERVER_PORT:8091}
@@ -10,6 +16,10 @@ management:
     web:
       exposure:
         include: health
+  health:
+    redis:
+      # memory 모드에서는 Redis가 없으니 health에 넣지 않는다. 기억은 보조라 redis 모드에서도 죽어도 대화는 된다 (RedisConversationMemory)
+      enabled: false
 
 mspace:
   llm:
@@ -53,6 +63,8 @@ mspace:
     # 기본은 메모리(agent 1대, 재시작하면 사라짐). Redis로 바꾸면 TTL은 Redis가 지운다
     memory:
       enabled: true
+      # memory: agent 1대 메모리(재시작하면 사라짐) | redis: 아래 spring.data.redis.url (11/5 결정, compose에 redis 추가)
+      store: ${MEMORY_STORE:memory}
       ttl: 24h
       # 보관·모델에 넘길 대화 글자 수 상한 (도구 결과 포함). 넘으면 오래된 차례부터 버린다
       max-chars: 20000

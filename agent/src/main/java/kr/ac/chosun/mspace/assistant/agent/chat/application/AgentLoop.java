@@ -42,7 +42,7 @@ public class AgentLoop {
 
     /** 기억 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock) {
-        this(llm, tools, props, clock, ConversationMemory.NONE, new MemoryProperties(false, null, 0));
+        this(llm, tools, props, clock, ConversationMemory.NONE, new MemoryProperties(false, null, null, 0));
     }
 
     @Autowired

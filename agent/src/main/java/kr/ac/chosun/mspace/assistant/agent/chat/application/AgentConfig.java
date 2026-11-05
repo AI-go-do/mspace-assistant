@@ -2,9 +2,12 @@ package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
 import java.time.Clock;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisConversationMemory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({AgentProperties.class, ChatJobProperties.class, MemoryProperties.class})
@@ -23,11 +26,17 @@ class AgentConfig {
     }
 
     /**
-     * 대화 맥락 보관. 기본은 메모리(agent 1대). 끄면 화면이 보낸 history만 쓴다.
-     * Redis·DB 어댑터는 저장소가 정해지면 여기서 바꿔 끼운다 (설계 4장)
+     * 대화 맥락 보관 (설계 4장). store=redis면 Redis(11/5 결정), 아니면 메모리(agent 1대). 끄면 화면이 보낸 history만 쓴다.
+     * Redis 템플릿은 starter가 만들고, 연결은 처음 쓸 때 맺는다(memory 모드에서는 쓰지 않으니 Redis 없이 뜬다)
      */
     @Bean
-    ConversationMemory conversationMemory(MemoryProperties props, Clock clock) {
-        return props.enabled() ? new InMemoryConversationMemory(props, clock) : ConversationMemory.NONE;
+    ConversationMemory conversationMemory(MemoryProperties props, Clock clock, ObjectProvider<StringRedisTemplate> redis) {
+        if (!props.enabled()) {
+            return ConversationMemory.NONE;
+        }
+        if ("redis".equals(props.store())) {
+            return new RedisConversationMemory(redis.getObject(), props);
+        }
+        return new InMemoryConversationMemory(props, clock);
     }
 }

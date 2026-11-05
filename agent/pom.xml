@@ -30,6 +30,12 @@
             <artifactId>mcp</artifactId>
         </dependency>
 
+        <!-- 대화 맥락 보관(Redis, 설계 4장). MEMORY_STORE=redis일 때만 연결한다. 기본(memory)에서는 연결하지 않는다 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
