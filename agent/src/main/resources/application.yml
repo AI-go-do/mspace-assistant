@@ -13,13 +13,19 @@ management:
 
 mspace:
   llm:
-    # gemini(시연) | ollama(학교 도입, #14)
+    # gemini(시연) | ollama(학교 도입)
     provider: ${LLM_PROVIDER:gemini}
     gemini:
       model: ${GEMINI_MODEL:gemini-2.5-flash}
       # 키는 .env·GitHub Secrets에만. 비어 있으면 비서는 "준비되지 않았어요"로 답한다
       api-key: ${GEMINI_API_KEY:}
       timeout: 20s
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:qwen2.5:7b}
+      # GPU 없는 서버에서 7b는 첫 응답이 30~90초 걸릴 수 있다(추정). 그러면 작은 모델로 바꿔 시간을 잰다 (#9)
+      timeout: 40s
+      connect-timeout: 5s
   agent:
     mcp-server-url: ${MCP_SERVER_URL:http://localhost:8090}
     # 학생 본인 토큰만 넘긴다. X-User-Id(로그인 붙기 전 임시)는 local 프로필에서만 켠다 (application-local.yml)
