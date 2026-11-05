@@ -11,6 +11,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ReadTimetableImage;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ScheduleGateway;
@@ -44,6 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  *   <li>GET·PUT·DELETE /api/agent/schedule: 내 시간표 화면 → mcp-server /api/schedule/me로 그대로 넘김 (모델 없음)</li>
+ *   <li>GET /api/agent/briefing: 오늘 브리핑(수업·내 예약·지금 빈 방 + 읽어 줄 문장). 모델 없음, 도구 3개 직접 호출</li>
  *   <li>POST /api/agent/schedule/parse: 시간표 캡처(multipart image)를 모델이 읽어 classes 초안으로. 저장은 안 함 → 화면이 확인 카드 → PUT</li>
  * </ul>
  */
@@ -62,10 +64,11 @@ class ChatController {
     private final ChatJobProperties jobProps;
     private final ConversationMemory memory;
     private final ReadTimetableImage timetableImage;
+    private final DailyBriefing briefing;
 
     ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
                    ScheduleGateway schedules, AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps,
-                   ConversationMemory memory, ReadTimetableImage timetableImage) {
+                   ConversationMemory memory, ReadTimetableImage timetableImage, DailyBriefing briefing) {
         this.agent = agent;
         this.confirmations = confirmations;
         this.accessCodes = accessCodes;
@@ -75,6 +78,7 @@ class ChatController {
         this.jobProps = jobProps;
         this.memory = memory;
         this.timetableImage = timetableImage;
+        this.briefing = briefing;
     }
 
     @PostMapping("/api/agent/chat")
@@ -174,6 +178,16 @@ class ChatController {
         ConfirmationGateway.Relayed relayed = accessCodes.accessCode(reservationId, user);
         return ResponseEntity.status(relayed.status()).cacheControl(CacheControl.noStore())
                 .contentType(MediaType.APPLICATION_JSON).body(relayed.json());
+    }
+
+    /** 오늘 브리핑. 앱을 열 때 한 번 부른다. 실패한 칸은 null + note, 나머지는 그대로 (#64 글 버전) */
+    @GetMapping("/api/agent/briefing")
+    ResponseEntity<?> briefing(@RequestHeader HttpHeaders headers) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(briefing.today(user));
     }
 
     /** 내 시간표 보기. 없으면 mcp-server의 404 NO_SCHEDULE 그대로 */
