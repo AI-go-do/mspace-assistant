@@ -17,6 +17,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
@@ -208,6 +209,50 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("한 답에 도구가 여러 개여도, 도구를 부르기 전마다 시간 상한을 보고 넘었으면 남은 도구를 부르지 않는다")
+    void stopsBetweenToolCallsAtTimeLimit() {
+        // given: 시계를 읽을 때마다 20초가 흐르고, 모델이 한 번에 도구 3개를 부른다
+        var llm = new ScriptedLlm().then(new LlmReply("", List.of(
+                new ToolCall("c1", "create_reservation", Map.of("roomId", 2)),
+                new ToolCall("c2", "my_reservations", Map.of()),
+                new ToolCall("c3", "my_reservations", Map.of()))));
+        var tools = new FakeTools(Map.of(
+                "create_reservation", new ToolGateway.Outcome(PROPOSAL, false),
+                "my_reservations", new ToolGateway.Outcome("{\"reservations\":[]}", false)));
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0),
+                new SlowClock(java.time.Duration.ofSeconds(20)));
+
+        // when
+        ChatResult result = loop.run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then: 20초·40초에는 부르고, 60초(상한 45초 넘음)에는 멈춘다. 먼저 만든 카드는 그대로 간다
+        assertThat(tools.called).hasSize(2);
+        assertThat(result.stoppedByLimit()).isTrue();
+        assertThat(result.reply()).contains("시간이 너무 오래 걸려서");
+        assertThat(result.confirmations()).hasSize(1);
+        assertThat(llm.seen).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("확인 토큰에 숫자 6개가 이어져도 가리지 않고 원래 값으로 카드에 싣는다 (가리면 확인이 실패한다)")
+    void keepsConfirmTokenUnmasked() {
+        // given
+        String proposal = PROPOSAL.replace("c_secret", "c_Ab123456cD");
+        var llm = new ScriptedLlm()
+                .then(tool("create_reservation", Map.of("roomId", 2)))
+                .then(say("확인 카드를 보여 드렸어요"));
+        var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(proposal, false)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then
+        assertThat(result.confirmations()).singleElement()
+                .satisfies(c -> assertThat(c.token()).isEqualTo("c_Ab123456cD"));
+        assertThat(llm.seen.get(1).toString()).doesNotContain("c_Ab");
+    }
+
+    @Test
     @DisplayName("시나리오 '내 예약 취소해 줘': 내 예약 → 취소 제안 → 확인 카드. 모델은 확인 토큰을 보지 못한다")
     void cancelProposalBecomesCard() {
         var llm = new ScriptedLlm()
@@ -306,6 +351,48 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("시나리오 '입실 번호 알려 줘'(대표자): 화면 카드만 만들고 모델 입력에는 번호가 없다")
+    void ownerAccessCodeBecomesCard() {
+        var llm = new ScriptedLlm().then(tool("show_access_code", Map.of())).then(say("화면 카드에서 확인해 주세요"));
+        // 혹시 mcp-server가 번호를 실어 보내도 지워지는지까지 본다
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(
+                "{\"reservationId\":7,\"owner\":true,\"cardShown\":true,\"accessCode\":\"482913\",\"message\":\"카드로 보여 줬음\"}",
+                false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        assertThat(result.accessCodeCards()).containsExactly(new ChatResult.AccessCodeCard(7));
+        assertThat(result.confirmations()).isEmpty();
+        assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.ToolResult.class,
+                r -> assertThat(r.json()).contains("\"cardShown\":true").doesNotContain("482913", "accessCode"));
+    }
+
+    @Test
+    @DisplayName("시나리오 '입실 번호 알려 줘'(참여자): 카드 없이 대표자에게 문의하라는 안내만")
+    void participantAccessCodeHasNoCard() {
+        var llm = new ScriptedLlm().then(tool("show_access_code", Map.of("reservationId", 9)))
+                .then(say("대표자가 아니라 입실 번호를 알 수 없어요. 대표자에게 문의하세요."));
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(
+                "{\"reservationId\":9,\"owner\":false,\"cardShown\":false,\"message\":\"대표자에게 문의하세요.\"}",
+                false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 뭐야?");
+
+        assertThat(result.accessCodeCards()).isEmpty();
+        assertThat(result.reply()).contains("대표자에게 문의하세요");
+    }
+
+    @Test
+    @DisplayName("지시문에 입실 번호를 지어내지 말라는 규칙이 있다")
+    void systemPromptForbidsInventingAccessCode() {
+        var llm = new ScriptedLlm().then(say("네"));
+
+        loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕");
+
+        assertThat(llm.lastSystem).contains("show_access_code", "번호를 지어내지 않는다");
+    }
+
+    @Test
     @DisplayName("학생이 채팅에 적은 6자리 입실 번호도 외부 AI로 보내기 전에 가린다")
     void masksAccessCode() {
         // given
@@ -320,6 +407,82 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("도구 결과와 모델 답도 다음 요청 전에 가린다: 어떤 도구의 accessCode든 지우고 학번·전화번호는 가린다")
+    void masksToolResultsAndModelReplies() {
+        // given: 도구가 (원래는 없지만) 목록 안에 입실 번호와 학번·전화번호를 실어 보낸다
+        String leaky = """
+                {"reservations":[{"id":7,"accessCode":"482913","note":"참여자 20230002, 010-1234-5678"}]}""";
+        var llm = new ScriptedLlm()
+                .then(new LlmReply("학번 20230001 확인할게요", List.of(new ToolCall("c1", "my_reservations", Map.of()))))
+                .then(say("내 예약은 1건이에요"));
+        var tools = new FakeTools(Map.of("my_reservations", new ToolGateway.Outcome(leaky, false)));
+
+        // when
+        loop(llm, tools).run(ME, List.of(), "내 예약 보여 줘");
+
+        // then
+        String sent = llm.seen.get(1).toString();
+        assertThat(sent).doesNotContain("482913", "20230002", "010-1234-5678", "20230001", "accessCode")
+                .contains("\"id\":7", "[학번]", "[전화번호]");
+    }
+
+    @Test
+    @DisplayName("도구 결과의 6자리 숫자 값(예약 id 123456)은 그대로 둬서 JSON이 깨지지 않고, 문자열 안의 6자리만 가린다")
+    void keepsNumericIdsInToolResults() throws Exception {
+        // given
+        String result = """
+                {"reservations":[{"id":123456,"roomId":2,"note":"번호 482913 맞아요"}]}""";
+        var llm = new ScriptedLlm()
+                .then(tool("my_reservations", Map.of()))
+                .then(say("내 예약은 1건이에요"));
+        var tools = new FakeTools(Map.of("my_reservations", new ToolGateway.Outcome(result, false)));
+
+        // when
+        loop(llm, tools).run(ME, List.of(), "내 예약 보여 줘");
+
+        // then
+        var toolResult = (LlmMessage.ToolResult) llm.seen.get(1).get(2);
+        var parsed = JSON.readTree(toolResult.json());
+        assertThat(parsed.get("reservations").get(0).get("id").asLong()).isEqualTo(123456L);
+        assertThat(toolResult.json()).doesNotContain("482913").contains("[입실 번호]");
+    }
+
+    @Test
+    @DisplayName("오류 결과도 외부 AI로 보내기 전에 가린다 (JSON 아닌 문장 포함)")
+    void masksErrorResults() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(tool("cancel_reservation", Map.of("reservationId", 7)))
+                .then(say("다시 해 볼게요"));
+        var tools = new FakeTools(Map.of("cancel_reservation",
+                new ToolGateway.Outcome("학번 20230002 학생의 예약이 아니에요", true)));
+
+        // when
+        loop(llm, tools).run(ME, List.of(), "취소해 줘");
+
+        // then
+        assertThat(llm.seen.get(1).toString()).doesNotContain("20230002").contains("[학번]");
+    }
+
+    @Test
+    @DisplayName("오류 결과에 확인 토큰이 실려 와도 모델에 넘기지 않고 카드도 만들지 않는다")
+    void dropsConfirmTokenFromErrorResults() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(tool("create_reservation", Map.of("roomId", 2)))
+                .then(say("다시 해 볼게요"));
+        var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(
+                "{\"code\":\"RESERVATION_TIME_TAKEN\",\"confirmToken\":\"c_leak\"}", true)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 2시 2번 방 잡아 줘");
+
+        // then
+        assertThat(result.confirmations()).isEmpty();
+        assertThat(llm.seen.get(1).toString()).doesNotContain("c_leak").contains("RESERVATION_TIME_TAKEN");
+    }
+
+    @Test
     @DisplayName("모델이 지어낸 도구 이름은 로그에 그대로 남기지 않는다 (학생 말이 섞일 수 있음)")
     void logsOnlyKnownToolNames() {
         // given
@@ -331,5 +494,45 @@ class AgentLoopTest {
             assertThat(AgentLoop.loggable("find_available_rooms", session)).isEqualTo("find_available_rooms");
             assertThat(AgentLoop.loggable("홍길동 학생 예약 취소", session)).isEqualTo("unknown");
         }
+    }
+
+    @Test
+    @DisplayName("카드를 만든 뒤 모델 답이 실패해도 카드는 화면에 돌려준다")
+    void keepsCardsWhenLlmFailsAfterTool() {
+        // given: 도구 결과 뒤 모델이 시간 초과
+        LlmClient llm = new LlmClient() {
+            int n;
+
+            @Override
+            public LlmReply chat(String system, List<LlmMessage> conversation, List<ToolSpec> tools) {
+                if (n++ == 0) {
+                    return tool("show_access_code", Map.of());
+                }
+                throw new LlmException("LLM_UNAVAILABLE", "응답 없음");
+            }
+        };
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(
+                "{\"reservationId\":7,\"owner\":true,\"cardShown\":true,\"message\":\"카드로 보여 줬음\"}", false)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        // then
+        assertThat(result.accessCodeCards()).containsExactly(new ChatResult.AccessCodeCard(7));
+        assertThat(result.reply()).contains("카드는 그대로 쓸 수 있어요");
+    }
+
+    @Test
+    @DisplayName("카드가 없을 때 모델이 실패하면 오류를 그대로 올린다")
+    void rethrowsWhenNoCards() {
+        // given
+        LlmClient llm = (system, conversation, tools) -> {
+            throw new LlmException("LLM_UNAVAILABLE", "응답 없음");
+        };
+
+        // when, then
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕"))
+                .isInstanceOf(LlmException.class);
     }
 }

@@ -45,7 +45,7 @@
 | `find_available_rooms` | 읽기 | `GET /api/rooms/availability?date=` (오늘~+6일, 방별 30분 칸 48개. 자정 넘김은 시작 날짜만 조회). **구현됨** | FR-ROOM-001 |
 | `room_status` | 읽기 | 방 현황 API (v0.2 FR-DEV-102에서 나옴, 경로 확인 필요) | FR-DEV-102 |
 | `my_reservations` | 읽기 | `GET /api/reservations/me` (응답 모양 11/2 합의, core PR 11/3 예정). **구현됨** | FR-RSV-006 |
-| `usage_rules` | 읽기 | `GET /api/rules` | FR-WEB-003 |
+| `usage_rules` | 읽기 | `GET /api/rules` (core #57, 로그인 없이도 열림). **구현됨** | FR-WEB-003 |
 | `create_reservation` | **쓰기** | `POST /api/reservations` | FR-RSV-001 |
 | `cancel_reservation` | **쓰기** | `POST /api/reservations/{id}/cancel` | FR-RSV-007 |
 | `checkout_reservation` | **쓰기** | `POST /api/reservations/{id}/checkout` | FR-RSV-008 |

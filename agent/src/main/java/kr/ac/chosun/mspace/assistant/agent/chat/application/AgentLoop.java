@@ -8,8 +8,10 @@ import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.AccessCodeCard;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.Confirmation;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
@@ -57,38 +59,65 @@ public class AgentLoop {
         }
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         List<Confirmation> confirmations = new ArrayList<>();
+        List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
-        // 그래서 모델을 다시 부르기 전에 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다
+        // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
+        // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
         Instant deadline = clock.instant().plus(props.chatTimeout());
 
         try (ToolGateway.Session session = tools.open(headers)) {
             String system = systemPrompt();
             while (true) {
-                if (calls > 0 && !clock.instant().isBefore(deadline)) {
-                    log.warn("agent time limit reached calls={} limit={}s", calls, props.chatTimeout().toSeconds());
-                    return new ChatResult(TIME_LIMIT_REPLY, confirmations, calls, true);
+                if (calls > 0 && pastDeadline(deadline, calls)) {
+                    return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                 }
-                LlmReply reply = llm.chat(system, conversation, session.tools());
+                LlmReply reply;
+                try {
+                    reply = llm.chat(system, conversation, session.tools());
+                } catch (LlmException e) {
+                    if (confirmations.isEmpty() && accessCodeCards.isEmpty()) {
+                        throw e;
+                    }
+                    // 카드는 이미 만들어졌다(확인 토큰 발급, 대표자 확인). 모델 답만 실패했으니 카드는 화면에 준다
+                    log.warn("agent llm failed after cards code={}", e.code());
+                    return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false);
+                }
                 if (!reply.wantsTools()) {
-                    return new ChatResult(reply.text(), confirmations, calls, false);
+                    return new ChatResult(reply.text(), confirmations, accessCodeCards, calls, false);
                 }
                 if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
-                    return new ChatResult(LIMIT_REPLY, confirmations, calls, true);
+                    return new ChatResult(LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                 }
-                conversation.add(new LlmMessage.Assistant(reply.text(), reply.toolCalls()));
+                // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
+                // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
+                conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
                 for (ToolCall call : reply.toolCalls()) {
+                    if (pastDeadline(deadline, calls)) {
+                        return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
+                    }
                     calls++;
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
                     log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
                     outcome.confirmation().ifPresent(confirmations::add);
+                    outcome.accessCodeCard().filter(c -> !accessCodeCards.contains(c)).ifPresent(accessCodeCards::add);
+                    // 도구 결과는 게이트웨이가 이미 가렸다(JSON 문자열 값만). 여기서 JSON 전체에 정규식을 걸면
+                    // 6자리 숫자 값이 바뀌어 JSON이 깨진다 (ToolGateway.Outcome 참고)
                     conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), outcome.json(), outcome.isError()));
                 }
             }
         }
+    }
+
+    private boolean pastDeadline(Instant deadline, int calls) {
+        if (clock.instant().isBefore(deadline)) {
+            return false;
+        }
+        log.warn("agent time limit reached calls={} limit={}s", calls, props.chatTimeout().toSeconds());
+        return true;
     }
 
     /**
@@ -98,6 +127,8 @@ public class AgentLoop {
     public static String loggable(String name, ToolGateway.Session session) {
         return session.tools().stream().anyMatch(t -> t.name().equals(name)) ? name : "unknown";
     }
+
+    static final String CARDS_ONLY_REPLY = "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요.";
 
     String systemPrompt() {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
@@ -109,8 +140,10 @@ public class AgentLoop {
                 지금은 %s, 서울 시간이다. "내일", "금요일" 같은 말은 이 날짜를 기준으로 YYYY-MM-DD로 바꿔 도구에 넣는다.
                 규칙:
                 - 빈 시간은 find_available_rooms로 확인하고, 없는 사실을 지어내지 않는다.
-                - create_reservation·cancel_reservation·checkout_reservation은 제안만 한다. 결과의 summary를 보여 주고
-                  "화면의 [확인]을 눌러 주세요"라고 안내한다. 예약·취소·퇴실이 끝났다고 말하지 않는다.
+                - create_reservation·cancel_reservation·checkout_reservation·continue_reservation은 제안만 한다. 결과의 summary를 보여 주고
+                  "화면의 [확인]을 눌러 주세요"라고 안내한다. 예약·취소·퇴실·연장이 끝났다고 말하지 않는다.
+                - 연장은 사용 중인 예약이 끝나기 10분 전부터, 30분 단위로 최대 2시간, 한 번만 된다. 몇 분 늘릴지 모르면 물어본다.
+                - 입실 번호는 show_access_code로만 안내한다. 번호는 화면 카드에만 나오고 너는 모른다. 번호를 지어내지 않는다.
                 - 학번·전화번호·이름을 묻지 않는다. 함께 쓰는 사람의 학번은 확인 화면에서 받는다.
                 - 도구가 오류를 주면 그 문장을 학생에게 전하고, 할 수 있는 다음 행동을 하나 제안한다.
                 - 수업 시간표는 아직 모른다. "수업 끝나고"처럼 말하면 끝나는 시각을 물어본다.
