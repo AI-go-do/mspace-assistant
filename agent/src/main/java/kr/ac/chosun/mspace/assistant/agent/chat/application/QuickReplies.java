@@ -53,9 +53,12 @@ final class QuickReplies {
         } catch (RuntimeException e) {
             return List.of();
         }
+        if (r == null || r.isMissingNode() || r.isNull()) { // 빈 결과("")는 Jackson 3에서 null
+            return List.of();
+        }
         return switch (last.tool()) {
             case "find_available_rooms" -> r.path("rooms").isEmpty()
-                    ? noRooms(r.path("date").asString(null), lastAllowed)
+                    ? noRooms(r.path("date").asString(null), r.path("note").asString(""), lastAllowed)
                     : List.of("첫 번째로 나온 방 잡아 줘", "다른 시간도 볼게");
             case "my_reservations" -> reservations(r);
             case "room_status" -> r.path("availableCount").asInt(0) > 0
@@ -68,7 +71,13 @@ final class QuickReplies {
         };
     }
 
-    private static List<String> noRooms(String date, java.time.LocalDate lastAllowed) {
+    /** mcp-server FindAvailableRooms.HEADCOUNT_NOTE의 앞부분. 인원 때문에 비면 날짜를 바꿔도 같은 결과라 인원을 고르게 한다 */
+    static final String HEADCOUNT_MARK = "명이 쓸 수 있는 방이 없어요";
+
+    private static List<String> noRooms(String date, String note, java.time.LocalDate lastAllowed) {
+        if (note.contains(HEADCOUNT_MARK)) {
+            return List.of("인원 바꿔서 다시 볼게", "지금 빈 방 있어?");
+        }
         if (lastAllowed != null && !nextDayAllowed(date, lastAllowed)) {
             return List.of("지금 빈 방 있어?");
         }

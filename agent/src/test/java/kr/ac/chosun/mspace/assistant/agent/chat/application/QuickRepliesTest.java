@@ -41,6 +41,23 @@ class QuickRepliesTest {
     }
 
     @Test
+    @DisplayName("빈방 없음: 인원 때문이면 날짜 대신 인원을 바꾸게, 빈 결과는 버튼 없음")
+    void roomsHeadcountAndEmpty() {
+        // given
+        List<Seen> headcount = List.of(ok("find_available_rooms",
+                "{\"date\":\"2026-11-06\",\"rooms\":[],\"note\":\"2명이 쓸 수 있는 방이 없어요. 1번 방 3~5명. 함께 쓸 사람을 더 넣어야 해요.\"}"));
+        List<Seen> blank = List.of(ok("find_available_rooms", ""));
+
+        // when
+        List<String> a = QuickReplies.suggest(headcount, false);
+        List<String> b = QuickReplies.suggest(blank, false);
+
+        // then
+        assertThat(a).containsExactly("인원 바꿔서 다시 볼게", "지금 빈 방 있어?");
+        assertThat(b).isEmpty();
+    }
+
+    @Test
     @DisplayName("빈방 없음: 다음 날이 조회 범위(오늘~+6일) 밖이면 '같은 시간 봐 줘'를 안 띄운다")
     void roomsLastDay() {
         // given: 11/3 기준 마지막 조회일 11/9
