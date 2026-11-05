@@ -163,4 +163,43 @@ class FindAvailableRoomsTest {
         assertThat(result.rooms()).isEmpty();
         assertThat(result.note()).startsWith("9명이 쓸 수 있는 방이 없어요.").contains("줄이거나").doesNotContain("더 넣어야");
     }
+
+    static FindAvailableRooms withClock(String nowHhmm, RoomDay.RoomSlots... rooms) {
+        java.time.Clock clock = java.time.Clock.fixed(at(nowHhmm).toInstant(), SeoulTime.ZONE);
+        return new FindAvailableRooms((date, credential) -> new RoomDay(date, List.of(rooms)), clock);
+    }
+
+    @Test
+    @DisplayName("원하는 시간이 다 차면 같은 길이로 가장 가까운 시간 3개를 alternatives로 준다")
+    void suggestsNearestAlternatives() {
+        // given: 14:00–16:00(2시간)을 원함. 1번 방 13:00–17:00 참, 2번 방 12:00–15:00 참
+        var find = withClock("09:00",
+                room(1, 3, 5, busyBetween("13:00", "17:00")),
+                room(2, 3, 5, busyBetween("12:00", "15:00")));
+
+        // when
+        AvailableRooms result = find.find(DAY, LocalTime.of(14, 0), LocalTime.of(16, 0), null, USER);
+
+        // then: 2번 방 15:00(1시간 뒤), 1번 방 11:00(3시간 앞)·17:00(3시간 뒤). 2번 방 10:00은 4시간 앞이라 빠짐
+        assertThat(result.rooms()).isEmpty();
+        assertThat(result.note()).contains("alternatives");
+        assertThat(result.alternatives()).extracting(a -> a.roomId() + "@" + a.startAt().toLocalTime() + "-" + a.endAt().toLocalTime())
+                .containsExactly("2@15:00-17:00", "1@11:00-13:00", "1@17:00-19:00");
+    }
+
+    @Test
+    @DisplayName("대안은 지난 시각을 빼고, 인원 때문에 빈 결과면 대안 대신 인원 안내를 준다")
+    void alternativesSkipPastAndHeadcount() {
+        // given: 지금 11:10, 원하는 12:00–13:00(1시간). 1번 방 12:00–14:00 참 → 앞 구간은 11:00 시작만 들어가는데 지났으니 14:00만
+        var find = withClock("11:10", room(1, 3, 5, busyBetween("12:00", "14:00")));
+
+        // when
+        AvailableRooms result = find.find(DAY, LocalTime.of(12, 0), LocalTime.of(13, 0), null, USER);
+        AvailableRooms tooFew = find.find(DAY, LocalTime.of(12, 0), LocalTime.of(13, 0), 2, USER);
+
+        // then
+        assertThat(result.alternatives()).extracting(a -> a.startAt().toLocalTime().toString()).containsExactly("14:00");
+        assertThat(tooFew.alternatives()).isEmpty();
+        assertThat(tooFew.note()).startsWith("2명이 쓸 수 있는 방이 없어요");
+    }
 }

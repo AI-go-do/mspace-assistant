@@ -29,7 +29,9 @@ class FindAvailableRoomsTool {
                     결과는 방마다 이어진 빈 구간(free) 목록이다. 시각은 서울 시간(+09:00).
                     조회할 수 있는 날짜는 오늘부터 6일 뒤까지다. 예약은 30분 단위, 1회 최대 2시간이다.
                     from·to를 주면 그 시간 전체가 비어 있는 방만 나온다. 자정을 넘기면(예: 23:00~01:00)
-                    시작 날짜를 date로 주고 to를 01:00으로 준다. note가 있으면 학생에게 함께 전한다.""",
+                    시작 날짜를 date로 주고 to를 01:00으로 준다. note가 있으면 학생에게 함께 전한다.
+                    그 시간에 빈방이 없으면 alternatives(같은 날, 같은 길이, 가장 가까운 시간 최대 3개)가 온다.
+                    직접 계산하지 말고 alternatives를 그대로 "이 시간은 어때요?"로 제안한다.""",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     AvailableRooms findAvailableRooms(
             McpSyncRequestContext context,
