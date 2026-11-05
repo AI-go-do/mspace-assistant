@@ -35,8 +35,11 @@ class UsageRulesToolTest extends McpToolTestSupport {
     @Test
     @DisplayName("도구 목록에 usage_rules가 읽기 전용, 입력 없이 보인다")
     void listsTool() {
+        // given
+        var client = connect(USER);
+
         // when
-        Tool tool = connect(USER).listTools().tools().stream()
+        Tool tool = client.listTools().tools().stream()
                 .filter(t -> t.name().equals("usage_rules")).findFirst().orElseThrow();
 
         // then
@@ -116,6 +119,26 @@ class UsageRulesToolTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("수칙 한 줄에 내용(rule)이 빠져 있어도 규칙 없이 답하지 않고 오류로 알린다")
+    void missingConductRuleIsError() {
+        // given: 수칙 항목에 rule이 없는 응답
+        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("""
+                        {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
+                          "checkinOpenBeforeMinutes":10,"noShowMinutes":15,"instantNoShowMinutes":10,
+                          "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
+                         "conduct":[{"key":"FOOD","title":"음식","penalty":"p"}],
+                         "reminders":{"checkin":"a","checkout":"b"}}""")));
+
+        // when
+        CallToolResult result = call(USER, "usage_rules", Map.of());
+
+        // then
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
+    }
+
+    @Test
     @DisplayName("core가 내려가 있으면 오류 문장을 그대로 전한다")
     void coreDown() {
         // given
@@ -126,5 +149,6 @@ class UsageRulesToolTest extends McpToolTestSupport {
 
         // then
         assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("예약 서버에 연결하지 못했어요");
     }
 }

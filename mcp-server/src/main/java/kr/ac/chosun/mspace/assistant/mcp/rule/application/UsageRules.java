@@ -38,7 +38,7 @@ public record UsageRules(Reservation reservation, List<Conduct> conduct, Reminde
         return allPresent(r.bookingWindowDays(), r.slotMinutes(), r.maxMinutes(), r.checkinOpenBeforeMinutes(),
                 r.noShowMinutes(), r.instantNoShowMinutes())
                 && e != null && allPresent(e.maxCount(), e.openBeforeMinutes(), e.maxMinutes(), e.chainGapMinutes())
-                && conduct != null && !conduct.isEmpty()
+                && conduct != null && !conduct.isEmpty() && conduct.stream().allMatch(c -> c != null && c.rule() != null)
                 && reminders != null && reminders.checkin() != null && reminders.checkout() != null;
     }
 
