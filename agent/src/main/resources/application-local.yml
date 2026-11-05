@@ -1,0 +1,8 @@
+# 로컬·리허설 전용 (SPRING_PROFILES_ACTIVE=local). 서버 배포에서는 켜지 않는다.
+# core가 MSPACE_DEV_HEADER=true일 때만 X-User-Id 헤더로 학생을 구분한다. 이 헤더 한 줄로 남의 예약에 닿을 수 있어
+# 기본 설정(application.yml)에서는 넘기지 않는다
+mspace:
+  agent:
+    forward-headers:
+      - Authorization
+      - X-User-Id
