@@ -61,6 +61,7 @@ public class AgentLoop {
         List<Confirmation> confirmations = new ArrayList<>();
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
+        Instant lookedUpAt = null; // 마지막으로 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
         // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
@@ -84,7 +85,7 @@ public class AgentLoop {
                     return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false);
                 }
                 if (!reply.wantsTools()) {
-                    return new ChatResult(grounded(reply.text(), calls), confirmations, accessCodeCards, calls, false);
+                    return new ChatResult(grounded(reply.text(), lookedUpAt), confirmations, accessCodeCards, calls, false);
                 }
                 if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
@@ -94,12 +95,16 @@ public class AgentLoop {
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
                 conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
                 for (ToolCall call : reply.toolCalls()) {
-                    if (pastDeadline(deadline, calls)) {
+                    Instant now = clock.instant(); // 기한 검사와 꼬리말의 조회 시각에 같이 쓴다 (시계는 한 번만 읽는다)
+                    if (pastDeadline(now, deadline, calls)) {
                         return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                     }
                     calls++;
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
+                    if (!outcome.isError()) {
+                        lookedUpAt = now;
+                    }
                     log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
                     outcome.confirmation().ifPresent(confirmations::add);
@@ -113,7 +118,11 @@ public class AgentLoop {
     }
 
     private boolean pastDeadline(Instant deadline, int calls) {
-        if (clock.instant().isBefore(deadline)) {
+        return pastDeadline(clock.instant(), deadline, calls);
+    }
+
+    private boolean pastDeadline(Instant now, Instant deadline, int calls) {
+        if (now.isBefore(deadline)) {
             return false;
         }
         log.warn("agent time limit reached calls={} limit={}s", calls, props.chatTimeout().toSeconds());
@@ -134,13 +143,15 @@ public class AgentLoop {
      * 도구를 하나라도 불러 낸 답에는 조회 시각을 꼬리말로 붙인다. "그걸 어떻게 알아?"에 모델의 말이 아니라
      * 코드가 근거를 보여 주는 것이라, 모델이 사과하거나 지어내도 학생은 조회 사실을 알 수 있다 (11/5 시연 피드백)
      */
-    String grounded(String text, int calls) {
-        if (calls == 0 || text == null || text.isBlank()) {
+    String grounded(String text, Instant lookedUpAt) {
+        if (lookedUpAt == null || text == null || text.isBlank()) {
             return text;
         }
-        ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
-        return text.stripTrailing() + "\n\n(예약 시스템 %02d:%02d 조회 기준)".formatted(now.getHour(), now.getMinute());
+        ZonedDateTime at = lookedUpAt.atZone(SEOUL);
+        return text.stripTrailing() + GROUNDING_SUFFIX.formatted(at.getHour(), at.getMinute());
     }
+
+    static final String GROUNDING_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 기준)";
 
     String systemPrompt() {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
@@ -167,9 +178,10 @@ public class AgentLoop {
                 - 인원을 말하지 않았으면 headcount를 넣지 않는다. 방마다 인원 범위가 있어(1~4번 방 3~5명, 5번 방 5~8명)
                   2명 이하는 예약할 수 없다. 인원이 안 맞으면 그 이유를 그대로 말한다.
                 - "5시"처럼 오전·오후가 없으면 지금 이후의 가장 가까운 시각으로 보고, 답에 "오후 5시"처럼 적는다.
-                - 앞선 대화의 네 답은 모두 도구로 조회한 결과다(도구 호출 기록은 대화에 다시 실리지 않는다).
-                  "그걸 어떻게 알아?"처럼 물으면 예약 시스템을 조회한 결과라고 답하고, 확인하지 않았다고 사과하지 않는다.
-                  다시 확인해 달라면 그 자리에서 도구를 다시 부른다.
+                - 앞선 네 답 중 "(예약 시스템 HH:MM 조회 기준)" 꼬리말이 붙은 것은 그 시각에 도구로 조회한 결과다
+                  (도구 호출 기록은 대화에 다시 실리지 않는다). "그걸 어떻게 알아?"처럼 물으면 그 시각에 예약 시스템을
+                  조회했다고 답하고, 확인하지 않았다고 사과하지 않는다. 꼬리말이 없는 답은 조회한 것이 아니니,
+                  근거를 묻거나 다시 확인해 달라면 그 자리에서 도구를 불러 답한다.
                 - "잠시만 기다려 주세요", "확인해 드릴게요"처럼 나중에 하겠다는 말은 하지 않는다. 네 답이 나가면
                   대화 차례가 끝나므로, 할 일은 이번 답 안에서 도구를 불러 끝낸다.
                 """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays());

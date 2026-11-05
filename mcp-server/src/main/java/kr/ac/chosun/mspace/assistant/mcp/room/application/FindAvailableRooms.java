@@ -23,7 +23,9 @@ public class FindAvailableRooms {
     static final String MIDNIGHT_NOTE = "자정 이후 부분은 예약할 때 확인돼요.";
     static final String NONE_NOTE = "조건에 맞는 빈방이 없어요. 다른 시간이나 날짜를 찾아볼 수 있어요.";
     /** 인원 때문에 방이 하나도 안 남았을 때. 빈 시간 문제로 잘못 전해지지 않게 이유와 방별 인원을 적는다 (11/5 시연: 2명 → "빈방 없음"으로 오해) */
-    static final String HEADCOUNT_NOTE = "%d명이 쓸 수 있는 방이 없어요. %s 인원을 바꾸거나 함께 쓸 사람을 더 넣어야 해요.";
+    static final String HEADCOUNT_NOTE = "%d명이 쓸 수 있는 방이 없어요. %s %s";
+    static final String TOO_FEW = "함께 쓸 사람을 더 넣어야 해요.";
+    static final String TOO_MANY = "한 방에 들어갈 수 없는 인원이라 인원을 줄이거나 두 방으로 나눠야 해요.";
 
     private final RoomAvailabilityPort port;
 
@@ -67,7 +69,9 @@ public class FindAvailableRooms {
         }
         String note = rooms.isEmpty()
                 ? (headcount != null && !anyRoomFitsHeadcount && !day.rooms().isEmpty()
-                        ? HEADCOUNT_NOTE.formatted(headcount, capacities(day.rooms())) : NONE_NOTE)
+                        ? HEADCOUNT_NOTE.formatted(headcount, capacities(day.rooms()),
+                                headcount > day.rooms().stream().mapToInt(RoomSlots::maxPeople).max().orElse(0) ? TOO_MANY : TOO_FEW)
+                        : NONE_NOTE)
                 : crossesMidnight ? MIDNIGHT_NOTE : null;
         return new AvailableRooms(day.date(), rooms, note);
     }

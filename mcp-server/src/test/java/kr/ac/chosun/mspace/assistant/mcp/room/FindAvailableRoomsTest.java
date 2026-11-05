@@ -146,6 +146,21 @@ class FindAvailableRoomsTest {
         assertThat(result.rooms()).isEmpty();
         assertThat(result.note())
                 .startsWith("2명이 쓸 수 있는 방이 없어요. 1번 방 3~5명, 5번 방 5~8명.")
+                .contains("더 넣어야")
                 .doesNotContain("조건에 맞는 빈방이 없어요");
+    }
+
+    @Test
+    @DisplayName("가장 큰 방보다 많은 인원(9명)이면 '더 넣어라'가 아니라 줄이거나 나누라고 적는다")
+    void headcountNoteTooMany() {
+        // given
+        var find = with(room(1, 3, 5, Set.of()), room(5, 5, 8, Set.of()));
+
+        // when
+        AvailableRooms result = find.find(DAY, null, null, 9, USER);
+
+        // then
+        assertThat(result.rooms()).isEmpty();
+        assertThat(result.note()).startsWith("9명이 쓸 수 있는 방이 없어요.").contains("줄이거나").doesNotContain("더 넣어야");
     }
 }

@@ -131,8 +131,10 @@ class GeminiLlmClientTest {
     @Test
     @DisplayName("두 번 다 5xx면 그때 '응답하지 않아요'. 세 번째는 보내지 않는다")
     void givesUpAfterSecond5xx() {
+        // given
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(503)));
 
+        // when / then
         assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
         gemini.verify(2, postRequestedFor(urlEqualTo(PATH)));
@@ -147,11 +149,18 @@ class GeminiLlmClientTest {
         gemini.stubFor(post(PATH).inScenario("empty").whenScenarioStateIs("second")
                 .willReturn(okJson("{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"됐어요\"}]}}]}")));
 
-        // when / then
-        assertThat(client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()).text()).isEqualTo("됐어요");
+        // when
+        LlmReply reply = client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of());
 
+        // then
+        assertThat(reply.text()).isEqualTo("됐어요");
+        gemini.verify(2, postRequestedFor(urlEqualTo(PATH)));
+
+        // given: 429는 한도라 다시 보내도 같다
         gemini.resetAll();
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(429)));
+
+        // when / then
         assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_RATE_LIMITED");
         gemini.verify(1, postRequestedFor(urlEqualTo(PATH)));
