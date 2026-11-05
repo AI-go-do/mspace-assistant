@@ -16,7 +16,9 @@ mspace:
     # gemini(시연) | ollama(학교 도입)
     provider: ${LLM_PROVIDER:gemini}
     gemini:
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      # 기본 gemini-3.5-flash-lite(무료 한도가 Flash보다 넉넉하다는 포럼 보고가 있음, AI Studio에서 확인). 도구 정확도가 모자라면 GEMINI_MODEL=gemini-3.8-flash
+      # 2.5 계열은 예전에 쓰던 프로젝트만 쓸 수 있다 (ai.google.dev/gemini-api/docs/deprecations, 11/5 확인)
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
       # 키는 .env·GitHub Secrets에만. 비어 있으면 비서는 "준비되지 않았어요"로 답한다
       api-key: ${GEMINI_API_KEY:}
       timeout: 20s
