@@ -174,6 +174,12 @@ public class ChatJobs implements AutoCloseable {
         });
     }
 
+    /** 이 학생의 접수가 대기·진행 중인지. 기억을 지우는 요청이 돌고 있는 대화와 겹치지 않게 한다 */
+    public boolean hasRunning(UserHeaders user) {
+        sweep();
+        return runningByOwner.containsKey(ownerKey(user));
+    }
+
     int size() {
         return jobs.size();
     }

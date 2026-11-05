@@ -17,6 +17,7 @@ import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -36,28 +37,84 @@ public class AgentLoop {
     private final ToolGateway tools;
     private final AgentProperties props;
     private final Clock clock;
+    private final ConversationMemory memory;
+    private final MemoryProperties memoryProps;
 
+    /** 기억 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock) {
+        this(llm, tools, props, clock, ConversationMemory.NONE, new MemoryProperties(false, null, null, 0));
+    }
+
+    @Autowired
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
+                     ConversationMemory memory, MemoryProperties memoryProps) {
         this.llm = llm;
         this.tools = tools;
         this.props = props;
         this.clock = clock;
+        this.memory = memory;
+        this.memoryProps = memoryProps;
     }
 
     /**
-     * @param history 앞선 대화(학생·비서의 글만). 도구 결과는 다시 보내지 않는다
+     * 서버가 기억한 대화가 있으면 그것을 잇고, 없을 때만 화면이 보낸 history를 쓴다 (서버 기억이 끊긴 뒤의 보조).
+     * 끝나면 이번 학생 말·도구 호출·결과·답을 함께 기억한다. 모델이 답을 못 만들면(예외) 이번 차례는 기억하지 않는다.
+     *
+     * @param history 화면이 보낸 앞선 대화(학생·비서의 글만)
      */
     public ChatResult run(UserHeaders headers, List<LlmMessage> history, String message) {
-        List<LlmMessage> conversation = new ArrayList<>();
+        String key = MemberKey.of(headers);
+        List<LlmMessage> remembered = memory.load(key);
+        List<LlmMessage> conversation = new ArrayList<>(
+                trim(remembered.isEmpty() ? masked(history) : remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
+        conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
+        ChatResult result = converse(headers, conversation);
+        // 모델 답도 다음 요청에 외부 AI로 다시 가니 학생 말과 같은 규칙으로 가려 둔다
+        conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(result.reply()), List.of()));
+        memory.save(key, trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));
+        return result;
+    }
+
+    /** 화면이 보낸 글은 학생이 고쳐 보낼 수 있어 비서 차례도 가린다 */
+    private static List<LlmMessage> masked(List<LlmMessage> history) {
+        List<LlmMessage> out = new ArrayList<>(history.size());
         for (LlmMessage m : history) {
-            // 비서 차례도 클라이언트가 보낸 글이라 가린다. 학생이 앞 대화를 고쳐 보낼 수 있다
-            conversation.add(switch (m) {
+            out.add(switch (m) {
                 case LlmMessage.User u -> new LlmMessage.User(PrivacyMask.mask(u.text()));
                 case LlmMessage.Assistant a -> new LlmMessage.Assistant(PrivacyMask.mask(a.text()), a.toolCalls());
                 case LlmMessage.ToolResult r -> r;
             });
         }
-        conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
+        return out;
+    }
+
+    /**
+     * 오래된 차례부터 버려 학생 차례 수와 글자 수를 상한 안에 둔다. 자르는 곳은 늘 학생 말 앞이라
+     * 도구 호출과 결과가 짝이 깨진 채 남지 않는다 (Gemini는 짝이 안 맞으면 400).
+     */
+    public static List<LlmMessage> trim(List<LlmMessage> conversation, int maxTurns, int maxChars) {
+        int turns = 0;
+        int chars = 0;
+        int start = conversation.size(); // 상한 안에 드는 차례가 하나도 없으면 빈 목록 (가장 최근 차례 하나가 너무 커도 상한을 지킨다)
+        for (int i = conversation.size() - 1; i >= 0; i--) {
+            LlmMessage m = conversation.get(i);
+            chars += switch (m) {
+                case LlmMessage.User u -> u.text().length();
+                case LlmMessage.Assistant a -> a.text() == null ? 0 : a.text().length();
+                case LlmMessage.ToolResult r -> r.json() == null ? 0 : r.json().length();
+            };
+            if (m instanceof LlmMessage.User) {
+                turns++;
+                if (turns > maxTurns || chars > maxChars) {
+                    break;
+                }
+                start = i;
+            }
+        }
+        return conversation.subList(start, conversation.size());
+    }
+
+    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation) {
         List<Confirmation> confirmations = new ArrayList<>();
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
@@ -94,9 +151,15 @@ public class AgentLoop {
                 // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
                 conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
-                for (ToolCall call : reply.toolCalls()) {
+                List<ToolCall> wanted = reply.toolCalls();
+                for (int i = 0; i < wanted.size(); i++) {
+                    ToolCall call = wanted.get(i);
                     Instant now = clock.instant(); // 기한 검사와 꼬리말의 조회 시각에 같이 쓴다 (시계는 한 번만 읽는다)
                     if (pastDeadline(now, deadline, calls)) {
+                        // 실행하지 않은 호출에도 결과를 붙여 둔다. 짝이 안 맞는 호출이 기억에 남으면 다음 요청마다 모델이 400을 낸다
+                        for (ToolCall rest : wanted.subList(i, wanted.size())) {
+                            conversation.add(new LlmMessage.ToolResult(rest.id(), rest.name(), SKIPPED_RESULT, true));
+                        }
                         return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true);
                     }
                     calls++;
@@ -137,6 +200,8 @@ public class AgentLoop {
         return session.tools().stream().anyMatch(t -> t.name().equals(name)) ? name : "unknown";
     }
 
+    /** 시간 상한으로 실행하지 않은 도구 호출의 결과 자리 (기억의 호출·결과 짝을 지킨다) */
+    static final String SKIPPED_RESULT = "{\"message\":\"시간이 오래 걸려 실행하지 않았어요\"}";
     static final String CARDS_ONLY_REPLY = "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요.";
 
     /**

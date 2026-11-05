@@ -10,6 +10,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <ul>
  *   <li>POST /api/agent/chat: 학생 말을 접수하고 바로 202 + jobId. 에이전트 반복은 뒤에서 돈다</li>
  *   <li>GET /api/agent/chat/{jobId}: 결과 조회(폴링). PENDING이면 pollAfterMs 뒤 다시 부른다. DONE이면 답 + 확인 카드</li>
+ *   <li>DELETE /api/agent/chat/history: 서버가 기억한 앞선 대화를 지운다 ("새 대화")</li>
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  * </ul>
@@ -48,15 +52,17 @@ class ChatController {
     private final AgentProperties props;
     private final ChatJobs jobs;
     private final ChatJobProperties jobProps;
+    private final ConversationMemory memory;
 
     ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
-                   AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps) {
+                   AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps, ConversationMemory memory) {
         this.agent = agent;
         this.confirmations = confirmations;
         this.accessCodes = accessCodes;
         this.props = props;
         this.jobs = jobs;
         this.jobProps = jobProps;
+        this.memory = memory;
     }
 
     @PostMapping("/api/agent/chat")
@@ -119,6 +125,23 @@ class ChatController {
                         "대화 결과를 찾지 못했어요. 다시 보내 주세요."));
     }
 
+    /**
+     * "새 대화": 서버가 기억한 앞선 대화를 지운다. 화면도 자기 history를 비운다.
+     * 이 학생의 채팅이 아직 돌고 있으면 409: 끝날 때 옛 대화를 다시 저장해 지운 것이 되살아나기 때문이다
+     */
+    @DeleteMapping("/api/agent/chat/history")
+    ResponseEntity<?> clearHistory(@RequestHeader HttpHeaders headers) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요.");
+        }
+        if (jobs.hasRunning(user)) {
+            return error(HttpStatus.CONFLICT, "CHAT_IN_PROGRESS", "앞의 질문에 아직 답하는 중이에요. 답이 온 뒤에 지워 주세요.");
+        }
+        memory.clear(MemberKey.of(user));
+        return ResponseEntity.noContent().build();
+    }
+
     /** 확인 결과(입실 번호 포함)는 학생 화면으로만 간다. 모델에는 넘기지 않는다 */
     @PostMapping("/api/agent/confirmations/{token}")
     ResponseEntity<String> confirm(@PathVariable String token, @RequestHeader HttpHeaders headers,
@@ -147,6 +170,11 @@ class ChatController {
         return error(status, e.code(), e.getMessage());
     }
 
+    @ExceptionHandler(ConversationMemory.Unavailable.class)
+    ResponseEntity<?> memoryFailed(ConversationMemory.Unavailable e) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "MEMORY_UNAVAILABLE", e.getMessage());
+    }
+
     @ExceptionHandler(ToolGateway.Unavailable.class)
     ResponseEntity<?> toolsFailed(ToolGateway.Unavailable e) {
         return error(HttpStatus.SERVICE_UNAVAILABLE, "TOOLS_UNAVAILABLE", e.getMessage());
@@ -167,7 +195,7 @@ class ChatController {
         return ResponseEntity.status(status).body(Map.of("code", code, "message", message));
     }
 
-    /** history: 앞선 대화 [{role: "user"|"assistant", text}]. 화면이 들고 있다가 보낸다 */
+    /** history: 앞선 대화 [{role: "user"|"assistant", text}]. 서버가 기억한 대화가 없을 때만 쓴다 (설계 4장) */
     record ChatRequest(String message, List<Turn> history) {
     }
 

@@ -20,7 +20,7 @@ M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Bo
 | 모듈 | 포트 | 열어 둔 것 |
 |---|---|---|
 | `mcp-server` | 8090 | MCP `/mcp` (도구 7개 중 읽기 2·쓰기 3 구현), 확인 실행 `POST /api/confirmations/{token}` |
-| `agent` | 8091 | 채팅 접수 `POST /api/agent/chat`(202 + jobId) → 결과 조회 `GET /api/agent/chat/{jobId}`(폴링), 확인 `POST /api/agent/confirmations/{token}`, 입실 번호 카드 `GET /api/agent/reservations/{id}/access-code` |
+| `agent` | 8091 | 채팅 접수 `POST /api/agent/chat`(202 + jobId) → 결과 조회 `GET /api/agent/chat/{jobId}`(폴링), 새 대화 `DELETE /api/agent/chat/history`, 확인 `POST /api/agent/confirmations/{token}`, 입실 번호 카드 `GET /api/agent/reservations/{id}/access-code` |
 
 ## 로컬 실행
 ```bash
