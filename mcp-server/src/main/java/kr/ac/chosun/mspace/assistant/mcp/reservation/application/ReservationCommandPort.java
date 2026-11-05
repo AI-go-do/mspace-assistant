@@ -14,6 +14,15 @@ public interface ReservationCommandPort {
     CreatedReservation create(UserCredential credential, int roomId, OffsetDateTime startAt, OffsetDateTime endAt,
                               List<String> participantStudentIds, String idempotencyKey);
 
+    /** 취소 (FR-RSV-007). 대표자·BOOKED·시작 전만. 어기면 core가 403/404/409로 막는다 */
+    StatusChange cancel(UserCredential credential, long reservationId);
+
+    /** 퇴실 (FR-RSV-008). IN_USE·대표자만. core가 조건부 UPDATE라 두 번 눌러도 한 번만 처리된다 */
+    StatusChange checkout(UserCredential credential, long reservationId);
+
+    record StatusChange(long id, String status) {
+    }
+
     /**
      * @param accessCode 6자리 입실 번호. 학생 화면에만 보여 주고 모델에는 넘기지 않는다
      * @param replayed   true면 같은 멱등 키 재전송이라 core가 새로 만들지 않고 처음 예약을 돌려준 것(200)

@@ -1,5 +1,5 @@
 # PR마다 빌드·테스트 (인프라·CI/CD 문서 4절 "PR 올릴 때"). core의 ci.yml과 같은 모양
-# + SonarQube Cloud 분석: main에 합칠 때 "새 코드 커버리지 80% 이상" 품질 게이트를 본다
+# + 학교 SonarQube(Community 서버) 분석: main에 합칠 때 "새 코드 커버리지 80% 이상" 품질 게이트를 본다
 name: CI
 
 on:
@@ -22,8 +22,6 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: 코드 받기
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -41,20 +39,39 @@ jobs:
       - name: 빌드 + 테스트 + 커버리지
         run: ./mvnw -B verify
 
-      # 학교 SonarQube 서버로 분석. SONAR_TOKEN이 아직 없으면(설정 전·fork PR) 건너뛴다. 빌드·테스트는 그대로 필수
-      # Community 판은 브랜치·PR 분석이 없어 한 갈래로만 쌓인다(확인 필요). 그래서
-      #  - develop·main에 합쳐질 때: 분석만 (대시보드 갱신)
-      #  - main으로 가는 PR: 분석 + 품질 게이트(새 코드 커버리지 80%)를 기다려 실패하면 CI도 실패
+      # 학교 SonarQube(Community) 서버. Community 판은 브랜치·PR을 나눠 담지 못하고 프로젝트 하나에 덮어쓴다.
+      # 토큰은 Sonar 단계에만 넘긴다. 빌드·테스트 단계(테스트 코드·의존성)가 토큰을 볼 수 없게 (core ci.yml과 같은 모양)
+
+      # 1) develop/main에 합쳐진 뒤: 결과를 기록만 한다 (막지 않음)
       - name: SonarQube 분석
-        if: env.SONAR_TOKEN != '' && (github.event_name == 'push' || github.base_ref == 'main')
+        if: github.event_name == 'push'
         env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          GATE_WAIT: ${{ github.base_ref == 'main' }}
-        run: >
-          ./mvnw -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
-          -Dsonar.host.url="$SONAR_HOST_URL"
-          -Dsonar.qualitygate.wait="$GATE_WAIT"
-          -Dsonar.qualitygate.timeout=300
+        continue-on-error: true    # Sonar 서버·토큰 문제로 develop 검사가 빨개지지 않게
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN이 없어 SonarQube 분석을 건너뜁니다."
+            exit 0
+          fi
+          ./mvnw -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.host.url="$SONAR_HOST_URL"
+
+      # 2) main으로 가는 PR: 품질 게이트(새 코드 커버리지 80%)를 통과해야 build가 초록.
+      #    토큰이 없으면 게이트를 확인할 수 없으니 건너뛰지 않고 실패시킨다
+      - name: SonarQube 품질 게이트 (main)
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN이 없어 main 품질 게이트를 확인할 수 없습니다. 저장소 Secrets를 넣어 주세요."
+            exit 1
+          fi
+          ./mvnw -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.host.url="$SONAR_HOST_URL" \
+            -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
 
       - name: 테스트 결과 보관
         if: always()

@@ -10,5 +10,5 @@ import java.time.OffsetDateTime;
  * @param participantCount 대표자 포함 인원
  */
 public record MyReservation(long id, String roomName, OffsetDateTime startAt, OffsetDateTime endAt,
-                            String status, boolean owner, int participantCount) {
+                            ReservationStatus status, boolean owner, int participantCount) {
 }
