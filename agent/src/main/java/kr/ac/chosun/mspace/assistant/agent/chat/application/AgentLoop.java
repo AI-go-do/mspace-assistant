@@ -122,6 +122,7 @@ public class AgentLoop {
         Instant lookedUpAt = null; // 마지막으로 예약 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
         boolean usedSchedule = false; // my_schedule로 학생이 넣은 시간표를 봤는지. 꼬리말에 "입력한 시간표 기준"
         List<String> hints = new ArrayList<>(); // 화면 신호 (ChatResult.HINT_*)
+        List<QuickReplies.Seen> seen = new ArrayList<>(); // 빠른 답장 규칙용 도구 결과
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
         // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
@@ -131,7 +132,7 @@ public class AgentLoop {
             String system = systemPrompt();
             while (true) {
                 if (calls > 0 && pastDeadline(deadline, calls)) {
-                    return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, List.copyOf(toolNames), List.copyOf(hints));
+                    return result(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
                 }
                 LlmReply reply;
                 try {
@@ -142,15 +143,15 @@ public class AgentLoop {
                     }
                     // 카드는 이미 만들어졌다(확인 토큰 발급, 대표자 확인). 모델 답만 실패했으니 카드는 화면에 준다
                     log.warn("agent llm failed after cards code={}", e.code());
-                    return new ChatResult(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false, List.copyOf(toolNames), List.copyOf(hints));
+                    return result(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false, toolNames, hints, seen);
                 }
                 if (!reply.wantsTools()) {
-                    return new ChatResult(grounded(reply.text(), lookedUpAt, usedSchedule), confirmations, accessCodeCards,
-                            calls, false, List.copyOf(toolNames), List.copyOf(hints));
+                    return result(grounded(reply.text(), lookedUpAt, usedSchedule), confirmations, accessCodeCards,
+                            calls, false, toolNames, hints, seen);
                 }
                 if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
                     log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
-                    return new ChatResult(LIMIT_REPLY, confirmations, accessCodeCards, calls, true, List.copyOf(toolNames), List.copyOf(hints));
+                    return result(LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
                 }
                 // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
@@ -164,7 +165,7 @@ public class AgentLoop {
                         for (ToolCall rest : wanted.subList(i, wanted.size())) {
                             conversation.add(new LlmMessage.ToolResult(rest.id(), rest.name(), SKIPPED_RESULT, true));
                         }
-                        return new ChatResult(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, List.copyOf(toolNames), List.copyOf(hints));
+                        return result(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
                     }
                     calls++;
                     toolNames.add(call.name());
@@ -182,6 +183,7 @@ public class AgentLoop {
                     }
                     log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
+                    seen.add(new QuickReplies.Seen(call.name(), outcome.json(), outcome.isError()));
                     outcome.confirmation().ifPresent(confirmations::add);
                     outcome.accessCodeCard().filter(c -> !accessCodeCards.contains(c)).ifPresent(accessCodeCards::add);
                     // 도구 결과는 게이트웨이가 이미 가렸다(JSON 문자열 값만). 여기서 JSON 전체에 정규식을 걸면
@@ -190,6 +192,20 @@ public class AgentLoop {
                 }
             }
         }
+    }
+
+    /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
+    private ChatResult result(String reply, List<Confirmation> confirmations, List<AccessCodeCard> cards,
+                                     int calls, boolean stopped, List<String> toolNames, List<String> hints,
+                                     List<QuickReplies.Seen> seen) {
+        List<String> suggestions = stopped ? List.of()
+                : QuickReplies.suggest(seen, !confirmations.isEmpty() || !cards.isEmpty(), lastAllowedDay());
+        return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints), suggestions);
+    }
+
+    /** 조회할 수 있는 마지막 날: 오늘(서울) + 미리 예약 일수 - 1 */
+    private java.time.LocalDate lastAllowedDay() {
+        return java.time.LocalDate.now(clock.withZone(SEOUL)).plusDays(props.rules().advanceDays() - 1L);
     }
 
     private boolean pastDeadline(Instant deadline, int calls) {
