@@ -24,7 +24,7 @@ class ChatJobsTest {
 
     static final UserHeaders OWNER = new UserHeaders(Map.of("Authorization", "Bearer owner"));
     static final UserHeaders OTHER = new UserHeaders(Map.of("Authorization", "Bearer other"));
-    static final ChatResult RESULT = new ChatResult("빈방이 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms"), List.of());
+    static final ChatResult RESULT = new ChatResult("빈방이 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms"), List.of(), List.of());
 
     /** 시간을 손으로 옮기는 시계 */
     static class MovableClock extends Clock {

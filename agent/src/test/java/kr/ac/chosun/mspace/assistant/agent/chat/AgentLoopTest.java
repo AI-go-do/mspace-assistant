@@ -136,6 +136,8 @@ class AgentLoopTest {
         assertThat(result.reply()).isEqualTo("2번 방이 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
         assertThat(tools.called).containsExactly("find_available_rooms");
         assertThat(result.tools()).containsExactly("find_available_rooms"); // 측정(#9)이 이걸로 도구 선택을 판정한다
+        assertThat(result.suggestions()).as("성공한 빈방 결과 → 빠른 답장이 결과에 실린다")
+                .containsExactly("첫 번째로 나온 방 잡아 줘", "다른 시간도 볼게");
         assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.ToolResult.class,
                 r -> assertThat(r.json()).contains("\"roomId\":2"));
     }
@@ -205,6 +207,7 @@ class AgentLoopTest {
         ChatResult result = loop(llm, tools).run(ME, List.of(), "계속 찾아 줘");
 
         assertThat(result.stoppedByLimit()).isTrue();
+        assertThat(result.suggestions()).as("멈춘 대화엔 빠른 답장 없음").isEmpty();
         assertThat(result.toolCalls()).isEqualTo(8);
         assertThat(tools.called).hasSize(8);
         assertThat(result.reply()).contains("너무 많아져서 멈췄어요");
@@ -425,6 +428,7 @@ class AgentLoopTest {
         assertThat(withoutSchedule.reply()).isEqualTo("아직 넣은 시간표가 없어요.");
         // 시간표가 없을 때는 화면이 [내 시간표] 버튼을 그리도록 신호를 준다 (설계 5장 ③)
         assertThat(withoutSchedule.hints()).containsExactly(ChatResult.HINT_OPEN_SCHEDULE);
+        assertThat(withoutSchedule.suggestions()).as("시간표 없음은 버튼(hints)으로, 빠른 답장은 비움").isEmpty();
     }
 
     /** 2026-11-03(화) 15:30부터 빈 칸이 하나도 없음 */

@@ -12,9 +12,12 @@ import java.util.List;
  * @param stoppedByLimit 도구 호출 최대 횟수를 넘어 멈췄으면 true
  * @param tools         부른 도구 이름(부른 순서, 중복 포함). 측정(#9)이 "맞는 도구를 골랐는지" 보는 데 쓴다. 인자는 넣지 않는다
  * @param hints         화면에 줄 신호. {@link #HINT_OPEN_SCHEDULE}: 시간표가 없어서(NO_SCHEDULE) 답했으니 [내 시간표] 버튼을 보여 달라
+ * @param suggestions   답 아래 "다음 말" 버튼 글(최대 3개, 없으면 빈 목록). 누르면 그 글을 그대로 채팅으로 보낸다.
+ *                      마지막 도구 결과로 규칙이 정한다({@link QuickReplies}). 확인 카드가 있으면 비어 있다
  */
 public record ChatResult(String reply, List<Confirmation> confirmations, List<AccessCodeCard> accessCodeCards,
-                         int toolCalls, boolean stoppedByLimit, List<String> tools, List<String> hints) {
+                         int toolCalls, boolean stoppedByLimit, List<String> tools, List<String> hints,
+                         List<String> suggestions) {
 
     /** my_schedule이 NO_SCHEDULE을 돌려줬다. 화면은 답 아래에 [내 시간표 넣기] 버튼을 그린다 (설계 5장 다음 단계 ③) */
     public static final String HINT_OPEN_SCHEDULE = "OPEN_SCHEDULE";
