@@ -3,6 +3,7 @@ package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.AccessCodeGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <ul>
  *   <li>POST /api/agent/chat: 학생 말 → 에이전트 반복 → 답 + 확인 카드</li>
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
+ *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  * </ul>
  */
 @RestController
@@ -35,11 +38,14 @@ class ChatController {
 
     private final AgentLoop agent;
     private final ConfirmationGateway confirmations;
+    private final AccessCodeGateway accessCodes;
     private final AgentProperties props;
 
-    ChatController(AgentLoop agent, ConfirmationGateway confirmations, AgentProperties props) {
+    ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
+                   AgentProperties props) {
         this.agent = agent;
         this.confirmations = confirmations;
+        this.accessCodes = accessCodes;
         this.props = props;
     }
 
@@ -84,6 +90,18 @@ class ChatController {
         // 예약 생성 결과에는 입실 번호가 들어 있어 브라우저·프록시가 저장하지 않게 한다
         return ResponseEntity.status(relayed.status()).contentType(MediaType.APPLICATION_JSON)
                 .cacheControl(CacheControl.noStore()).body(relayed.json());
+    }
+
+    /** 입실 번호는 학생 화면으로만 간다. 캐시에 남지 않게 no-store */
+    @GetMapping("/api/agent/reservations/{reservationId}/access-code")
+    ResponseEntity<?> accessCode(@PathVariable long reservationId, @RequestHeader HttpHeaders headers) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다");
+        }
+        ConfirmationGateway.Relayed relayed = accessCodes.accessCode(reservationId, user);
+        return ResponseEntity.status(relayed.status()).cacheControl(CacheControl.noStore())
+                .contentType(MediaType.APPLICATION_JSON).body(relayed.json());
     }
 
     @ExceptionHandler(LlmException.class)
