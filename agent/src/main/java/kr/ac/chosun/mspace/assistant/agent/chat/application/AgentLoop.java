@@ -172,7 +172,7 @@ public class AgentLoop {
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
                     if (!outcome.isError() && SCHEDULE_TOOL.equals(call.name())) {
                         // 시간표가 없다는 답(NO_SCHEDULE)은 시간표를 본 근거가 아니다. 대신 화면에 [내 시간표] 버튼 신호를 준다
-                        boolean noSchedule = outcome.json().contains("\"NO_SCHEDULE\"");
+                        boolean noSchedule = NO_SCHEDULE.matcher(outcome.json()).find();
                         usedSchedule |= !noSchedule;
                         if (noSchedule && !hints.contains(ChatResult.HINT_OPEN_SCHEDULE)) {
                             hints.add(ChatResult.HINT_OPEN_SCHEDULE);
@@ -241,6 +241,10 @@ public class AgentLoop {
     }
 
     static final String SCHEDULE_TOOL = "my_schedule";
+
+    /** 최상위 "code":"NO_SCHEDULE"만. 과목명에 같은 글자가 있어도 시간표 없음으로 보지 않는다 */
+
+    static final java.util.regex.Pattern NO_SCHEDULE = java.util.regex.Pattern.compile("\"code\"\\s*:\\s*\"NO_SCHEDULE\"");
     static final String GROUNDING_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 기준)";
     static final String SCHEDULE_SUFFIX = "\n\n(입력한 시간표 기준)";
     static final String BOTH_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 · 입력한 시간표 기준)";
@@ -273,6 +277,9 @@ public class AgentLoop {
                   다음 날 날짜로 my_schedule을 다시 부르고 그 searchFromAt부터 find_available_rooms를 부른다. 다음 날이
                   주말이거나 수업이 없으면 오전 9시부터 본다. 답에는 "오늘은 없어서 내일 기준으로 찾았어요"처럼 날짜가
                   바뀐 이유를 먼저 말한다. 이틀 다 없으면 멈추고 원하는 날짜를 묻는다(사흘째까지 혼자 넘어가지 않는다).
+                  다음 날로 넘어가지 않는 경우: 빈방이 없는 이유가 인원(결과 note에 인원 안내)이면 날짜가 아니라 인원을
+                  바꾸라고 안내한다. 다음 날이 조회 범위(오늘부터 %4$d일) 밖이면 부르지 말고 그렇다고 말한다. 다음 날
+                  searchFromAt의 날짜가 그 다음 날로 넘어가면(밤늦은 수업) 그 시각으로 찾지 말고 학생에게 시각을 묻는다.
                 - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
                 - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면

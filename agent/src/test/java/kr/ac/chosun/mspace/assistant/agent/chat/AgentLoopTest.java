@@ -435,7 +435,7 @@ class AgentLoopTest {
              "classes":[{"name":"운영체제","startAt":"2026-11-04T10:00:00+09:00","endAt":"2026-11-04T12:00:00+09:00"}],
              "lastClassEndAt":"2026-11-04T12:00:00+09:00","searchFromAt":"2026-11-04T12:30:00+09:00",
              "bufferMinutes":30,"note":null}""";
-    static final String FREE_WED = "{\"date\":\"2026-11-04\",\"rooms\":[{\"roomId\":3,\"free\":[]}],\"note\":null}";
+    static final String FREE_WED = "{\"date\":\"2026-11-04\",\"rooms\":[{\"roomId\":3,\"free\":[{\"startAt\":\"2026-11-04T12:30:00+09:00\",\"endAt\":\"2026-11-04T15:00:00+09:00\"}]}],\"note\":null}";
 
     @Test
     @DisplayName("장면 C '수업 끝나고 빈방 잡아 줘' - 오늘 없으면 되묻지 않고 다음 날 시간표 → 빈방 순으로 이어서 본다")
