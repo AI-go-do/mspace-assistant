@@ -161,8 +161,15 @@ class ScheduleTest extends McpToolTestSupport {
     @Test
     @DisplayName("로그인 헤더가 없으면 REST는 401, 도구는 오류")
     void unauthorized() throws Exception {
-        assertThat(send("GET", Map.of(), null).statusCode()).isEqualTo(401);
-        CallToolResult result = call(Map.of(), "my_schedule", Map.of());
+        // given
+        Map<String, String> noLogin = Map.of();
+
+        // when
+        HttpResponse<String> rest = send("GET", noLogin, null);
+        CallToolResult result = call(noLogin, "my_schedule", Map.of());
+
+        // then
+        assertThat(rest.statusCode()).isEqualTo(401);
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("로그인이 필요합니다");
     }
@@ -212,18 +219,29 @@ class ScheduleTest extends McpToolTestSupport {
     @Test
     @DisplayName("REST: 요일·시각·과목명·빈 목록 모양이 틀리면 400 INVALID_REQUEST")
     void rejectsBadInput() throws Exception {
+        // given
         Map<String, String> me = student();
-        assertThat(send("PUT", me, "{\"classes\":[{\"dayOfWeek\":\"월\",\"startTime\":\"09:00\",\"endTime\":\"10:00\",\"name\":\"a\"}]}").body())
-                .contains("INVALID_REQUEST", "MON~SUN");
-        assertThat(send("PUT", me, "{\"classes\":[{\"dayOfWeek\":\"MON\",\"startTime\":\"9시\",\"endTime\":\"10:00\",\"name\":\"a\"}]}").body())
-                .contains("HH:mm");
-        assertThat(send("PUT", me, "{\"classes\":[{\"dayOfWeek\":\"MON\",\"startTime\":\"10:00\",\"endTime\":\"09:00\",\"name\":\"a\"}]}").body())
-                .contains("시작보다 늦어야");
-        assertThat(send("PUT", me, "{\"classes\":[{\"dayOfWeek\":\"MON\",\"startTime\":\"09:00\",\"endTime\":\"10:00\",\"name\":\"  \"}]}").body())
-                .contains("과목명은 1~30자");
+
+        // when
+        HttpResponse<String> badDay = send("PUT", me, one("월", "09:00", "10:00", "a"));
+        HttpResponse<String> badTime = send("PUT", me, one("MON", "9시", "10:00", "a"));
+        HttpResponse<String> endBeforeStart = send("PUT", me, one("MON", "10:00", "09:00", "a"));
+        HttpResponse<String> blankName = send("PUT", me, one("MON", "09:00", "10:00", "  "));
         HttpResponse<String> empty = send("PUT", me, "{\"classes\":[]}");
+
+        // then
+        assertThat(badDay.body()).contains("INVALID_REQUEST", "MON~SUN");
+        assertThat(badTime.body()).contains("HH:mm");
+        assertThat(endBeforeStart.body()).contains("시작보다 늦어야");
+        assertThat(blankName.body()).contains("과목명은 1~30자");
         assertThat(empty.statusCode()).isEqualTo(400);
         assertThat(empty.body()).contains("하나 이상");
+        assertThat(send("GET", me, null).statusCode()).isEqualTo(404); // 하나도 저장되지 않음
+    }
+
+    static String one(String day, String start, String end, String name) {
+        return "{\"classes\":[{\"dayOfWeek\":\"%s\",\"startTime\":\"%s\",\"endTime\":\"%s\",\"name\":\"%s\"}]}"
+                .formatted(day, start, end, name);
     }
 
     /** 서명은 보지 않으니 가짜 서명으로 충분하다 (게이트웨이가 확인) */

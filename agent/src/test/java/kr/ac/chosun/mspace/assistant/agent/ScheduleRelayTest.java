@@ -70,10 +70,13 @@ class ScheduleRelayTest {
     @Test
     @DisplayName("PUT: 화면 본문과 학생 헤더를 그대로 넘기고 답을 캐시하지 않게 돌려준다")
     void relaysPut() throws Exception {
+        // given
         mcpServer.stubFor(put("/api/schedule/me").willReturn(okJson(BODY)));
 
+        // when
         HttpResponse<String> response = send("PUT", Map.of("X-User-Id", "1"), BODY);
 
+        // then
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("자료구조");
         assertThat(response.headers().firstValue("Cache-Control")).hasValueSatisfying(v -> assertThat(v).contains("no-store"));
@@ -84,12 +87,15 @@ class ScheduleRelayTest {
     @Test
     @DisplayName("GET: 시간표가 없으면 mcp-server의 404 NO_SCHEDULE을 그대로")
     void relaysNotFound() throws Exception {
+        // given
         mcpServer.stubFor(get("/api/schedule/me").willReturn(aResponse().withStatus(404)
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"code\":\"NO_SCHEDULE\",\"message\":\"아직 넣은 시간표가 없어요.\"}")));
 
+        // when
         HttpResponse<String> response = send("GET", Map.of("X-User-Id", "1"), null);
 
+        // then
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NO_SCHEDULE");
     }
@@ -97,10 +103,13 @@ class ScheduleRelayTest {
     @Test
     @DisplayName("DELETE: 204를 그대로")
     void relaysDelete() throws Exception {
+        // given
         mcpServer.stubFor(delete("/api/schedule/me").willReturn(aResponse().withStatus(204)));
 
+        // when
         HttpResponse<String> response = send("DELETE", Map.of("X-User-Id", "1"), null);
 
+        // then
         assertThat(response.statusCode()).isEqualTo(204);
         mcpServer.verify(deleteRequestedFor(urlEqualTo("/api/schedule/me")).withHeader("X-User-Id", equalTo("1")));
     }
@@ -108,8 +117,10 @@ class ScheduleRelayTest {
     @Test
     @DisplayName("로그인 헤더가 없으면 401, mcp-server를 부르지 않는다")
     void needsLogin() throws Exception {
+        // when
         HttpResponse<String> response = send("GET", Map.of(), null);
 
+        // then
         assertThat(response.statusCode()).isEqualTo(401);
         mcpServer.verify(0, anyRequestedFor(anyUrl()));
     }
@@ -117,11 +128,14 @@ class ScheduleRelayTest {
     @Test
     @DisplayName("mcp-server가 꺼져 있으면 503 TOOLS_UNAVAILABLE")
     void mcpServerDown() throws Exception {
+        // given
         mcpServer.stubFor(get("/api/schedule/me")
                 .willReturn(aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER)));
 
+        // when
         HttpResponse<String> response = send("GET", Map.of("X-User-Id", "1"), null);
 
+        // then
         assertThat(response.statusCode()).isEqualTo(503);
         assertThat(response.body()).contains("TOOLS_UNAVAILABLE");
     }

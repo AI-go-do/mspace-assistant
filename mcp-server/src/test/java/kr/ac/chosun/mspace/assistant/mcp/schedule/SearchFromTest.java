@@ -31,11 +31,14 @@ class SearchFromTest {
     @ParameterizedTest(name = "{0} 끝 → {1}부터")
     @CsvSource({"14:50,15:00", "15:00,15:00"})
     void zeroBuffer(String end, String expected) {
+        // given
         var schedule = new MySchedule(new InMemoryScheduleRepository(), new ScheduleProperties("memory", 0, 30, 0, 0),
                 Clock.systemUTC());
 
+        // when
         OffsetDateTime from = schedule.searchFrom(OffsetDateTime.parse("2026-11-06T" + end + ":00+09:00"));
 
+        // then
         assertThat(from.toLocalTime().toString()).isEqualTo(expected);
     }
 }

@@ -379,6 +379,7 @@ class AgentLoopTest {
     @Test
     @DisplayName("시나리오 '내일 수업 끝나고 2시간 잡아 줘': 되묻지 않고 my_schedule → find_available_rooms(from=searchFromAt) → 확인 카드")
     void classEndFromSchedule() {
+        // given
         var llm = new ScriptedLlm()
                 .then(tool("my_schedule", Map.of("date", "2026-11-03")))
                 .then(tool("find_available_rooms", Map.of("date", "2026-11-03", "from", "15:30", "to", "17:30")))
@@ -390,8 +391,10 @@ class AgentLoopTest {
                 "find_available_rooms", new ToolGateway.Outcome(FREE, false),
                 "create_reservation", new ToolGateway.Outcome(PROPOSAL, false)));
 
+        // when
         ChatResult result = loop(llm, tools).run(ME, List.of(), "내일 수업 끝나고 2시간 잡아 줘");
 
+        // then
         assertThat(llm.lastSystem).contains("먼저 my_schedule", "되묻지 않는다", "searchFromAt")
                 .doesNotContain("수업 시간표는 아직 모른다");
         assertThat(tools.called).containsExactly("my_schedule", "find_available_rooms", "create_reservation");
@@ -404,14 +407,17 @@ class AgentLoopTest {
     @Test
     @DisplayName("시간표만 본 답은 '입력한 시간표 기준', 시간표가 없다는 답에는 시간표 꼬리말을 붙이지 않는다")
     void scheduleGrounding() {
+        // given
         var seen = new ScriptedLlm().then(tool("my_schedule", Map.of())).then(say("오늘은 자료구조가 있어요"));
         var none = new ScriptedLlm().then(tool("my_schedule", Map.of())).then(say("아직 넣은 시간표가 없어요."));
 
+        // when
         ChatResult withSchedule = loop(seen, new FakeTools(Map.of("my_schedule", new ToolGateway.Outcome(TUESDAY, false))))
                 .run(ME, List.of(), "오늘 수업 뭐 있어?");
         ChatResult withoutSchedule = loop(none, new FakeTools(Map.of("my_schedule", new ToolGateway.Outcome(NO_SCHEDULE, false))))
                 .run(ME, List.of(), "오늘 수업 뭐 있어?");
 
+        // then
         assertThat(withSchedule.reply()).isEqualTo("오늘은 자료구조가 있어요\n\n(입력한 시간표 기준)");
         assertThat(withoutSchedule.reply()).isEqualTo("아직 넣은 시간표가 없어요.");
     }

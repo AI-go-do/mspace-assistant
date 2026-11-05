@@ -68,17 +68,21 @@ class RedisScheduleRepositoryTest {
     @Test
     @DisplayName("값이 깨져 있으면 없는 것으로 본다 (다시 넣으면 고쳐진다)")
     void brokenValueIsEmpty() {
+        // when
         when(redis.opsForValue()).thenReturn(values);
         when(values.get("agent:schedule:m:42")).thenReturn("{not json");
 
+        // then
         assertThat(repository.find("m:42")).isEmpty();
     }
 
     @Test
     @DisplayName("지우기는 그 학생 키만 지운다")
     void delete() {
+        // when
         repository.delete("m:42");
 
+        // then
         verify(redis).delete("agent:schedule:m:42");
     }
 }
