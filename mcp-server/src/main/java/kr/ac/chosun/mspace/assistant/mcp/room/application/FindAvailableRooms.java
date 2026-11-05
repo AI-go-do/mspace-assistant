@@ -1,16 +1,21 @@
 package kr.ac.chosun.mspace.assistant.mcp.room.application;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import kr.ac.chosun.mspace.assistant.mcp.room.application.AvailableRooms.Alternative;
 import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.common.UserCredential;
 import kr.ac.chosun.mspace.assistant.mcp.room.application.AvailableRooms.FreeRange;
 import kr.ac.chosun.mspace.assistant.mcp.room.application.AvailableRooms.FreeRoom;
 import kr.ac.chosun.mspace.assistant.mcp.room.application.RoomDay.RoomSlots;
 import kr.ac.chosun.mspace.assistant.mcp.room.application.RoomDay.Slot;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,12 +30,22 @@ public class FindAvailableRooms {
     /** 인원 때문에 방이 하나도 안 남았을 때. 빈 시간 문제로 잘못 전해지지 않게 이유와 방별 인원을 적는다 (11/5 시연: 2명 → "빈방 없음"으로 오해) */
     static final String HEADCOUNT_NOTE = "%d명이 쓸 수 있는 방이 없어요. %s %s";
     static final String TOO_FEW = "함께 쓸 사람을 더 넣어야 해요.";
+    /** 원하는 시간은 찼지만 같은 날 가까운 시간이 있을 때. 모델이 alternatives를 그대로 제안하게 */
+    static final String ALTERNATIVES_NOTE = "그 시간에는 빈방이 없어요. 같은 길이로 가장 가까운 시간은 alternatives에 있어요. 이 중에서 고르게 제안해요.";
+    static final int MAX_ALTERNATIVES = 3;
     static final String TOO_MANY = "한 방에 들어갈 수 없는 인원이라 인원을 줄이거나 두 방으로 나눠야 해요.";
 
     private final RoomAvailabilityPort port;
+    private final Clock clock;
+
+    @Autowired
+    public FindAvailableRooms(RoomAvailabilityPort port, Clock clock) {
+        this.port = port;
+        this.clock = clock;
+    }
 
     public FindAvailableRooms(RoomAvailabilityPort port) {
-        this.port = port;
+        this(port, Clock.systemUTC());
     }
 
     /**
@@ -47,6 +62,7 @@ public class FindAvailableRooms {
         OffsetDateTime windowEnd = to == null ? null : crossesMidnight ? at(date.plusDays(1), LocalTime.MIDNIGHT) : at(date, to);
 
         List<FreeRoom> rooms = new ArrayList<>();
+        List<Alternative> candidates = new ArrayList<>();
         boolean anyRoomFitsHeadcount = false;
         for (RoomSlots room : day.rooms()) {
             if (headcount != null && (headcount < room.minPeople() || headcount > room.maxPeople())) {
@@ -56,6 +72,9 @@ public class FindAvailableRooms {
             List<FreeRange> free = merge(room.slots());
             if (windowStart != null && windowEnd != null) {
                 if (free.stream().noneMatch(r -> !r.startAt().isAfter(windowStart) && !r.endAt().isBefore(windowEnd))) {
+                    if (!crossesMidnight) {
+                        candidates.addAll(nearest(room, free, windowStart, Duration.between(windowStart, windowEnd)));
+                    }
                     continue;
                 }
             } else if (windowStart != null) {
@@ -67,13 +86,64 @@ public class FindAvailableRooms {
                 rooms.add(new FreeRoom(room.roomId(), room.roomName(), room.minPeople(), room.maxPeople(), free));
             }
         }
-        String note = rooms.isEmpty()
+        List<Alternative> alternatives = rooms.isEmpty() ? pick(candidates, windowStart) : List.of();
+        String note = rooms.isEmpty() && !alternatives.isEmpty() ? ALTERNATIVES_NOTE
+                : rooms.isEmpty()
                 ? (headcount != null && !anyRoomFitsHeadcount && !day.rooms().isEmpty()
                         ? HEADCOUNT_NOTE.formatted(headcount, capacities(day.rooms()),
                                 headcount > day.rooms().stream().mapToInt(RoomSlots::maxPeople).max().orElse(0) ? TOO_MANY : TOO_FEW)
                         : NONE_NOTE)
                 : crossesMidnight ? MIDNIGHT_NOTE : null;
-        return new AvailableRooms(day.date(), rooms, note);
+        return new AvailableRooms(day.date(), rooms, note, alternatives);
+    }
+
+    /**
+     * 한 방에서 원하는 길이가 들어가는 빈 구간마다, 원하는 시작에 가장 가까운 시작 하나.
+     * 이미 지난 시각은 빼고, 구간 경계가 30분 칸이라 시작도 30분 칸에 맞는다.
+     */
+    private List<Alternative> nearest(RoomSlots room, List<FreeRange> free, OffsetDateTime wanted, Duration length) {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        List<Alternative> found = new ArrayList<>();
+        for (FreeRange r : free) {
+            OffsetDateTime earliest = r.startAt().isBefore(now) ? ceilToSlot(now, r.startAt()) : r.startAt();
+            OffsetDateTime latest = r.endAt().minus(length);
+            if (latest.isBefore(earliest)) {
+                continue;
+            }
+            OffsetDateTime start = wanted.isBefore(earliest) ? earliest : wanted.isAfter(latest) ? latest : wanted;
+            found.add(new Alternative(room.roomId(), room.roomName(), start, start.plus(length)));
+        }
+        return found;
+    }
+
+    /** 지난 시각 now를 구간 시작 기준 30분 칸으로 올린다 */
+    private static OffsetDateTime ceilToSlot(OffsetDateTime now, OffsetDateTime base) {
+        long minutes = Duration.between(base, now).toMinutes();
+        long slots = (minutes + 29) / 30;
+        OffsetDateTime t = base.plusMinutes(slots * 30);
+        return t.isBefore(now) ? t.plusMinutes(30) : t;
+    }
+
+    /** 원하는 시작에서 가까운 순(같으면 이른 것, 그다음 방 번호), 같은 시작은 한 번만, 최대 3개 */
+    private static List<Alternative> pick(List<Alternative> candidates, OffsetDateTime wanted) {
+        if (wanted == null) {
+            return List.of();
+        }
+        List<Alternative> sorted = candidates.stream()
+                .sorted(Comparator.comparingLong((Alternative a) -> Math.abs(Duration.between(wanted, a.startAt()).toMinutes()))
+                        .thenComparing(Alternative::startAt)
+                        .thenComparingInt(Alternative::roomId))
+                .toList();
+        List<Alternative> picked = new ArrayList<>();
+        for (Alternative a : sorted) {
+            if (picked.stream().noneMatch(p -> p.startAt().isEqual(a.startAt()))) {
+                picked.add(a);
+            }
+            if (picked.size() == MAX_ALTERNATIVES) {
+                break;
+            }
+        }
+        return picked;
     }
 
     /** "1번 방 3~5명, 5번 방 5~8명." 모델이 인원 범위를 지어내지 않고 그대로 전하게 */
