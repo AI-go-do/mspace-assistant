@@ -33,6 +33,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,6 +94,7 @@ class ChatControllerTest {
     final ConversationMemory memory = mock(ConversationMemory.class);
     MockMvc mvc;
     final ReadTimetableImage timetable = mock(ReadTimetableImage.class);
+    final DailyBriefing dailyBriefing = mock(DailyBriefing.class);
 
     @BeforeEach
     void setUp() {
@@ -101,7 +103,7 @@ class ChatControllerTest {
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
         ChatController controller = new ChatController(agent, mock(ConfirmationGateway.class),
                 mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory,
-                timetable);
+                timetable, dailyBriefing);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
                 .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms"), List.of(), List.of()));
@@ -282,5 +284,28 @@ class ChatControllerTest {
         when(timetable.read(eq("application/pdf"), any())).thenThrow(new LlmException("LLM_UNAVAILABLE", "사진을 읽지 못했어요."));
         mvc.perform(multipart("/api/agent/schedule/parse").file(pdf).header("Authorization", "Bearer owner"))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("LLM_UNAVAILABLE"));
+    }
+    @Test
+    @DisplayName("오늘 브리핑: 로그인 헤더로 GET → 200 text·hints, 없으면 401이고 도구를 부르지 않는다")
+    void briefing() throws Exception {
+        // given
+        when(dailyBriefing.today(any(UserHeaders.class))).thenReturn(new DailyBriefing.Briefing("2026-11-06", "금",
+                "2026-11-06T08:00:00+09:00", new DailyBriefing.Schedule(List.of(), null, "아직 넣은 시간표가 없어요."),
+                new DailyBriefing.Reservations(List.of(), null), new DailyBriefing.Rooms(List.of("2번 방"), "10:00", null),
+                "11월 6일 금요일 브리핑이에요. …", List.of("OPEN_SCHEDULE")));
+
+        // when
+        var ok = mvc.perform(get("/api/agent/briefing").header("Authorization", "Bearer owner"));
+        var anonymous = mvc.perform(get("/api/agent/briefing"));
+
+        // then
+        ok.andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.text").value("11월 6일 금요일 브리핑이에요. …"))
+                .andExpect(jsonPath("$.rooms.availableNames[0]").value("2번 방"))
+                .andExpect(jsonPath("$.hints[0]").value("OPEN_SCHEDULE"));
+        anonymous.andExpect(status().isUnauthorized());
+        verify(dailyBriefing).today(any(UserHeaders.class));
+        verifyNoMoreInteractions(dailyBriefing);
     }
 }
