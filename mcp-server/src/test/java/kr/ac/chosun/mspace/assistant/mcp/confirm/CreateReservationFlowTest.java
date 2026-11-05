@@ -75,9 +75,13 @@ class CreateReservationFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("모델이 시각에 오프셋을 빼고 보내도 서울 시간으로 보고 확인안을 만든다")
     void acceptsTimeWithoutOffset() {
+        // given: 모델이 오프셋(+09:00)을 빼고 보낸다
+
+        // when
         CallToolResult result = call(ME, "create_reservation", Map.of("roomId", 1,
                 "startAt", "2026-11-03T14:00", "endAt", "2026-11-03T16:00:00", "headcount", 3));
 
+        // then
         assertThat(result.isError()).isFalse();
         assertThat(text(result)).contains("1번 방, 11월 3일(화) 14:00–16:00, 3명으로 예약할까요?");
         core.verify(0, postRequestedFor(urlEqualTo("/api/reservations")));
@@ -86,9 +90,13 @@ class CreateReservationFlowTest extends McpToolTestSupport {
     @Test
     @DisplayName("시각 형식이 아예 틀리면 400 안내를 돌려준다")
     void rejectsMalformedTime() {
+        // given: ISO-8601이 아닌 시각
+
+        // when
         CallToolResult result = call(ME, "create_reservation", Map.of("roomId", 1,
                 "startAt", "내일 2시", "endAt", "2026-11-03T16:00", "headcount", 3));
 
+        // then
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("시작·끝 시각");
     }
