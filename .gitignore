@@ -21,3 +21,7 @@ build/
 
 # OS
 .DS_Store
+
+# Python (scripts/measure)
+__pycache__/
+*.pyc
