@@ -20,7 +20,7 @@ public record ChatJobProperties(int workers, int queueCapacity, Duration resultT
         workers = workers <= 0 ? 4 : workers;
         queueCapacity = queueCapacity <= 0 ? 20 : queueCapacity;
         resultTtl = resultTtl == null ? Duration.ofMinutes(5) : resultTtl;
-        pendingTtl = pendingTtl == null ? Duration.ofMinutes(3) : pendingTtl;
+        pendingTtl = pendingTtl == null ? Duration.ofMinutes(5) : pendingTtl;
         pollAfter = pollAfter == null ? Duration.ofSeconds(1) : pollAfter;
     }
 }

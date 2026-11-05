@@ -58,7 +58,9 @@ public class ChatJobs implements AutoCloseable {
         }
     }
 
-    private record Job(String owner, Instant createdAt, AtomicReference<View> view, AtomicReference<Instant> doneAt) {
+    /** startedAt: 작업 스레드가 집어 든 시각. 돌기 시작한 작업은 pendingTtl로 지우지 않는다 (AgentLoop 기한이 끝을 보장) */
+    private record Job(String owner, Instant createdAt, AtomicReference<Instant> startedAt, AtomicReference<View> view,
+                       AtomicReference<Instant> doneAt) {
     }
 
     private final Map<String, Job> jobs = new ConcurrentHashMap<>();
@@ -99,7 +101,7 @@ public class ChatJobs implements AutoCloseable {
         if (running != null) {
             return new Submitted.Rejected("CHAT_IN_PROGRESS", "앞의 질문에 아직 답하는 중이에요. 답이 온 뒤에 다시 보내 주세요.");
         }
-        Job job = new Job(owner, clock.instant(),
+        Job job = new Job(owner, clock.instant(), new AtomicReference<>(),
                 new AtomicReference<>(new View(jobId, Status.PENDING, null, null)), new AtomicReference<>());
         jobs.put(jobId, job);
         try {
@@ -124,8 +126,18 @@ public class ChatJobs implements AutoCloseable {
         return Optional.of(job.view().get());
     }
 
+    /** sweep()이 시작 전 접수를 만료시켰다는 표시. 실제 시각이 아니다 */
+    private static final Instant EXPIRED = Instant.EPOCH;
+
     private void run(String jobId, Job job, Supplier<ChatResult> work) {
-        View done;
+        // 접수·조회가 한동안 없어도 대기열에서 pendingTtl을 넘긴 접수가 여기서 정리되게 먼저 훑는다
+        sweep();
+        // 대기열에서 pendingTtl을 넘겨 이미 지워진 접수는 돌리지 않는다 (아무도 결과를 못 받는데 모델만 부르게 됨)
+        if (jobs.get(jobId) != job || !job.startedAt().compareAndSet(null, clock.instant())) {
+            return;
+        }
+        View done = new View(jobId, Status.FAILED, null,
+                new Failure("AGENT_FAILED", "답을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."));
         try {
             done = new View(jobId, Status.DONE, work.get(), null);
         } catch (LlmException e) {
@@ -135,23 +147,26 @@ public class ChatJobs implements AutoCloseable {
         } catch (RuntimeException e) {
             // 메시지에는 학생 말·토큰이 섞일 수 있어 종류만 남긴다 (CLAUDE.md 4장)
             log.warn("agent chat failed type={}", e.getClass().getSimpleName());
-            done = new View(jobId, Status.FAILED, null,
-                    new Failure("AGENT_FAILED", "답을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."));
+        } finally {
+            // Error(OutOfMemoryError 등)가 나도 PENDING으로 남아 그 학생이 계속 CHAT_IN_PROGRESS가 되지 않게
+            job.view().set(done);
+            job.doneAt().set(clock.instant());
+            runningByOwner.remove(job.owner(), jobId);
         }
-        job.view().set(done);
-        job.doneAt().set(clock.instant());
-        runningByOwner.remove(job.owner(), jobId);
     }
 
-    /** 끝난 지 resultTtl이 지난 결과, 접수한 지 pendingTtl이 지난 미완료 접수를 지운다. 보관 건수가 적어 매번 훑어도 된다 */
+    /** 끝난 지 resultTtl이 지난 결과, 접수한 지 pendingTtl이 지나도록 시작하지 못한 접수를 지운다. 보관 건수가 적어 매번 훑어도 된다 */
     private void sweep() {
         Instant now = clock.instant();
         jobs.entrySet().removeIf(e -> {
             Job job = e.getValue();
             Instant doneAt = job.doneAt().get();
+            // 시작 못 한 접수는 startedAt을 EXPIRED로 바꾸는 데 성공했을 때만 지운다.
+            // run()도 같은 칸을 compareAndSet으로 잡으므로 "시작"과 "만료" 중 하나만 이긴다 (그 사이에 시작된 작업을 지우지 않게)
             boolean expired = doneAt != null
                     ? doneAt.plus(props.resultTtl()).isBefore(now)
-                    : job.createdAt().plus(props.pendingTtl()).isBefore(now);
+                    : job.createdAt().plus(props.pendingTtl()).isBefore(now)
+                            && job.startedAt().compareAndSet(null, EXPIRED);
             if (expired) {
                 runningByOwner.remove(job.owner(), e.getKey());
             }

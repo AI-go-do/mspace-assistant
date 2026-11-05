@@ -16,7 +16,9 @@ mspace:
     # gemini(시연) | ollama(학교 도입)
     provider: ${LLM_PROVIDER:gemini}
     gemini:
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      # 기본 gemini-3.5-flash-lite(무료 한도가 Flash보다 넉넉하다는 포럼 보고가 있음, AI Studio에서 확인). 도구 정확도가 모자라면 GEMINI_MODEL=gemini-3.8-flash
+      # 2.5 계열은 예전에 쓰던 프로젝트만 쓸 수 있다 (ai.google.dev/gemini-api/docs/deprecations, 11/5 확인)
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
       # 키는 .env·GitHub Secrets에만. 비어 있으면 비서는 "준비되지 않았어요"로 답한다
       api-key: ${GEMINI_API_KEY:}
       timeout: 20s
@@ -41,7 +43,8 @@ mspace:
       workers: 4
       queue-capacity: 20
       result-ttl: 5m
-      pending-ttl: 3m
+      # 대기 최악: 대기열 20건 / 처리 4건 = 5바퀴 × 대화 기한 45초 = 225초. 그보다 길게 둬야 받은 접수를 잃지 않는다
+      pending-ttl: 5m
       poll-after: 1s
     # 입력 상한: 말 한 번 글자 수, 모델에 넘길 앞선 대화 수(최근 것만). 무료 할당량을 지킨다
     max-message-chars: 1000
