@@ -39,6 +39,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class ChatController {
 
+    /** AGENT_BUSY(503) 뒤 다시 보낼 때까지 기다릴 초. 대기열이 한 바퀴 도는 시간보다 짧게 둔다 */
+    static final int RETRY_AFTER_SECONDS = 5;
+
     private final AgentLoop agent;
     private final ConfirmationGateway confirmations;
     private final AccessCodeGateway accessCodes;
@@ -91,9 +94,12 @@ class ChatController {
                     .location(URI.create("/api/agent/chat/" + a.jobId()))
                     .cacheControl(CacheControl.noStore())
                     .body(new Accepted(a.jobId(), ChatJobs.Status.PENDING, jobProps.pollAfter().toMillis()));
-            case ChatJobs.Submitted.Rejected r -> error(
-                    "CHAT_IN_PROGRESS".equals(r.code()) ? HttpStatus.CONFLICT : HttpStatus.SERVICE_UNAVAILABLE,
-                    r.code(), r.message());
+            case ChatJobs.Submitted.Rejected r when "CHAT_IN_PROGRESS".equals(r.code()) ->
+                    error(HttpStatus.CONFLICT, r.code(), r.message());
+            // 붐빌 때는 화면이 언제 다시 보낼지 알 수 있게 Retry-After(초)
+            case ChatJobs.Submitted.Rejected r -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .header(HttpHeaders.RETRY_AFTER, String.valueOf(RETRY_AFTER_SECONDS))
+                    .body(error(HttpStatus.SERVICE_UNAVAILABLE, r.code(), r.message()).getBody());
         };
     }
 

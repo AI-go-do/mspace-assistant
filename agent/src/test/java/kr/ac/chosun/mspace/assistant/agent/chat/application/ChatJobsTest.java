@@ -1,6 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -235,12 +236,76 @@ class ChatJobsTest {
     }
 
     @Test
+    @DisplayName("대기열에서 접수 보관 시간을 넘겨 지워진 작업은 나중에 차례가 와도 모델을 부르지 않는다")
+    void expiredQueuedJobDoesNotRun() {
+        // given: 접수만 되고 아직 작업 스레드가 집지 않음
+        ManualExecutor executor = new ManualExecutor();
+        ChatJobs jobs = new ChatJobs(props, clock, executor);
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        jobs.submit(OWNER, () -> {
+            calls.incrementAndGet();
+            return RESULT;
+        });
+        clock.now = clock.now.plus(Duration.ofMinutes(4));
+        jobs.submit(OTHER, () -> RESULT); // 접수하면서 오래된 접수를 정리한다
+
+        // when
+        executor.runAll();
+
+        // then
+        assertThat(calls).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("이미 돌고 있는 작업은 접수 보관 시간이 지나도 지우지 않아, 같은 학생 작업이 두 개 돌지 않는다")
+    void runningJobIsNotSwept() {
+        // given
+        ChatJobs jobs = new ChatJobs(props, clock, direct());
+        java.util.concurrent.atomic.AtomicReference<ChatJobs.Submitted> duringRun = new java.util.concurrent.atomic.AtomicReference<>();
+
+        // when: 작업이 도는 동안 시간이 4분 흐르고 같은 학생이 또 보낸다
+        var first = (ChatJobs.Submitted.Accepted) jobs.submit(OWNER, () -> {
+            clock.now = clock.now.plus(Duration.ofMinutes(4));
+            duringRun.set(jobs.submit(OWNER, () -> RESULT));
+            return RESULT;
+        });
+
+        // then
+        assertThat(duringRun.get()).isInstanceOf(ChatJobs.Submitted.Rejected.class);
+        assertThat(jobs.find(first.jobId(), OWNER)).get().extracting(ChatJobs.View::status).isEqualTo(ChatJobs.Status.DONE);
+    }
+
+    @Test
+    @DisplayName("작업 중 Error가 나도 FAILED로 끝나고 그 학생은 바로 다시 보낼 수 있다")
+    void errorStillFinishes() {
+        // given
+        ManualExecutor executor = new ManualExecutor();
+        ChatJobs jobs = new ChatJobs(props, clock, executor);
+        var accepted = (ChatJobs.Submitted.Accepted) jobs.submit(OWNER, () -> {
+            throw new StackOverflowError();
+        });
+
+        // when: Error는 작업 스레드 밖으로 그대로 나간다(스레드풀이 그 스레드를 새로 만든다)
+        assertThatThrownBy(executor::runAll).isInstanceOf(StackOverflowError.class);
+
+        // then
+        assertThat(jobs.find(accepted.jobId(), OWNER)).get().extracting(ChatJobs.View::status)
+                .isEqualTo(ChatJobs.Status.FAILED);
+        assertThat(jobs.submit(OWNER, () -> RESULT)).isInstanceOf(ChatJobs.Submitted.Accepted.class);
+    }
+
+    @Test
     @DisplayName("주인 키는 토큰 원문이 아니라 해시이고, 헤더 이름 대소문자와 순서에 흔들리지 않는다")
     void ownerKeyIsHash() {
+        // given
+        var sameUserOtherCase = new UserHeaders(Map.of("authorization", "Bearer owner"));
+
+        // when
         String key = ChatJobs.ownerKey(OWNER);
 
+        // then
         assertThat(key).hasSize(64).doesNotContain("owner");
-        assertThat(ChatJobs.ownerKey(new UserHeaders(Map.of("authorization", "Bearer owner")))).isEqualTo(key);
+        assertThat(ChatJobs.ownerKey(sameUserOtherCase)).isEqualTo(key);
         assertThat(ChatJobs.ownerKey(OTHER)).isNotEqualTo(key);
     }
 
