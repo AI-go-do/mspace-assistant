@@ -130,6 +130,8 @@ public class ChatJobs implements AutoCloseable {
     private static final Instant EXPIRED = Instant.EPOCH;
 
     private void run(String jobId, Job job, Supplier<ChatResult> work) {
+        // 접수·조회가 한동안 없어도 대기열에서 pendingTtl을 넘긴 접수가 여기서 정리되게 먼저 훑는다
+        sweep();
         // 대기열에서 pendingTtl을 넘겨 이미 지워진 접수는 돌리지 않는다 (아무도 결과를 못 받는데 모델만 부르게 됨)
         if (jobs.get(jobId) != job || !job.startedAt().compareAndSet(null, clock.instant())) {
             return;
