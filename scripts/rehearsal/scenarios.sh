@@ -37,7 +37,7 @@ for r in rs:
   return $rc
 }
 # 확인 요청이 시간 초과되면 서버에서는 계속 처리돼 정리 뒤에 예약이 생길 수 있다. 그 표시 파일
-CONFIRM_TIMEOUT_MARK=$(mktemp)
+CONFIRM_TIMEOUT_MARK=$(mktemp) && [ -n "$CONFIRM_TIMEOUT_MARK" ] || { echo "임시 파일을 만들 수 없어 시나리오를 돌리지 않아요" >&2; exit 1; }
 rm -f "$CONFIRM_TIMEOUT_MARK"
 on_exit() {
   local st=$?
@@ -53,7 +53,7 @@ on_exit() {
 trap on_exit EXIT
 # 채팅은 접수(202 + jobId) → 결과 조회(폴링). 예전 agent(바로 결과)도 그대로 받는다. 결과 JSON만 출력한다
 chat() {
-  local r id deadline
+  local r id deadline rc
   # 요청마다 5초, 전체 폴링은 POLL_LIMIT초(기본 90)까지. agent가 응답 없이 붙잡아도 정리(trap)까지 간다
   r=$(curl -s --max-time 5 -X POST "$AGENT/api/agent/chat" -H "X-User-Id: $1" -H 'Content-Type: application/json' \
     -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1],"history":[]}))' "$2")")
@@ -62,19 +62,21 @@ chat() {
   deadline=$((SECONDS + ${POLL_LIMIT:-90}))
   while [ "$SECONDS" -lt "$deadline" ]; do
     sleep 1
-    r=$(curl -s --max-time 5 "$AGENT/api/agent/chat/$id" -H "X-User-Id: $1")
+    r=$(curl -s --max-time 5 "$AGENT/api/agent/chat/$id" -H "X-User-Id: $1"); rc=$?
+    # 조회 한 번이 시간 초과(curl 28)면 전체 기한 안에서 다시 묻는다. 그 밖의 오류 응답은 바로 돌려준다
+    [ "$rc" = 28 ] && continue
     case "$(echo "$r" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))' 2>/dev/null)" in
       DONE) echo "$r" | python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin)["result"],ensure_ascii=False))'; return ;;
-      # 조회 한 번이 시간 초과(빈 응답)여도 전체 기한 안에서는 다시 묻는다
-      PENDING|"") ;;
-      *) echo "$r"; return ;;
+      PENDING) ;;
+      *) echo "${r:-{\"code\":\"POLL_FAILED\",\"curlExit\":$rc\}}"; return ;;
     esac
   done
   echo '{"code":"POLL_TIMEOUT"}'
 }
 confirm() {
   curl -s --max-time 10 -X POST "$AGENT/api/agent/confirmations/$2" -H "X-User-Id: $1" -H 'Content-Type: application/json' -d "$3" \
-    || { touch "$CONFIRM_TIMEOUT_MARK"; echo '{"code":"CONFIRM_TIMEOUT"}'; }
+    || { touch "$CONFIRM_TIMEOUT_MARK" || echo "확인 시간 초과 표시를 남기지 못했어요. 끝난 뒤 OWNER 예약을 직접 확인해 주세요" >&2
+         echo '{"code":"CONFIRM_TIMEOUT"}'; }
 }
 j() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1"; }
 
