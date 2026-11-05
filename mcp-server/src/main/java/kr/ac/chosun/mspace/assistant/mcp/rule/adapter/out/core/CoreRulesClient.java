@@ -20,8 +20,8 @@ class CoreRulesClient implements UsageRulesPort {
     @Override
     public UsageRules find(UserCredential credential) {
         UsageRules rules = core.call("GET /api/rules", credential, rest -> rest.get().uri("/api/rules"), UsageRules.class);
-        if (rules == null || rules.reservation() == null) {
-            // 규칙을 모르면 지어내지 않게 오류로 돌려준다
+        if (rules == null || !rules.complete()) {
+            // 규칙을 모르면 지어내지 않게 오류로 돌려준다 (숫자 하나라도 빠지면 0으로 안내하지 않게)
             throw new CoreApiException(CoreHttp.BAD_RESPONSE, "이용 규칙을 불러오지 못했어요. 앱의 이용 규칙 화면을 확인해 주세요.", 502);
         }
         return rules;

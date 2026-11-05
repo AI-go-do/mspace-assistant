@@ -16,12 +16,37 @@ public record UsageRules(Reservation reservation, List<Conduct> conduct, Reminde
      * @param noShowMinutes            미리 예약 입실 기한(분)
      * @param instantNoShowMinutes     지금 바로 쓰기 입실 기한(분)
      */
-    public record Reservation(int bookingWindowDays, int slotMinutes, int maxMinutes, int checkinOpenBeforeMinutes,
-                              int noShowMinutes, int instantNoShowMinutes, Extension extension) {
+    public record Reservation(Integer bookingWindowDays, Integer slotMinutes, Integer maxMinutes,
+                              Integer checkinOpenBeforeMinutes, Integer noShowMinutes, Integer instantNoShowMinutes,
+                              Extension extension) {
     }
 
     /** 연장: 횟수, 종료 몇 분 전부터, 한 번에 최대(분), 이어진 사용으로 보는 간격(분) */
-    public record Extension(int maxCount, int openBeforeMinutes, int maxMinutes, int chainGapMinutes) {
+    public record Extension(Integer maxCount, Integer openBeforeMinutes, Integer maxMinutes, Integer chainGapMinutes) {
+    }
+
+    /**
+     * 숫자가 하나라도 빠졌는지. 숫자를 int로 받으면 빠진 값이 0이 되어 "0분 안에 입실" 같은 틀린 안내가 나가므로
+     * Integer로 받고 여기서 걸러 낸다.
+     */
+    public boolean complete() {
+        if (reservation == null) {
+            return false;
+        }
+        Reservation r = reservation;
+        Extension e = r.extension();
+        return allPresent(r.bookingWindowDays(), r.slotMinutes(), r.maxMinutes(), r.checkinOpenBeforeMinutes(),
+                r.noShowMinutes(), r.instantNoShowMinutes())
+                && e != null && allPresent(e.maxCount(), e.openBeforeMinutes(), e.maxMinutes(), e.chainGapMinutes());
+    }
+
+    private static boolean allPresent(Integer... values) {
+        for (Integer v : values) {
+            if (v == null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** 이용 수칙 한 줄: 구분(key), 제목, 수칙, 어기면 */

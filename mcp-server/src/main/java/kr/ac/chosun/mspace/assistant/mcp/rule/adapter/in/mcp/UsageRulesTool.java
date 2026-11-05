@@ -21,7 +21,7 @@ class UsageRulesTool {
             description = """
                     M-SPACE 이용 규칙을 돌려준다. "음식 먹어도 돼?", "노쇼하면 어떻게 돼?", "며칠 전부터 예약돼?",
                     "연장 몇 번 돼?"처럼 규칙·벌칙을 물을 때 쓴다. 입력은 없다.
-                    reservation은 예약 숫자(미리 예약 일수, 30분 단위, 1회 최대 분, 입실 기한 분, 연장 규칙),
+                    reservation은 예약 숫자(미리 예약 일수, 예약 단위 분, 1회 최대 분, 입실 기한 분, 연장 규칙),
                     conduct는 이용 수칙(title·rule·penalty), reminders는 체크인·퇴실 때 한 줄 안내다.
                     규칙은 이 결과에 있는 것만 말하고, 없는 규칙은 지어내지 않고 모른다고 한다.""",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))

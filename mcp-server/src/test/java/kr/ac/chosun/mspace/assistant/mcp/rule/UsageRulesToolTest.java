@@ -62,11 +62,30 @@ class UsageRulesToolTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("core가 빈 본문을 주면 규칙을 지어내지 않게 오류로 안내한다")
-    void emptyBodyIsError() {
+    @DisplayName("core 응답에 reservation이 없으면 규칙을 지어내지 않게 오류로 안내한다")
+    void missingReservationIsError() {
         // given
         core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json").withBody("{}")));
+
+        // when
+        CallToolResult result = call(USER, "usage_rules", Map.of());
+
+        // then
+        assertThat(result.isError()).isTrue();
+        assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
+    }
+
+    @Test
+    @DisplayName("core 응답에 숫자가 하나라도 빠지면 0으로 안내하지 않고 오류로 안내한다")
+    void missingNumberIsError() {
+        // given: noShowMinutes가 빠진 응답
+        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody("""
+                        {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
+                          "checkinOpenBeforeMinutes":10,"instantNoShowMinutes":10,
+                          "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
+                         "conduct":[],"reminders":{"checkin":"a","checkout":"b"}}""")));
 
         // when
         CallToolResult result = call(USER, "usage_rules", Map.of());
