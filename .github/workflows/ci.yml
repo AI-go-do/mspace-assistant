@@ -73,6 +73,30 @@ jobs:
             -Dsonar.host.url="$SONAR_HOST_URL" \
             -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
 
+      # 3) 게이트가 실패하면 어떤 조건이 걸렸는지 로그에 바로 찍는다. 학교 SonarQube 대시보드는 학교 밖에서 안 열려서
+      #    로그만 보고 고칠 수 있게 한다. 출력은 조건 이름·값·기준, 새 코드 이슈의 규칙·파일·줄·문장뿐 (토큰은 안 찍힘)
+      - name: SonarQube 품질 게이트 실패 이유
+        if: failure() && github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          [ -z "$SONAR_TOKEN" ] && exit 0
+          api() { curl -sS -m 30 -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/$1"; }
+          echo "== 품질 게이트 조건 (ERROR가 걸린 조건)"
+          api "qualitygates/project_status?projectKey=mspace-assistant" \
+            | jq -r '.projectStatus.conditions[] | "\(.status)\t\(.metricKey)\t실제=\(.actualValue // "-")\t기준 \(.comparator) \(.errorThreshold)"'
+          echo "== 새 코드 이슈 (최대 100건)"
+          api "issues/search?componentKeys=mspace-assistant&inNewCodePeriod=true&resolved=false&ps=100" \
+            | jq -r '"총 \(.total)건", (.issues[] | "\(.severity)\t\(.rule)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")'
+          echo "== 검토 안 된 보안 핫스팟 (새 코드)"
+          api "hotspots/search?projectKey=mspace-assistant&inNewCodePeriod=true&status=TO_REVIEW&ps=100" \
+            | jq -r '"총 \(.paging.total)건", (.hotspots[] | "\(.vulnerabilityProbability)\t\(.ruleKey)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")'
+          echo "== 새 코드에서 커버리지가 낮은 파일 (상위 15)"
+          api "measures/component_tree?component=mspace-assistant&metricKeys=new_coverage,new_uncovered_lines,new_uncovered_conditions&qualifiers=FIL&ps=500" \
+            | jq -r '[.components[] | {p: .path, m: ([.measures[] | {(.metric): (.period.value // .value)}] | add)} | select(.m.new_coverage != null)]
+                     | sort_by(.m.new_coverage | tonumber) | .[:15][] | "\(.m.new_coverage)%\t안 덮인 줄 \(.m.new_uncovered_lines // "-")\t조건 \(.m.new_uncovered_conditions // "-")\t\(.p)"'
+
       - name: 테스트 결과 보관
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
