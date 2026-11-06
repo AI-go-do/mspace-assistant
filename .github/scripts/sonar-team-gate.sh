@@ -63,10 +63,11 @@ fi
 if [ -n "$duplication" ] && awk -v a="$duplication" -v b="$MAX_DUPLICATION" 'BEGIN{exit !(a > b)}'; then
   echo "실패: 새 코드 중복이 ${MAX_DUPLICATION}%보다 높아요"; fail=1
 fi
-if [ -n "$rel" ] && awk -v a="$rel" 'BEGIN{exit !(a > 1)}'; then
+# 등급 값이 비어 있어도 건수로 한 번 더 본다
+if { [ -n "$rel" ] && awk -v a="$rel" 'BEGIN{exit !(a > 1)}'; } || awk -v a="${bugs:-0}" 'BEGIN{exit !(a > 0)}'; then
   echo "실패: 새 코드에 버그가 있어요 (신뢰성 등급 A 아님). 대시보드 Issues에서 유형 Bug를 보세요"; fail=1
 fi
-if [ -n "$sec" ] && awk -v a="$sec" 'BEGIN{exit !(a > 1)}'; then
+if { [ -n "$sec" ] && awk -v a="$sec" 'BEGIN{exit !(a > 1)}'; } || awk -v a="${vulns:-0}" 'BEGIN{exit !(a > 0)}'; then
   echo "실패: 새 코드에 취약점이 있어요 (보안 등급 A 아님). 대시보드 Issues에서 유형 Vulnerability를 보세요"; fail=1
 fi
 [ "$fail" = 0 ] && echo "팀 규칙 품질 게이트 통과"
