@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: mspace-assistant-mcp
+  data:
+    redis:
+      # SCHEDULE_STORE=redis일 때만 쓴다. compose에서는 agent와 같은 redis://redis:6379
+      url: ${REDIS_URL:redis://localhost:6379}
+      connect-timeout: 2s
+      timeout: 2s
+  ai:
+    mcp:
+      server:
+        name: mspace-assistant
+        version: 0.0.1
+        type: SYNC
+        protocol: STREAMABLE          # POST /mcp 하나로 주고받는다 (SSE 방식은 2.0에서 권장하지 않음)
+        instructions: "조선대 IT융합대학 M-SPACE 학습공간 예약 도구. 시각은 서울 시간(+09:00)."
+
+server:
+  port: ${SERVER_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    redis:
+      # memory 모드에서는 Redis가 없으니 health에 넣지 않는다
+      enabled: false
+
+mspace:
+  core:
+    base-url: ${CORE_BASE_URL:http://localhost:8080}
+    # 학생 본인 토큰만 넘긴다. X-User-Id(로그인 붙기 전 임시)는 local 프로필에서만 켠다 (application-local.yml)
+    forward-headers:
+      - Authorization
+    timeout: 3s
+    # core가 다른 서버에 있어 공용 구간을 지나면 true (#44). 같은 호스트의 compose(http://core:8080)·localhost는 false로 둔다
+    require-https: ${CORE_REQUIRE_HTTPS:false}
+  # 쓰기 도구 확인 토큰. 짧게 두어 오래된 확인안이 실행되지 않게 한다
+  confirm:
+    ttl: 2m
+  # 연장하기(FR-RSV-105). core 규칙과 같은 값. core가 최종 판정하고 여기서는 확인안 전에 먼저 거른다
+  continue:
+    open-before-minutes: 10
+    max-minutes: 120
+    slot-minutes: 30
+
+  # 학생이 직접 넣은 수업 시간표 (#63, 설계 5장). my_schedule 도구가 읽는다
+  schedule:
+    # memory: mcp-server 1대 메모리(재시작하면 사라짐) | redis: 위 spring.data.redis.url (키 agent:schedule:<학생 키>, TTL 없음)
+    store: ${SCHEDULE_STORE:memory}
+    # 마지막 수업이 끝나고 방까지 옮겨 갈 여유. searchFromAt = 끝 + 여유를 다음 30분 칸으로 올림 (14:50 → 15:30)
+    buffer-minutes: 30
+    slot-minutes: 30
+    max-classes: 40
+    max-name-chars: 30
+    # week_plan: 오늘부터 며칠을, 수업 없는 날은 몇 시부터 볼지
+    plan-days: 7
+    plan-from-time: "09:00"
+
+logging:
+  level:
+    # MCP 요청 본문(사용자 말이 들어 있을 수 있음)을 로그에 남기지 않게 SDK 로그는 경고 이상만
+    io.modelcontextprotocol: WARN
+    # 확인 API 본문(참여자 학번)·core 응답(입실 번호)이 DEBUG 로그에 찍히지 않게 고정 (CLAUDE.md 4장)
+    org.springframework.web: INFO
+    org.springframework.http: INFO

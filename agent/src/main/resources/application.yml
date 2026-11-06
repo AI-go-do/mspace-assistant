@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: mspace-assistant-agent
+  data:
+    redis:
+      # MEMORY_STORE=redis일 때만 쓴다. compose에서는 redis://redis:6379
+      url: ${REDIS_URL:redis://localhost:6379}
+      connect-timeout: 2s
+      timeout: 2s
+
+spring.servlet.multipart:
+  # 시간표 캡처 읽기(POST /api/agent/schedule/parse). 5MB 넘으면 400
+  max-file-size: 5MB
+  max-request-size: 6MB
+
+server:
+  port: ${SERVER_PORT:8091}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    redis:
+      # memory 모드에서는 Redis가 없으니 health에 넣지 않는다. 기억은 보조라 redis 모드에서도 죽어도 대화는 된다 (RedisConversationMemory)
+      enabled: false
+
+mspace:
+  llm:
+    # gemini(시연) | ollama(학교 도입)
+    provider: ${LLM_PROVIDER:gemini}
+    gemini:
+      # 기본 gemini-3.5-flash-lite(무료 한도가 Flash보다 넉넉하다는 포럼 보고가 있음, AI Studio에서 확인). 도구 정확도가 모자라면 GEMINI_MODEL=gemini-3.8-flash
+      # 2.5 계열은 예전에 쓰던 프로젝트만 쓸 수 있다 (ai.google.dev/gemini-api/docs/deprecations, 11/5 확인)
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+      # 키는 .env·GitHub Secrets에만. 비어 있으면 비서는 "준비되지 않았어요"로 답한다
+      api-key: ${GEMINI_API_KEY:}
+      timeout: 20s
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:qwen2.5:7b}
+      # GPU 없는 서버에서 7b는 첫 응답이 30~90초 걸릴 수 있다(추정). 그러면 작은 모델로 바꿔 시간을 잰다 (#9)
+      timeout: 40s
+      connect-timeout: 5s
+  agent:
+    mcp-server-url: ${MCP_SERVER_URL:http://localhost:8090}
+    # 학생 본인 토큰만 넘긴다. X-User-Id(로그인 붙기 전 임시)는 local 프로필에서만 켠다 (application-local.yml)
+    forward-headers:
+      - Authorization
+    # 대화 한 번에 도구 호출 최대 횟수. 넘으면 멈추고 알린다 (CLAUDE.md 4장)
+    max-tool-calls: 8
+    timeout: 10s
+    # 대화 한 번 전체 시간 상한. 넘으면 지금까지의 확인 카드와 함께 멈춘다 (결과는 폴링으로 받아 nginx 제한과 무관)
+    chat-timeout: 45s
+    # 채팅 접수 → 결과 조회(폴링). 메모리 보관이라 agent 인스턴스 1대 기준
+    jobs:
+      workers: 4
+      queue-capacity: 20
+      result-ttl: 5m
+      # 대기 최악: 대기열 20건 / 처리 4건 = 5바퀴 × 대화 기한 45초 = 225초. 그보다 길게 둬야 받은 접수를 잃지 않는다
+      pending-ttl: 5m
+      poll-after: 1s
+    # 입력 상한: 말 한 번 글자 수, 모델에 넘길 앞선 대화 수(최근 것만). 무료 할당량을 지킨다
+    max-message-chars: 1000
+    max-history-turns: 20
+    # 대화 맥락을 서버가 기억한다 (11/5 멘토 제안). 가린 글·도구 호출·결과를 학생(토큰 sub)별로 보관.
+    # 기본은 메모리(agent 1대, 재시작하면 사라짐). Redis로 바꾸면 TTL은 Redis가 지운다
+    memory:
+      enabled: true
+      # memory: agent 1대 메모리(재시작하면 사라짐) | redis: 아래 spring.data.redis.url (11/5 결정, compose에 redis 추가)
+      store: ${MEMORY_STORE:memory}
+      ttl: 24h
+      # 보관·모델에 넘길 대화 글자 수 상한 (도구 결과 포함). 넘으면 오래된 차례부터 버린다
+      max-chars: 20000
+    # 지시문에 넣는 예약 규칙. core 설정(mspace.reservation)과 같은 값으로 둔다
+    rules:
+      slot-minutes: 30
+      max-hours: 2
+      advance-days: 7
+
+logging:
+  level:
+    # 요청·응답 본문(참여자 학번, 입실 번호, 학생 말)이 DEBUG 로그에 찍히지 않게 고정한다.
+    # root를 DEBUG로 올려도 이 패키지들은 INFO/WARN에 머문다 (CLAUDE.md 4장)
+    org.springframework.web: INFO
+    org.springframework.http: INFO
+    io.modelcontextprotocol: WARN

@@ -3,10 +3,15 @@
 .env.*
 !.env.example
 
-# Gradle / Java
+# Maven / Java
+target/
+
+# Gradle (쓰지 않지만 실수로 생긴 파일 방지)
 .gradle/
 build/
-out/
+# IntelliJ 출력 폴더. 앞에 / 를 붙여 루트만 무시 (adapter/out 패키지가 무시되던 문제)
+/out/
+*/out/production/
 *.class
 
 # IDE
@@ -16,3 +21,7 @@ out/
 
 # OS
 .DS_Store
+
+# Python (scripts/measure)
+__pycache__/
+*.pyc

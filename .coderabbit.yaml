@@ -1,0 +1,24 @@
+# CodeRabbit AI 리뷰 설정. 팀 규칙상 "참고용"이라 승인·변경 요청은 하지 않고 댓글만 단다
+language: ko-KR
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - develop
+      - main
+  path_instructions:
+    - path: "**/*.java"
+      instructions: |
+        Java 21, Spring Boot 4.1, Jackson 3(tools.jackson)을 쓴다. com.fasterxml.jackson.databind, @MockBean 같은 예전 방식을 지적한다.
+        이 레포는 AI 비서다. 다음을 특히 본다:
+        - 로그에 사용자 말 원문, 토큰, 이름·학번·전화번호, 6자리 입실 번호가 남는지
+        - 모델(외부 AI)로 가는 도구 결과에 위 개인정보가 들어가는지
+        - 관리자 토큰이나 공용 토큰으로 예약 코어를 부르는지 (사용자 본인 헤더만 넘겨야 한다)
+        - 쓰기 도구가 확인 토큰 없이 바로 실행되는지
+    - path: "**/src/test/**"
+      instructions: "@DisplayName은 한국어, given/when/then 구분. 테스트를 끄거나 건너뛰는 변경은 지적한다."
