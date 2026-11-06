@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
@@ -98,6 +100,7 @@ class ChatControllerTest {
     final DailyBriefing dailyBriefing = mock(DailyBriefing.class);
     final ConfirmationGateway confirmations = mock(ConfirmationGateway.class);
     final ConfirmationFollowUp followUp = mock(ConfirmationFollowUp.class);
+    final InMemoryPersonaStore personas = new InMemoryPersonaStore();
 
     @BeforeEach
     void setUp() {
@@ -106,7 +109,7 @@ class ChatControllerTest {
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
         ChatController controller = new ChatController(agent, confirmations, followUp,
                 mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory,
-                timetable, dailyBriefing);
+                timetable, dailyBriefing, personas);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
                 .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms"), List.of(), List.of()));
@@ -327,5 +330,36 @@ class ChatControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.suggestions[0]").value("입실 번호 보여 줘"));
+    }
+
+    @Test
+    @DisplayName("비서 성향: 고른 적 없으면 기본(알아서), PUT으로 바꾸면 그 학생만 바뀌고 GET에 선택지 3개가 같이 온다")
+    void persona() throws Exception {
+        mvc.perform(get("/api/agent/persona")).andExpect(status().isUnauthorized());
+
+        mvc.perform(get("/api/agent/persona").header("Authorization", "Bearer owner"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.style").value("ACTIVE"))
+                .andExpect(jsonPath("$.options.length()").value(3))
+                .andExpect(jsonPath("$.options[2].style").value("NAGGING"));
+
+        mvc.perform(put("/api/agent/persona").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"style\":\"nagging\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.style").value("NAGGING"))
+                .andExpect(jsonPath("$.label").value("잔소리"))
+                .andExpect(header().string("Cache-Control", "no-store"));
+        mvc.perform(get("/api/agent/persona").header("Authorization", "Bearer owner"))
+                .andExpect(jsonPath("$.style").value("NAGGING"));
+        mvc.perform(get("/api/agent/persona").header("Authorization", "Bearer other"))
+                .andExpect(jsonPath("$.style").value("ACTIVE"));
+
+        mvc.perform(put("/api/agent/persona").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"style\":\"LOUD\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PERSONA"));
+        mvc.perform(put("/api/agent/persona").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
     }
 }
