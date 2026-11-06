@@ -9,6 +9,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationFollowUp;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing;
@@ -42,7 +43,8 @@ import org.springframework.web.multipart.MultipartFile;
  *   <li>POST /api/agent/chat: 학생 말을 접수하고 바로 202 + jobId. 에이전트 반복은 뒤에서 돈다</li>
  *   <li>GET /api/agent/chat/{jobId}: 결과 조회(폴링). PENDING이면 pollAfterMs 뒤 다시 부른다. DONE이면 답 + 확인 카드</li>
  *   <li>DELETE /api/agent/chat/history: 서버가 기억한 앞선 대화를 지운다 ("새 대화")</li>
- *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
+ *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음).
+ *       결과는 대화 맥락에 남기고(모델이 "예약됐다"를 알게) 빠른 답장 suggestions를 붙인다</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  *   <li>GET·PUT·DELETE /api/agent/schedule: 내 시간표 화면 → mcp-server /api/schedule/me로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/briefing: 오늘 브리핑(수업·내 예약·지금 빈 방 + 읽어 줄 문장). 모델 없음, 도구 3개 직접 호출</li>
@@ -57,6 +59,7 @@ class ChatController {
 
     private final AgentLoop agent;
     private final ConfirmationGateway confirmations;
+    private final ConfirmationFollowUp followUp;
     private final AccessCodeGateway accessCodes;
     private final ScheduleGateway schedules;
     private final AgentProperties props;
@@ -66,11 +69,13 @@ class ChatController {
     private final ReadTimetableImage timetableImage;
     private final DailyBriefing briefing;
 
-    ChatController(AgentLoop agent, ConfirmationGateway confirmations, AccessCodeGateway accessCodes,
-                   ScheduleGateway schedules, AgentProperties props, ChatJobs jobs, ChatJobProperties jobProps,
-                   ConversationMemory memory, ReadTimetableImage timetableImage, DailyBriefing briefing) {
+    ChatController(AgentLoop agent, ConfirmationGateway confirmations, ConfirmationFollowUp followUp,
+                   AccessCodeGateway accessCodes, ScheduleGateway schedules, AgentProperties props, ChatJobs jobs,
+                   ChatJobProperties jobProps, ConversationMemory memory, ReadTimetableImage timetableImage,
+                   DailyBriefing briefing) {
         this.agent = agent;
         this.confirmations = confirmations;
+        this.followUp = followUp;
         this.accessCodes = accessCodes;
         this.schedules = schedules;
         this.props = props;
@@ -162,10 +167,11 @@ class ChatController {
     @PostMapping("/api/agent/confirmations/{token}")
     ResponseEntity<String> confirm(@PathVariable String token, @RequestHeader HttpHeaders headers,
                                    @RequestBody(required = false) String body) {
-        ConfirmationGateway.Relayed relayed = confirmations.confirm(token, user(headers), body);
+        UserHeaders user = user(headers);
+        ConfirmationGateway.Relayed relayed = confirmations.confirm(token, user, body);
         // 예약 생성 결과에는 입실 번호가 들어 있어 브라우저·프록시가 저장하지 않게 한다
         return ResponseEntity.status(relayed.status()).contentType(MediaType.APPLICATION_JSON)
-                .cacheControl(CacheControl.noStore()).body(relayed.json());
+                .cacheControl(CacheControl.noStore()).body(followUp.record(user, relayed));
     }
 
     /** 입실 번호는 학생 화면으로만 간다. 캐시에 남지 않게 no-store */
