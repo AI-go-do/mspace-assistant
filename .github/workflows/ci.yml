@@ -73,6 +73,18 @@ jobs:
             -Dsonar.host.url="$SONAR_HOST_URL" \
             -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
 
+      # 게이트가 실패하면 어떤 조건(새 코드 커버리지·새 이슈·중복·핫스팟)에 걸렸는지 로그에 남긴다.
+      # 학교 Sonar 서버는 팀 밖(클라우드 작업 환경)에서 대시보드를 못 열 때가 있어서. 토큰 값은 출력하지 않는다
+      - name: 품질 게이트 실패 조건 출력
+        if: failure() && github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=mspace-assistant" \
+            | python3 -c 'import json,sys; s=json.load(sys.stdin)["projectStatus"]; print("게이트:", s["status"]); [print(c["status"], c["metricKey"], "실제", c.get("actualValue"), c["comparator"], c.get("errorThreshold")) for c in s["conditions"]]' \
+            || echo "조건을 읽지 못했어요(토큰에 Browse 권한이 없을 수 있음). 대시보드에서 확인해 주세요."
+
       - name: 테스트 결과 보관
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
