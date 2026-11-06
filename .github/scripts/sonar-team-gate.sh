@@ -53,18 +53,43 @@ check_mine() {
 check_mine
 
 # 2) 새 코드 값 읽기. 새 코드 지표는 period.value에 들어 있다. 덮을 새 줄이 없으면 커버리지 값이 없을 수 있다
-measures=$(api "measures/component?component=$SONAR_PROJECT&metricKeys=new_coverage,new_duplicated_lines_density,new_lines_to_cover,new_violations,new_bugs,new_vulnerabilities,new_reliability_rating,new_security_rating") \
-  || { echo "Sonar 지표를 읽지 못했어요"; exit 1; }
-check_mine
-val() { echo "$measures" | jq -r --arg k "$1" '[.component.measures[] | select(.metric == $k) | (.period.value // .value)][0] // empty'; }
+# 지표는 하나씩 읽는다. 서버에 없는 지표 키가 하나라도 있으면 한꺼번에 읽기가 404로 통째로 실패한다
+# (11-06 #81: "Sonar 지표를 읽지 못했어요"). 못 읽은 지표는 상태 코드와 응답 앞부분을 찍고 빈 값으로 둔다
+val() {
+  local out code
+  out=$(curl -sS -m 30 -u "$SONAR_TOKEN:" -w '\n%{http_code}' \
+        "$SONAR_HOST_URL/api/measures/component?component=$SONAR_PROJECT&metricKeys=$1" 2>&1) || true
+  code=$(echo "$out" | tail -n1)
+  if [ "$code" != "200" ]; then
+    echo "참고: 지표 $1 을(를) 읽지 못했어요 (상태 $code: $(echo "$out" | sed '$d' | head -c 200))" >&2
+    return 0
+  fi
+  echo "$out" | sed '$d' | jq -r --arg k "$1" '[.component.measures[]? | select(.metric == $k) | (.period.value // .value)][0] // empty'
+}
+# 건수 지표(new_bugs·new_vulnerabilities)가 없으면 새 코드 이슈 목록에서 유형 BUG·VULNERABILITY 수를 센다
+# 새 품질 모델(MQR)의 신뢰성·보안 이슈 수는 코드 스멜도 섞여 있어 쓰지 않는다 (코드 스멜은 막지 않는 팀 규칙)
+count_type() {
+  local out code
+  out=$(curl -sS -m 30 -u "$SONAR_TOKEN:" -w '\n%{http_code}' \
+        "$SONAR_HOST_URL/api/issues/search?componentKeys=$SONAR_PROJECT&inNewCodePeriod=true&resolved=false&types=$1&ps=1" 2>&1) || true
+  code=$(echo "$out" | tail -n1)
+  if [ "$code" != "200" ]; then
+    echo "참고: 유형 $1 이슈 수를 읽지 못했어요 (상태 $code: $(echo "$out" | sed '$d' | head -c 200))" >&2
+    return 0
+  fi
+  echo "$out" | sed '$d' | jq -r '.total // empty'
+}
 coverage=$(val new_coverage)
 duplication=$(val new_duplicated_lines_density)
 to_cover=$(val new_lines_to_cover)
 issues=$(val new_violations)
 bugs=$(val new_bugs)
+[ -n "$bugs" ] || bugs=$(count_type BUG)
 vulns=$(val new_vulnerabilities)
+[ -n "$vulns" ] || vulns=$(count_type VULNERABILITY)
 rel=$(val new_reliability_rating)   # 1.0=A … 5.0=E
 sec=$(val new_security_rating)
+check_mine
 
 echo "새 코드 커버리지: ${coverage:-없음}% (기준 ${MIN_COVERAGE}% 이상, 덮을 새 줄 ${to_cover:-0}줄)"
 echo "새 코드 중복: ${duplication:-0}% (기준 ${MAX_DUPLICATION}% 이하)"
