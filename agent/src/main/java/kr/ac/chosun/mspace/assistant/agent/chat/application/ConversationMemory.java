@@ -40,6 +40,13 @@ public interface ConversationMemory {
         return List.of();
     }
 
+    /**
+     * 꺼냈던 글을 되돌려 놓는다 (채팅이 모델 오류로 끝나 저장하지 못했을 때). 그 사이 새로 쌓인 글보다 **앞에** 둬서 순서를 지킨다.
+     * 실패는 예외 없이 넘어간다
+     */
+    default void restoreNotes(String memberKey, List<LlmMessage> notes) {
+    }
+
     /** 저장소에 닿지 못해 지우지 못함. 읽기·저장 실패는 기억 없이 넘어가지만, 지우기 실패는 학생에게 알린다 */
     class Unavailable extends RuntimeException {
         public Unavailable() {

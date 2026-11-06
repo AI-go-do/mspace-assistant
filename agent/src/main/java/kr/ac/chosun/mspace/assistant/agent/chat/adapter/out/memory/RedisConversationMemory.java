@@ -74,6 +74,20 @@ public class RedisConversationMemory implements ConversationMemory {
     }
 
     @Override
+    public void restoreNotes(String memberKey, List<LlmMessage> notes) {
+        if (notes.isEmpty()) {
+            return;
+        }
+        try {
+            String key = NOTES_PREFIX + memberKey;
+            redis.opsForList().leftPush(key, ConversationJson.write(notes)); // 머리에 넣어 그 사이 쌓인 글보다 앞
+            redis.expire(key, props.ttl());
+        } catch (DataAccessException e) {
+            log.warn("conversation note restore failed type={}", e.getClass().getSimpleName());
+        }
+    }
+
+    @Override
     public List<LlmMessage> takeNotes(String memberKey) {
         try {
             List<String> popped = redis.opsForList().leftPop(NOTES_PREFIX + memberKey, MAX_NOTES);

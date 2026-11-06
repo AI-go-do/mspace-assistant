@@ -250,4 +250,32 @@ class ConversationMemoryTest {
         // then
         assertThat(llm.seen.get(1)).containsSequence(note.get(0), note.get(1), new LlmMessage.User("방금 잡은 거 취소해 줘"));
     }
+
+    @Test
+    @DisplayName("모델 오류로 채팅이 실패하면 꺼냈던 미룬 글을 되돌려 놓는다(그 사이 쌓인 글보다 앞). 서버 기억이 없고 미룬 글만 있으면 화면 기록 뒤에 붙인다")
+    void restoresNotesOnFailureAndKeepsClientHistory() {
+        // given
+        var memory = new InMemoryConversationMemory(MEMORY, CLOCK);
+        var tools = new FakeTools(Map.of());
+        List<LlmMessage> first = List.of(new LlmMessage.User("[화면] 확인"), new LlmMessage.Assistant("예약했어요. (예약 7번, BOOKED)", List.of()));
+        List<LlmMessage> second = List.of(new LlmMessage.User("[화면] 확인"), new LlmMessage.Assistant("취소했어요. (예약 7번, CANCELED)", List.of()));
+        var llm = new ScriptedLlm().then(say("답"));
+        llm.beforeReply = () -> {
+            memory.addNote(MemberKey.of(ME), second); // 모델이 도는 동안 또 하나
+            throw new kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException("LLM_UNAVAILABLE", "down");
+        };
+        var loop = loop(llm, tools, memory, 20, 20_000);
+        List<LlmMessage> client = List.of(new LlmMessage.User("화면이 든 옛말"), new LlmMessage.Assistant("옛 답", List.of()));
+        memory.addNote(MemberKey.of(ME), first);
+
+        // when
+        assertThatThrownBy(() -> loop.run(ME, client, "취소해 줘")).isInstanceOf(RuntimeException.class);
+        llm.beforeReply = null;
+        loop.run(ME, client, "다시 취소해 줘");
+
+        // then
+        assertThat(llm.seen.get(0)).containsExactly(client.get(0), client.get(1), first.get(0), first.get(1), new LlmMessage.User("취소해 줘"));
+        assertThat(llm.seen.get(1)).containsExactly(client.get(0), client.get(1), first.get(0), first.get(1), second.get(0), second.get(1),
+                new LlmMessage.User("다시 취소해 줘"));
+    }
 }
