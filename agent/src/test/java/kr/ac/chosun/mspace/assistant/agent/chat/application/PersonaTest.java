@@ -20,6 +20,7 @@ class PersonaTest {
         assertThat(Persona.requested(null)).isEmpty();
         assertThat(Persona.requested("잔소리 모드로 바꾸지 마")).as("부정은 바꾸기 아님").isEmpty();
         assertThat(Persona.requested("조용한 비서는 싫어")).isEmpty();
+        assertThat(Persona.requested("잔소리 모드로 바꾸면 안 돼")).isEmpty();
         assertThat(Persona.requested("잔소리 모드 그만하고 알아서 모드로")).as("뒤에 다른 성향이 있어도 부정이 섞이면 모델에 맡김").isEmpty();
     }
 
@@ -32,5 +33,18 @@ class PersonaTest {
         assertThat(Persona.parse("")).isEmpty();
         assertThat(Persona.DEFAULT).isEqualTo(Persona.ACTIVE);
         assertThat(Persona.all()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("분해형 한글로 쓴 \"잔소리 모드로\"도 잔소리로 바꾼다 (기본 성향으로 잘못 저장하지 않는다)")
+    void decomposedHangul() {
+        // given
+        String decomposed = java.text.Normalizer.normalize("잔소리 모드로 바꿔 줘", java.text.Normalizer.Form.NFD);
+
+        // when
+        var persona = Persona.requested(decomposed);
+
+        // then
+        org.assertj.core.api.Assertions.assertThat(persona).contains(Persona.NAGGING);
     }
 }

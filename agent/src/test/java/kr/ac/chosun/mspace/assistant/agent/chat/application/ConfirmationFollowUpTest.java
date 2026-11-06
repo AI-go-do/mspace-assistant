@@ -30,7 +30,7 @@ class ConfirmationFollowUpTest {
         String body = "{\"action\":\"CREATE\",\"reservationId\":7,\"status\":\"BOOKED\",\"accessCode\":\"483920\",\"replayed\":false,\"message\":\"예약했어요.\"}";
 
         // when
-        String out = followUp.record(ME, new ConfirmationGateway.Relayed(201, body));
+        String out = followUp.remember(ME, new ConfirmationGateway.Relayed(201, body));
 
         // then
         var node = json.readTree(out);
@@ -53,7 +53,7 @@ class ConfirmationFollowUpTest {
         String body = "{\"code\":\"RESERVATION_TIME_TAKEN\",\"message\":\"그 시간에 다른 예약이 있어요.\"}";
 
         // when
-        String out = followUp.record(ME, new ConfirmationGateway.Relayed(409, body));
+        String out = followUp.remember(ME, new ConfirmationGateway.Relayed(409, body));
 
         // then
         assertThat(json.readTree(out).has("suggestions")).isFalse();
@@ -72,9 +72,9 @@ class ConfirmationFollowUpTest {
         String body = "{\"action\":\"CANCEL\",\"reservationId\":7,\"status\":\"CANCELED\",\"accessCode\":null,\"replayed\":false,\"message\":\"취소했어요.\"}";
 
         // when
-        String out = followUp.record(ME, new ConfirmationGateway.Relayed(200, body));
-        String anonymous = followUp.record(new UserHeaders(Map.of()), new ConfirmationGateway.Relayed(401, "{\"code\":\"UNAUTHORIZED\",\"message\":\"로그인\"}"));
-        String odd = followUp.record(ME, new ConfirmationGateway.Relayed(502, "<html>bad gateway</html>"));
+        String out = followUp.remember(ME, new ConfirmationGateway.Relayed(200, body));
+        String anonymous = followUp.remember(new UserHeaders(Map.of()), new ConfirmationGateway.Relayed(401, "{\"code\":\"UNAUTHORIZED\",\"message\":\"로그인\"}"));
+        String odd = followUp.remember(ME, new ConfirmationGateway.Relayed(502, "<html>bad gateway</html>"));
 
         // then
         assertThat(json.readTree(out).path("suggestions")).extracting(n -> n.asString()).containsExactly("다른 시간 찾아 줘", "지금 빈 방 있어?");

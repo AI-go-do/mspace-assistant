@@ -3,7 +3,6 @@ package kr.ac.chosun.mspace.assistant.mcp.schedule.application;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
@@ -84,7 +83,12 @@ public class PlanWeek {
             }
         }
         boolean any = days.stream().anyMatch(d -> d.option() != null);
-        String note = code != null ? NO_SCHEDULE_NOTE.formatted(props.planFromTime()) : any ? null : NONE_NOTE;
+        String note = null;
+        if (code != null) {
+            note = NO_SCHEDULE_NOTE.formatted(props.planFromTime());
+        } else if (!any) {
+            note = NONE_NOTE;
+        }
         return new WeekPlan(today, last, length, code, days, note);
     }
 
@@ -123,7 +127,10 @@ public class PlanWeek {
         }
         AvailableRooms found = rooms.find(ds.date(), from.toLocalTime(), null, headcount, credential);
         Option best = earliest(found, from, Duration.ofMinutes(length));
-        String reason = best != null ? null : found.note() != null && found.rooms().isEmpty() ? found.note() : REASON_NONE;
+        String reason = null;
+        if (best == null) {
+            reason = found.note() != null && found.rooms().isEmpty() ? found.note() : REASON_NONE;
+        }
         return new DayPlan(ds.date(), ds.dayOfWeek(), ds.classes().size(), ds.lastClassEndAt(), from, best, reason);
     }
 

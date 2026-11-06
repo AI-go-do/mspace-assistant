@@ -85,13 +85,17 @@ jobs:
             | python3 -c 'import json,sys; s=json.load(sys.stdin)["projectStatus"]; print("게이트:", s["status"]); [print(c["status"], c["metricKey"], "실제", c.get("actualValue"), c["comparator"], c.get("errorThreshold")) for c in s["conditions"]]' \
             || echo "조건을 읽지 못했어요(토큰에 Browse 권한이 없을 수 있음). 대시보드에서 확인해 주세요."
           # 조건만으로는 어디를 고칠지 몰라서, 새 코드의 이슈·검토 안 된 핫스팟·커버리지 낮은 파일도 찍는다 (규칙·파일·줄·문장만)
-          api() { curl -sf -m 30 -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/$1"; }
-          echo "== 새 코드 이슈"
-          api "issues/search?componentKeys=mspace-assistant&inNewCodePeriod=true&resolved=false&ps=100" \
+          # 실패하면 상태 코드와 본문 앞부분을 찍는다(-f로 조용히 넘어가면 왜 빈 목록인지 모른다)
+          api() { curl -sS -m 30 -u "$SONAR_TOKEN:" -w '\n%{http_code}' "$SONAR_HOST_URL/api/$1" > /tmp/sonar.out || true
+                  code=$(tail -n1 /tmp/sonar.out); if [ "$code" != "200" ]; then echo "API $code: $(head -c 300 /tmp/sonar.out)" >&2; return 1; fi
+                  sed '$d' /tmp/sonar.out; }
+          echo "== 새 코드 이슈 (최대 500건)"
+          api "issues/search?componentKeys=mspace-assistant&inNewCodePeriod=true&resolved=false&ps=500" \
             | jq -r '"총 \(.total)건", (.issues[] | "\(.severity)\t\(.rule)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")' || true
-          echo "== 검토 안 된 보안 핫스팟 (새 코드)"
-          api "hotspots/search?projectKey=mspace-assistant&inNewCodePeriod=true&status=TO_REVIEW&ps=100" \
-            | jq -r '"총 \(.paging.total)건", (.hotspots[] | "\(.vulnerabilityProbability)\t\(.ruleKey)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")' || true
+          echo "== 검토 안 된 보안 핫스팟"
+          # inNewCodePeriod는 서버 버전에 따라 없는 매개변수라 빼고, 검토 안 된 것 전부를 본다
+          api "hotspots/search?projectKey=mspace-assistant&status=TO_REVIEW&ps=500" \
+            | jq -r '"총 \(.paging.total)건", (.hotspots[] | "\(.vulnerabilityProbability)\t\(.ruleKey // .securityCategory)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")' || true
           echo "== 새 코드 커버리지가 낮은 파일 (상위 15)"
           api "measures/component_tree?component=mspace-assistant&metricKeys=new_coverage,new_uncovered_lines&qualifiers=FIL&ps=500" \
             | jq -r '[.components[] | {p: .path, m: ([.measures[] | {(.metric): (.period.value // .value)}] | add)} | select(.m.new_coverage != null)]

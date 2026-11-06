@@ -20,6 +20,7 @@ public interface PersonaStore {
 
         @Override
         public void save(String memberKey, Persona persona) {
+            // 저장소 없음: 늘 기본 성향으로 답한다
         }
     };
 }

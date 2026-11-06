@@ -82,25 +82,27 @@ public class OllamaLlmClient implements LlmClient {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", orEmpty(system)));
         for (LlmMessage m : conversation) {
-            switch (m) {
-                case LlmMessage.User u -> messages.add(Map.of("role", "user", "content", orEmpty(u.text())));
-                case LlmMessage.Assistant a -> {
-                    Map<String, Object> msg = new LinkedHashMap<>();
-                    msg.put("role", "assistant");
-                    msg.put("content", a.text() == null ? "" : a.text());
-                    if (!a.toolCalls().isEmpty()) {
-                        msg.put("tool_calls", a.toolCalls().stream()
-                                .map(c -> Map.of("function", Map.of("name", orEmpty(c.name()),
-                                        "arguments", c.arguments() == null ? Map.of() : c.arguments())))
-                                .toList());
-                    }
-                    messages.add(msg);
-                }
-                case LlmMessage.ToolResult r -> messages.add(Map.of("role", "tool", "tool_name", orEmpty(r.name()),
-                        "content", r.isError() ? "{\"error\":" + r.json() + "}" : orEmpty(r.json())));
-            }
+            messages.add(switch (m) {
+                case LlmMessage.User(String text) -> Map.of("role", "user", "content", orEmpty(text));
+                case LlmMessage.Assistant(String text, List<ToolCall> toolCalls) -> assistant(text, toolCalls);
+                case LlmMessage.ToolResult(var callId, String name, String json, boolean isError) -> Map.of("role", "tool",
+                        "tool_name", orEmpty(name), "content", isError ? "{\"error\":" + json + "}" : orEmpty(json));
+            });
         }
         return messages;
+    }
+
+    private static Map<String, Object> assistant(String text, List<ToolCall> toolCalls) {
+        Map<String, Object> msg = new LinkedHashMap<>();
+        msg.put("role", "assistant");
+        msg.put("content", orEmpty(text));
+        if (!toolCalls.isEmpty()) {
+            msg.put("tool_calls", toolCalls.stream()
+                    .map(c -> Map.of("function", Map.of("name", orEmpty(c.name()),
+                            "arguments", c.arguments() == null ? Map.of() : c.arguments())))
+                    .toList());
+        }
+        return msg;
     }
 
     private static Map<String, Object> tool(ToolSpec spec) {

@@ -48,12 +48,10 @@ class McpToolGatewayTest {
                 })
                 .build();
 
-        Tool echo = Tool.builder().name("echo").description("받은 글을 그대로 돌려줌")
-                .inputSchema(Map.of("type", "object", "properties", Map.of("text", Map.of("type", "string"))))
+        Tool echo = Tool.builder("echo", Map.of("type", "object", "properties", Map.of("text", Map.of("type", "string"))))
+                .description("받은 글을 그대로 돌려줌")
                 .build();
-        Tool broken = Tool.builder().name("broken").description("항상 오류")
-                .inputSchema(Map.of("type", "object"))
-                .build();
+        Tool broken = Tool.builder("broken", Map.of("type", "object")).description("항상 오류").build();
         server = McpServer.sync(transport).serverInfo("test", "1")
                 .tools(
                         SyncToolSpecification.builder().tool(echo)
@@ -75,7 +73,7 @@ class McpToolGatewayTest {
         tomcat.setBaseDir(System.getProperty("java.io.tmpdir") + "/mcp-gateway-test-" + port);
         Context ctx = tomcat.addContext("", null);
         Tomcat.addServlet(ctx, "mcp", transport).setAsyncSupported(true);
-        ctx.addServletMappingDecoded("/mcp", "mcp");
+        ctx.addServletMapping("/mcp", "mcp");
         tomcat.getConnector();
         tomcat.start();
         url = "http://localhost:" + port;
