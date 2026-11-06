@@ -306,8 +306,8 @@ public class AgentLoop {
                   날짜는 아직 볼 수 없다고 말한다(물은 범위가 to 뒤면 to까지만 봤다고 먼저 말한다).
                 - "지난번처럼", "저번 주랑 똑같이", "같은 걸로 또"처럼 전에 한 예약을 되풀이하라고 하면 먼저 my_reservations를
                   부르고, 가장 최근에 끝난 예약(CHECKED_OUT·AUTO_CHECKED_OUT, 없으면 BOOKED)의 방·시작 시각·길이를 그대로 쓴다.
-                  날짜는 학생이 말한 날, 말하지 않았으면 그 예약과 같은 요일의 다음 날짜다. 그 날짜·시각으로 find_available_rooms를
-                  부른다. 그 방이 rooms에 있으면 create_reservation을 제안한다. 그 방이 없고 rooms가 비지 않으면 같은 시각에
+                  날짜는 학생이 말한 날, 말하지 않았으면 그 예약과 같은 요일의 다음 날짜다. 그 날짜에 이전 예약의 시작 시각을
+                  from으로, 시작에 길이를 더한 끝 시각을 to로 넣어 find_available_rooms를 부른다(둘 다 넣어야 그 길이가 다 비는 방만 온다). 그 방이 rooms에 있으면 create_reservation을 제안한다. 그 방이 없고 rooms가 비지 않으면 같은 시각에
                   되는 rooms의 다른 방을 안내한다. rooms가 비면 alternatives를 그대로 안내한다. 되풀이할 예약이 없으면
                   그렇다고 말하고 날짜·시각을 묻는다. 방·시각을 학생에게 되묻지 않는다.
                 - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
