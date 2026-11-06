@@ -166,6 +166,35 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("모델이 꼬리말을 흉내 내 써도 코드가 하나만 붙이고, 도구 없는 답의 가짜 꼬리말은 지운다 (#74)")
+    void footerOnlyOnce() {
+        var imitating = new ScriptedLlm()
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-03")))
+                .then(say("다 비어 있어요\n\n(예약 시스템 15:00 조회 기준)"));
+        var fake = new ScriptedLlm().then(say("비어 있을 거예요 (예약 시스템 14:00 조회 기준)"));
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+
+        ChatResult once = loop(imitating, tools).run(ME, List.of(), "오늘 빈방");
+        ChatResult none = loop(fake, tools).run(ME, List.of(), "오늘 빈방");
+
+        assertThat(once.reply()).isEqualTo("다 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
+        assertThat(none.reply()).as("도구를 안 불렀으니 모델이 쓴 근거 꼬리말은 거짓 → 지움").isEqualTo("비어 있을 거예요");
+    }
+
+    @Test
+    @DisplayName("답에 섞인 도구 이름은 학생 말로 바꾼다 (#74)")
+    void hidesToolNamesInReply() {
+        var llm = new ScriptedLlm()
+                .then(tool("room_status", Map.of()))
+                .then(say("`start_now_reservation`으로 바로 잡을 수 있어요"));
+        var tools = new FakeTools(Map.of("room_status", new ToolGateway.Outcome(FREE, false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "지금 빈 방");
+
+        assertThat(result.reply()).isEqualTo("지금 바로 쓰기으로 바로 잡을 수 있어요\n\n(예약 시스템 15:00 조회 기준)");
+    }
+
+    @Test
     @DisplayName("도구가 실패만 했으면 조회한 게 아니므로 꼬리말을 붙이지 않는다")
     void noGroundingWhenOnlyFailedTools() {
         // given
