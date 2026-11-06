@@ -20,6 +20,7 @@ class PersonaTest {
         assertThat(Persona.requested(null)).isEmpty();
         assertThat(Persona.requested("잔소리 모드로 바꾸지 마")).as("부정은 바꾸기 아님").isEmpty();
         assertThat(Persona.requested("조용한 비서는 싫어")).isEmpty();
+        assertThat(Persona.requested("잔소리 모드로 바꾸면 안 돼")).isEmpty();
         assertThat(Persona.requested("잔소리 모드 그만하고 알아서 모드로")).as("뒤에 다른 성향이 있어도 부정이 섞이면 모델에 맡김").isEmpty();
     }
 
