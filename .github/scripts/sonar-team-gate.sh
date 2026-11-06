@@ -15,7 +15,9 @@ report=target/sonar/report-task.txt
 task_id=$(grep '^ceTaskId=' "$report" | cut -d= -f2- || true)
 [ -n "$task_id" ] || { echo "$report 에 ceTaskId가 없어요"; exit 1; }
 status=PENDING
-for _ in $(seq 1 60); do
+# 요청이 매번 시간 초과돼도 전체 5분을 넘지 않게, 횟수가 아니라 경과 시간으로 끝낸다
+deadline=$((SECONDS + 300))
+while [ "$SECONDS" -lt "$deadline" ]; do
   # 한 번 못 읽어도(네트워크 순간 끊김) 멈추지 않고 다시 묻는다
   status=$(api "ce/task?id=$task_id" | jq -r '.task.status' || echo PENDING)
   case "$status" in
