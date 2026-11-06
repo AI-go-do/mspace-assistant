@@ -12,10 +12,12 @@ api() { curl -sf -m 30 -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/$1"; }
 # 1) 스캐너가 남긴 작업 id로 서버 처리가 끝나기를 기다린다 (최대 5분)
 report=target/sonar/report-task.txt
 [ -f "$report" ] || { echo "$report 가 없어요: Sonar 분석이 올라가지 않았어요"; exit 1; }
-task_id=$(grep '^ceTaskId=' "$report" | cut -d= -f2-)
+task_id=$(grep '^ceTaskId=' "$report" | cut -d= -f2- || true)
+[ -n "$task_id" ] || { echo "$report 에 ceTaskId가 없어요"; exit 1; }
 status=PENDING
 for _ in $(seq 1 60); do
-  status=$(api "ce/task?id=$task_id" | jq -r '.task.status')
+  # 한 번 못 읽어도(네트워크 순간 끊김) 멈추지 않고 다시 묻는다
+  status=$(api "ce/task?id=$task_id" | jq -r '.task.status' || echo PENDING)
   case "$status" in
     SUCCESS) break ;;
     FAILED|CANCELED) echo "Sonar 서버가 분석을 처리하지 못했어요: $status"; exit 1 ;;
@@ -33,7 +35,8 @@ not_mine() { echo "그 사이 다른 분석(develop push 등)이 끝나 프로�
 [ "$(latest)" = "$analysis_id" ] || not_mine
 
 # 2) 새 코드 값 읽기. 새 코드 지표는 period.value에 들어 있다. 덮을 새 줄이 없으면 커버리지 값이 없을 수 있다
-measures=$(api "measures/component?component=$SONAR_PROJECT&metricKeys=new_coverage,new_duplicated_lines_density,new_lines_to_cover,new_violations,new_bugs,new_vulnerabilities,new_reliability_rating,new_security_rating")
+measures=$(api "measures/component?component=$SONAR_PROJECT&metricKeys=new_coverage,new_duplicated_lines_density,new_lines_to_cover,new_violations,new_bugs,new_vulnerabilities,new_reliability_rating,new_security_rating") \
+  || { echo "Sonar 지표를 읽지 못했어요"; exit 1; }
 [ "$(latest)" = "$analysis_id" ] || not_mine
 val() { echo "$measures" | jq -r --arg k "$1" '[.component.measures[] | select(.metric == $k) | (.period.value // .value)][0] // empty'; }
 coverage=$(val new_coverage)
