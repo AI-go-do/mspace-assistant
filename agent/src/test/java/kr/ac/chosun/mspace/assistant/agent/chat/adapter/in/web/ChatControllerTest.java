@@ -293,9 +293,9 @@ class ChatControllerTest {
     void briefing() throws Exception {
         // given
         when(dailyBriefing.today(any(UserHeaders.class))).thenReturn(new DailyBriefing.Briefing("2026-11-06", "금",
-                "2026-11-06T08:00:00+09:00", new DailyBriefing.Schedule(List.of(), null, "아직 넣은 시간표가 없어요."),
+                "2026-11-06T08:00:00+09:00", new DailyBriefing.Schedule(List.of(), null, "아직 넣은 시간표가 없어요."), null, null,
                 new DailyBriefing.Reservations(List.of(), null), new DailyBriefing.Rooms(List.of("2번 방"), "10:00", null),
-                "11월 6일 금요일 브리핑이에요. …", List.of("OPEN_SCHEDULE")));
+                "11월 6일 금요일 브리핑이에요. …", List.of("OPEN_SCHEDULE"), List.of()));
 
         // when
         var ok = mvc.perform(get("/api/agent/briefing").header("Authorization", "Bearer owner"));

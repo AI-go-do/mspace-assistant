@@ -134,8 +134,8 @@ class MyReservationsToolTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("끝난 지 7일이 넘은 예약은 빼고, 7일 안에 끝난 예약과 끝나지 않은 예약은 남긴다")
-    void dropsFinishedOlderThanSevenDays() {
+    @DisplayName("끝난 지 14일이 넘은 예약은 빼고, 14일 안에 끝난 예약(지난주 것 포함)과 끝나지 않은 예약은 남긴다")
+    void dropsFinishedOlderThanKeepDays() {
         // given: 지금 기준 상대 시각으로 만든다 (날짜가 바뀌어도 테스트가 깨지지 않게)
         OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).withNano(0);
         String json = """
@@ -147,9 +147,9 @@ class MyReservationsToolTest extends McpToolTestSupport {
                   {"id": 22, "room": {"id": 2, "name": "2번 방"}, "startAt": "%s", "endAt": "%s",
                    "status": "BOOKED", "owner": true, "accessCode": null, "participants": []}
                 ]""".formatted(
-                now.minusDays(10).minusHours(1), now.minusDays(10),
-                now.minusDays(3).minusHours(1), now.minusDays(3),
-                now.minusDays(10).minusHours(1), now.minusDays(10));
+                now.minusDays(20).minusHours(1), now.minusDays(20),
+                now.minusDays(8).minusHours(1), now.minusDays(8),
+                now.minusDays(20).minusHours(1), now.minusDays(20));
         core.stubFor(get("/api/reservations/me").willReturn(okJson(json)));
 
         // when

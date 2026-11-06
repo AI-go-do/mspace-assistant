@@ -221,6 +221,44 @@
           ]
         }
       ]
+    },
+    {
+      "id": "Q16",
+      "group": "예약",
+      "text": "지난번이랑 똑같이 다음 주에도 잡아 줘",
+      "expect": [
+        {
+          "first_tool": "my_reservations",
+          "tools_all": [
+            "my_reservations",
+            "find_available_rooms"
+          ],
+          "confirm_tool": "create_reservation"
+        },
+        {
+          "first_tool": "my_reservations",
+          "tools_all": [
+            "my_reservations",
+            "find_available_rooms"
+          ],
+          "reply_any": [
+            "alternatives",
+            "가까운",
+            "없어"
+          ]
+        },
+        {
+          "first_tool": "my_reservations",
+          "tools_none": [
+            "find_available_rooms"
+          ],
+          "reply_any": [
+            "없",
+            "날짜"
+          ]
+        }
+      ],
+      "note": "계정에 최근 끝낸 예약이 있으면 방·시각을 묻지 않고 확인 카드까지(1번) 또는 그 시간이 차서 대안 안내(2번). 끝낸 예약이 없는 계정이면 되풀이할 예약이 없다고 말하고 날짜·시각을 물어야(3번) 통과. 어느 쪽이든 첫 도구 호출이 my_reservations여야(first_tool) 해요"
     }
   ]
 }

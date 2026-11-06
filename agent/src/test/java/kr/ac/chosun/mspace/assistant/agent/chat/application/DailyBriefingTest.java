@@ -60,8 +60,20 @@ class DailyBriefingTest {
         };
     }
 
+    static final String FREE = """
+            {"date":"2026-11-06","rooms":[
+              {"roomId":3,"roomName":"3번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T15:30:00+09:00","endAt":"2026-11-06T16:30:00+09:00"}]},
+              {"roomId":2,"roomName":"2번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T14:00:00+09:00","endAt":"2026-11-06T19:00:00+09:00"}]},
+              {"roomId":1,"roomName":"1번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T16:00:00+09:00","endAt":"2026-11-06T22:00:00+09:00"}]},
+              {"roomId":4,"roomName":"4번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T10:30:00+09:00","endAt":"2026-11-06T12:30:00+09:00"}]}],
+             "note":null,"alternatives":[]}""";
+
     static DailyBriefing briefing(ToolGateway tools) {
-        return new DailyBriefing(tools, CLOCK, JsonMapper.builder().build());
+        return briefing(tools, CLOCK);
+    }
+
+    static DailyBriefing briefing(ToolGateway tools, Clock clock) {
+        return new DailyBriefing(tools, clock, JsonMapper.builder().build(), new AgentProperties.Rules(30, 2, 7));
     }
 
     @Test
@@ -85,6 +97,8 @@ class DailyBriefingTest {
         assertThat(b.rooms().availableNames()).containsExactly("2번 방", "3번 방");
         assertThat(b.rooms().earliestLimit()).isEqualTo("09:30");
         assertThat(b.hints()).isEmpty();
+        assertThat(b.afterClass()).as("대표자 예약이 있으면 수업 뒤 칸을 보지 않는다").isNull();
+        assertThat(b.suggestions()).isEmpty();
         assertThat(b.text()).isEqualTo("11월 6일 금요일 브리핑이에요. 오늘 수업은 자료구조 09:00–10:15, 운영체제 13:00–14:50 두 개예요. "
                 + "마지막 수업은 14:50에 끝나요. 오늘 예약은 1번 방 15:30–17:30이고 대표자예요. 그 뒤로 1건이 더 있어요. "
                 + "지금 바로 쓸 수 있는 방은 2번 방, 3번 방 두 개예요.");
@@ -155,5 +169,112 @@ class DailyBriefingTest {
         assertThat(b.reservations().items()).extracting(DailyBriefing.ReservationItem::id).containsExactly(3L, 2L);
         assertThat(b.reservations().items().getFirst().today()).isTrue();
         assertThat(b.text()).contains("오늘 예약은 5번 방 23:30–09:00(사용 중)이에요. 그 뒤로 1건이 더 있어요.");
+    }
+
+    @Test
+    @DisplayName("수업 있고 대표자 예약 없음: searchFromAt(15:30)부터 find_available_rooms를 불러 가장 이른 칸(같은 시작이면 더 긴 쪽, 최대 2시간) + 버튼 문장")
+    void afterClassSuggestion() {
+        // given: 3번 방 15:30–16:30(1시간), 2번 방 14:00–19:00(15:30부터 2시간 가능), 1번 방 16:00–
+        List<String> called = new ArrayList<>();
+        var tools = fake(Map.of("my_schedule", FRIDAY, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", FREE), called);
+
+        // when
+        DailyBriefing.Briefing b = briefing(tools).today(ME);
+
+        // then
+        assertThat(called).contains("find_available_rooms{date=2026-11-06}");
+        assertThat(b.afterClass().searchFrom()).isEqualTo("15:30");
+        assertThat(b.afterClass().roomName()).isEqualTo("2번 방");
+        assertThat(b.afterClass().start()).isEqualTo("15:30");
+        assertThat(b.afterClass().end()).isEqualTo("17:30");
+        assertThat(b.afterClass().minutes()).isEqualTo(120);
+        // 공강 10:15 끝 + 30분 → 11:00 ~ 13:00 (2시간). 4번 방 10:30–12:30 → 11:00부터 1시간 30분
+        assertThat(b.freePeriod().periodStart()).isEqualTo("11:00");
+        assertThat(b.freePeriod().periodEnd()).isEqualTo("13:00");
+        assertThat(b.freePeriod().roomName()).isEqualTo("4번 방");
+        assertThat(b.freePeriod().minutes()).isEqualTo(90);
+        assertThat(b.suggestions()).containsExactly("15:30 2번 방 2시간 잡아 줘", "11:00 4번 방 1시간 30분 잡아 줘");
+        assertThat(b.text()).contains("마지막 수업은 14:50에 끝나요. 공강 11:00–13:00에는 4번 방을 11:00부터 1시간 30분 쓸 수 있어요. "
+                + "수업 끝나고 15:30부터 2번 방을 2시간 쓸 수 있어요. 잡아 둔 예약은 없어요.");
+    }
+
+    @Test
+    @DisplayName("수업이 이미 끝난 뒤(18:10)에 열면 지금 칸(18:30)부터 본다. 같은 시작이면 더 긴 쪽(1번 방 2시간 > 2번 방 30분)")
+    void afterClassFromNow() {
+        // given: 18:10 서울. 2번 방은 –19:00라 30분, 1번 방은 –22:00라 2시간 → 1번 방
+        Clock late = Clock.fixed(Instant.parse("2026-11-06T09:10:00Z"), ZoneId.of("UTC"));
+        List<String> called = new ArrayList<>();
+        var tools = fake(Map.of("my_schedule", FRIDAY, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", FREE), called);
+
+        // when
+        DailyBriefing.Briefing b = briefing(tools, late).today(ME);
+
+        // then
+        assertThat(called).contains("find_available_rooms{date=2026-11-06}");
+        assertThat(b.afterClass().searchFrom()).isEqualTo("18:30");
+        assertThat(b.afterClass().start()).isEqualTo("18:30");
+        assertThat(b.freePeriod()).as("공강은 이미 지났다").isNull();
+        assertThat(b.afterClass().minutes()).isEqualTo(120);
+        assertThat(b.afterClass().roomName()).isEqualTo("1번 방");
+        assertThat(b.suggestions()).containsExactly("18:30 1번 방 2시간 잡아 줘");
+        assertThat(DailyBriefing.lengthText(90)).isEqualTo("1시간 30분");
+        assertThat(DailyBriefing.lengthText(30)).isEqualTo("30분");
+    }
+
+    @Test
+    @DisplayName("공강: 1시간보다 짧은 공강은 안 보고, 공강 중간(11:40)에 열면 지금 칸(12:00)부터 남은 만큼만")
+    void freePeriodShortOrInProgress() {
+        // given: 수업 09:00–10:15, 11:00–12:00(공강 10:45→11:00~11:00 = 0), 13:00–14:50(공강 12:30~13:00 = 30분) → 공강 없음
+        String tight = """
+                {"date":"2026-11-06","dayOfWeek":"금","code":null,
+                 "classes":[{"name":"A","startAt":"2026-11-06T09:00:00+09:00","endAt":"2026-11-06T10:15:00+09:00"},
+                            {"name":"B","startAt":"2026-11-06T11:00:00+09:00","endAt":"2026-11-06T12:00:00+09:00"},
+                            {"name":"C","startAt":"2026-11-06T13:00:00+09:00","endAt":"2026-11-06T14:50:00+09:00"}],
+                 "lastClassEndAt":"2026-11-06T14:50:00+09:00","searchFromAt":"2026-11-06T15:30:00+09:00","bufferMinutes":30,"note":null}""";
+        var none = fake(Map.of("my_schedule", tight, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", FREE), new ArrayList<>());
+        Clock midGap = Clock.fixed(Instant.parse("2026-11-06T02:40:00Z"), ZoneId.of("UTC")); // 11:40 서울
+        var inProgress = fake(Map.of("my_schedule", FRIDAY, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", FREE), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing n = briefing(none).today(ME);
+        DailyBriefing.Briefing p = briefing(inProgress, midGap).today(ME);
+
+        // then
+        assertThat(n.freePeriod()).isNull();
+        assertThat(n.afterClass().roomName()).isEqualTo("2번 방");
+        assertThat(p.freePeriod().periodStart()).isEqualTo("12:00");
+        assertThat(p.freePeriod().start()).isEqualTo("12:00");
+        assertThat(p.freePeriod().minutes()).isEqualTo(30); // 4번 방 –12:30
+        assertThat(p.suggestions()).containsExactly("15:30 2번 방 2시간 잡아 줘", "12:00 4번 방 30분 잡아 줘");
+    }
+
+    @Test
+    @DisplayName("빈방 조회 실패·빈 결과: 다른 칸은 그대로, 문장만 '확인하지 못했어요'/'쓸 수 있는 방은 없어요'. 시간표 없으면 아예 안 본다")
+    void afterClassNoneOrFailed() {
+        // given: 조회 실패
+        List<String> called = new ArrayList<>();
+        var failed = fake(Map.of("my_schedule", FRIDAY, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS), called);
+        var none = fake(Map.of("my_schedule", FRIDAY, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", "{\"date\":\"2026-11-06\",\"rooms\":[],\"note\":\"없어요\"}"), new ArrayList<>());
+        List<String> noScheduleCalls = new ArrayList<>();
+        var noSchedule = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS),
+                noScheduleCalls);
+
+        // when
+        DailyBriefing.Briefing f = briefing(failed).today(ME);
+        DailyBriefing.Briefing n = briefing(none).today(ME);
+        briefing(noSchedule).today(ME);
+
+        // then
+        assertThat(f.afterClass().note()).isEqualTo(DailyBriefing.AFTER_CLASS_FAILED);
+        assertThat(f.suggestions()).isEmpty();
+        assertThat(f.text()).contains("수업 뒤 빈방을 확인하지 못했어요. 잡아 둔 예약은 없어요.");
+        assertThat(n.afterClass().note()).isEqualTo(DailyBriefing.AFTER_CLASS_NONE);
+        assertThat(n.text()).contains("수업 끝나고 오늘 쓸 수 있는 방은 없어요.");
+        assertThat(noScheduleCalls).noneMatch(c -> c.startsWith("find_available_rooms"));
     }
 }
