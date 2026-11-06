@@ -32,14 +32,30 @@ analysis_id=$(api "ce/task?id=$task_id" | jq -r '.task.analysisId // empty')
 
 # Community 서버는 브랜치·PR을 나눠 담지 못하고 프로젝트 하나에 덮어쓴다. 그래서 값을 읽기 전과 뒤에
 # 프로젝트의 마지막 분석이 이 분석인지 확인해, 다른 분석(develop push 등)의 값으로 판정하지 않게 한다
-latest() { api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty'; }
-not_mine() { echo "그 사이 다른 분석(develop push 등)이 끝나 프로젝트 값이 바뀌었어요. 이 build를 다시 실행해 주세요"; exit 1; }
-[ "$(latest)" = "$analysis_id" ] || not_mine
+# 마지막 분석 id는 분석 목록(project_analyses)에서 읽고, 권한이 없으면(403) 프로젝트 작업 현황(ce/component,
+# 프로젝트 보기 권한으로 열림)의 마지막 완료 작업에서 읽는다 (11-06 #81: 분석 목록이 막혀 매번 실패)
+# 둘 다 못 읽을 때만 확인을 건너뛰고 경고를 남긴다
+latest() {
+  local k
+  k=$(api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty' || true)
+  [ -n "$k" ] || k=$(api "ce/component?component=$SONAR_PROJECT" | jq -r '.current.analysisId // empty' || true)
+  echo "$k"
+}
+check_mine() {
+  local now; now=$(latest)
+  if [ -z "$now" ]; then
+    echo "경고: 마지막 분석 id를 읽지 못해(권한 없음 등) 겹친 분석 확인은 건너뛰어요"; return 0
+  fi
+  [ "$now" = "$analysis_id" ] && return 0
+  echo "그 사이 다른 분석(develop push 등)이 끝나 프로젝트 값이 바뀌었어요 (이 분석 $analysis_id, 마지막 분석 $now). 이 build를 다시 실행해 주세요"
+  exit 1
+}
+check_mine
 
 # 2) 새 코드 값 읽기. 새 코드 지표는 period.value에 들어 있다. 덮을 새 줄이 없으면 커버리지 값이 없을 수 있다
 measures=$(api "measures/component?component=$SONAR_PROJECT&metricKeys=new_coverage,new_duplicated_lines_density,new_lines_to_cover,new_violations,new_bugs,new_vulnerabilities,new_reliability_rating,new_security_rating") \
   || { echo "Sonar 지표를 읽지 못했어요"; exit 1; }
-[ "$(latest)" = "$analysis_id" ] || not_mine
+check_mine
 val() { echo "$measures" | jq -r --arg k "$1" '[.component.measures[] | select(.metric == $k) | (.period.value // .value)][0] // empty'; }
 coverage=$(val new_coverage)
 duplication=$(val new_duplicated_lines_density)
@@ -71,7 +87,13 @@ fi
 if [ -n "$duplication" ] && awk -v a="$duplication" -v b="$MAX_DUPLICATION" 'BEGIN{exit !(a > b)}'; then
   echo "실패: 새 코드 중복이 ${MAX_DUPLICATION}%보다 높아요"; fail=1
 fi
-# 등급 값이 비어 있어도 건수로 한 번 더 본다
+# 등급 값이 비어 있어도 건수로 한 번 더 본다. 둘 다 못 읽으면 0으로 치지 않고 실패한다
+if [ -z "$rel" ] && [ -z "$bugs" ]; then
+  echo "실패: 새 버그 건수와 신뢰성 등급을 모두 읽지 못했어요"; fail=1
+fi
+if [ -z "$sec" ] && [ -z "$vulns" ]; then
+  echo "실패: 새 취약점 건수와 보안 등급을 모두 읽지 못했어요"; fail=1
+fi
 if { [ -n "$rel" ] && awk -v a="$rel" 'BEGIN{exit !(a > 1)}'; } || awk -v a="${bugs:-0}" 'BEGIN{exit !(a > 0)}'; then
   echo "실패: 새 코드에 버그가 있어요 (신뢰성 등급 A 아님). 대시보드 Issues에서 유형 Bug를 보세요"; fail=1
 fi
