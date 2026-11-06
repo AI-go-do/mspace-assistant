@@ -14,6 +14,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.mcp.ProposalParser;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.MemoryProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
@@ -699,5 +701,33 @@ class AgentLoopTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕"))
                 .isInstanceOf(LlmException.class);
+    }
+
+    @Test
+    @DisplayName("'브리핑'이 들어간 말은 모델 없이 오늘 브리핑으로 바로 답하고(도구 이름 briefing), 답·힌트·빠른 답장이 그대로 간다")
+    void briefingShortcut() {
+        // given
+        var llm = new ScriptedLlm().then(say("모델이 답하면 안 됨"));
+        var tools = new FakeTools(Map.of());
+        var briefing = org.mockito.Mockito.mock(kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing.class);
+        org.mockito.Mockito.when(briefing.today(org.mockito.ArgumentMatchers.any(UserHeaders.class)))
+                .thenReturn(new kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing.Briefing("2026-11-03", "화",
+                        "2026-11-03T15:00:00+09:00", null, null, null, null, "11월 3일 화요일 브리핑이에요. …",
+                        List.of("OPEN_SCHEDULE"), List.of("15:30 2번 방 2시간 잡아 줘")));
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), briefing);
+
+        // when
+        ChatResult result = loop.run(ME, List.of(), "오늘 브리핑 해 줘");
+        ChatResult normal = loop.run(ME, List.of(), "내일 빈방");
+
+        // then
+        assertThat(result.reply()).isEqualTo("11월 3일 화요일 브리핑이에요. …");
+        assertThat(result.tools()).containsExactly("briefing");
+        assertThat(result.hints()).containsExactly("OPEN_SCHEDULE");
+        assertThat(result.suggestions()).containsExactly("15:30 2번 방 2시간 잡아 줘");
+        assertThat(result.toolCalls()).isZero();
+        assertThat(llm.seen).as("브리핑은 모델을 안 거친다").hasSize(1); // 두 번째(보통 말)만
+        assertThat(normal.reply()).startsWith("모델이 답하면 안 됨");
     }
 }
