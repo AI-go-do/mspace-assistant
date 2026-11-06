@@ -1,5 +1,6 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -24,8 +25,7 @@ public enum Persona {
             성향: 조용히. 학생이 물은 것만 한두 문장으로 답한다. 묻지 않은 제안·권유·잔소리는 하지 않는다.
             다음 행동을 제안하라는 다른 규칙보다 이 규칙이 우선한다(도구 결과의 note·message는 그대로 전한다)."""),
     ACTIVE("알아서", "답 끝에 지금 할 수 있는 다음 행동을 하나 제안해요. (기본)",
-            """
-            성향: 알아서. 답 끝에 지금 할 수 있는 다음 행동을 하나 제안한다(예: "바로 잡을까요?", "연장할까요?")."""),
+            "성향: 알아서. 답 끝에 지금 할 수 있는 다음 행동을 하나 제안한다(예: \"바로 잡을까요?\", \"연장할까요?\")."),
     NAGGING("잔소리", "입실·퇴실·연장·노쇼·시간표를 매번 챙기고 재촉해요.",
             """
             성향: 잔소리. 답마다 끝에 한 줄로 챙긴다: 예약이 있으면 입실(미리 예약은 시작 15분, 즉시 시작은 10분 안에 입실 안 하면
@@ -36,10 +36,10 @@ public enum Persona {
 
     /** 채팅으로 바꾸는 말: "잔소리 모드로", "조용한 비서로 해 줘", "알아서 하는 성향으로 바꿔" */
     private static final Pattern REQUEST = Pattern.compile(
-            "(조용|수동|능동|알아서|잔소리).{0,6}?(모드|성향|비서|스타일)");
+            "(조용|수동|능동|알아서|잔소리).{0,6}?(모드|성향|비서|스타일)", Pattern.CANON_EQ);
 
-    /** 요청 뒤의 부정: 바꾸지 마, 하지 말고, 싫어, 안 해, 그만 */
-    private static final Pattern NEGATION = Pattern.compile("지\\s*마|말아|말고|싫|안\\s*해|안\\s*할|그만|아니");
+    /** 요청 뒤의 부정: 바꾸지 마, 하지 말고, 싫어, 안 해, 바꾸면 안 돼, 그만 */
+    private static final Pattern NEGATION = Pattern.compile("지\\s*마|말아|말고|싫|안\\s*해|안\\s*할|면\\s*안|그만|아니", Pattern.CANON_EQ);
 
     private final String label;
     private final String description;
@@ -81,8 +81,10 @@ public enum Persona {
         if (message == null) {
             return Optional.empty();
         }
-        Matcher m = REQUEST.matcher(message);
-        if (!m.find() || NEGATION.matcher(message.substring(m.end())).find()) {
+        // 분해형 한글(ㅈ+ㅗ+ㅇ…)도 완성형으로 맞춘 뒤 본다. 안 맞추면 매치된 글자가 아래 switch의 완성형과 달라 기본 성향이 저장된다
+        String text = Normalizer.normalize(message, Normalizer.Form.NFC);
+        Matcher m = REQUEST.matcher(text);
+        if (!m.find() || NEGATION.matcher(text.substring(m.end())).find()) {
             return Optional.empty(); // "잔소리 모드로 바꾸지 마"는 바꾸라는 말이 아니다 → 모델에 넘긴다
         }
         return Optional.of(switch (m.group(1)) {

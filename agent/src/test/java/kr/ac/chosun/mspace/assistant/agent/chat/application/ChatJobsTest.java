@@ -63,6 +63,7 @@ class ChatJobsTest {
 
         @Override
         public void shutdown() {
+            // 손으로 돌리는 executor라 멈출 스레드가 없다
         }
 
         @Override
@@ -176,7 +177,7 @@ class ChatJobsTest {
 
     @Test
     @DisplayName("스레드와 대기열이 다 차면 AGENT_BUSY로 바로 거절하고, 거절된 접수는 남지 않는다")
-    void rejectsWhenQueueFull() throws Exception {
+    void rejectsWhenQueueFull() {
         // given: 스레드 1개 + 대기열 1개
         CountDownLatch release = new CountDownLatch(1);
         ChatJobs jobs = new ChatJobs(props, clock);
@@ -300,8 +301,7 @@ class ChatJobsTest {
     @Test
     @DisplayName("작업 시작과 만료 정리가 동시에 일어나도 둘 중 하나만 이겨서, 돌기 시작한 작업은 지워지지 않는다")
     void startAndSweepRace() throws Exception {
-        ExecutorService racers = Executors.newFixedThreadPool(2);
-        try {
+        try (ExecutorService racers = Executors.newFixedThreadPool(2)) {
             for (int round = 0; round < 300; round++) {
                 // given: 시작 전 접수가 보관 시간을 넘김
                 ManualExecutor executor = new ManualExecutor();
@@ -325,7 +325,6 @@ class ChatJobsTest {
                 assertThat(jobs.find(accepted.jobId(), OWNER).isPresent()).as("round %d", round)
                         .isEqualTo(calls.get() == 1);
             }
-        } finally {
             racers.shutdownNow();
         }
     }

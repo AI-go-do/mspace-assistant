@@ -63,10 +63,12 @@ public interface ConversationMemory {
 
         @Override
         public void save(String memberKey, List<LlmMessage> conversation) {
+            // 기억을 끈 설정: 저장하지 않는다
         }
 
         @Override
         public void clear(String memberKey) {
+            // 기억을 끈 설정: 지울 것이 없다
         }
     };
 }

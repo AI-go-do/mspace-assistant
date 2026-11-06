@@ -50,7 +50,7 @@ class RedisScheduleRepositoryTest {
         // then
         Timetable read = repository.find("m:42").orElseThrow();
         assertThat(read.classes()).isEqualTo(timetable.classes());
-        assertThat(read.updatedAt().toString()).isEqualTo("2026-11-05T18:40+09:00");
+        assertThat(read.updatedAt()).hasToString("2026-11-05T18:40+09:00");
     }
 
     @Test

@@ -24,7 +24,7 @@ class SearchFromTest {
         OffsetDateTime from = schedule.searchFrom(OffsetDateTime.parse("2026-11-06T" + end + ":00+09:00"));
 
         // then
-        assertThat(from.toLocalTime().toString()).isEqualTo(expected);
+        assertThat(from.toLocalTime()).hasToString(expected);
     }
 
     @DisplayName("여유를 0분으로 바꾸면 끝 시각을 칸으로만 올린다 (설정값)")
@@ -39,6 +39,6 @@ class SearchFromTest {
         OffsetDateTime from = schedule.searchFrom(OffsetDateTime.parse("2026-11-06T" + end + ":00+09:00"));
 
         // then
-        assertThat(from.toLocalTime().toString()).isEqualTo(expected);
+        assertThat(from.toLocalTime()).hasToString(expected);
     }
 }

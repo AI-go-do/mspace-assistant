@@ -56,6 +56,7 @@ class DailyBriefingTest {
 
             @Override
             public void close() {
+                // 가짜 세션이라 닫을 연결이 없다
             }
         };
     }

@@ -60,7 +60,7 @@ public class MySchedule {
         int slot = props.slotMinutes();
         int minuteOfDay = t.getHour() * 60 + t.getMinute();
         int rest = minuteOfDay % slot;
-        return rest == 0 ? t : t.plusMinutes(slot - rest);
+        return rest == 0 ? t : t.plusMinutes((long) slot - rest);
     }
 
     private static OffsetDateTime at(LocalDate day, java.time.LocalTime time) {

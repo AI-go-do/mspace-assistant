@@ -32,10 +32,11 @@ final class ConversationJson {
         List<Line> lines = new ArrayList<>(conversation.size());
         for (LlmMessage m : conversation) {
             lines.add(switch (m) {
-                case LlmMessage.User u -> new Line("u", u.text(), null, null, null, null, null);
-                case LlmMessage.Assistant a -> new Line("a", a.text(), a.toolCalls().stream()
+                case LlmMessage.User(String text) -> new Line("u", text, null, null, null, null, null);
+                case LlmMessage.Assistant(String text, var toolCalls) -> new Line("a", text, toolCalls.stream()
                         .map(c -> new Call(c.id(), c.name(), c.arguments(), c.signature())).toList(), null, null, null, null);
-                case LlmMessage.ToolResult r -> new Line("r", null, null, r.callId(), r.name(), r.json(), r.isError());
+                case LlmMessage.ToolResult(String callId, String name, String json, boolean isError) ->
+                        new Line("r", null, null, callId, name, json, isError);
             });
         }
         return JSON.writeValueAsString(lines);

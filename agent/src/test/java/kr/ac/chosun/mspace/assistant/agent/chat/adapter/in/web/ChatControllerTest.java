@@ -69,6 +69,7 @@ class ChatControllerTest {
 
         @Override
         public void shutdown() {
+            // 손으로 돌리는 executor라 멈출 스레드가 없다
         }
 
         @Override
@@ -107,10 +108,13 @@ class ChatControllerTest {
         ChatJobProperties jobProps = new ChatJobProperties(0, 0, null, null, null);
         ChatJobs jobs = new ChatJobs(jobProps, Clock.systemUTC(), executor);
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
-        ChatController controller = new ChatController(agent, confirmations, followUp,
-                mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory,
-                timetable, dailyBriefing, personas);
-        mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc = MockMvcBuilders.standaloneSetup(
+                        new ChatController(agent, props, jobs, jobProps, memory),
+                        new ConfirmationController(confirmations, followUp, mock(AccessCodeGateway.class), props),
+                        new ScheduleController(mock(ScheduleGateway.class), timetable, props),
+                        new AssistantSettingsController(dailyBriefing, personas, props))
+                .setControllerAdvice(new AgentErrors())
+                .build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
                 .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms"), List.of(), List.of()));
     }
@@ -250,7 +254,7 @@ class ChatControllerTest {
     void parseScheduleImage() throws Exception {
         // given
         byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
-        when(timetable.read(eq("image/png"), eq(png))).thenReturn(new ReadTimetableImage.Draft(
+        when(timetable.read("image/png", png)).thenReturn(new ReadTimetableImage.Draft(
                 List.of(new ReadTimetableImage.ClassDraft("MON", "09:00", "10:30", "자료구조")), 1, "읽지 못한 칸이 1개 있어요."));
 
         // when · then
@@ -321,7 +325,7 @@ class ChatControllerTest {
         // given
         var relayed = new ConfirmationGateway.Relayed(201, "{\"action\":\"CREATE\",\"reservationId\":7,\"message\":\"예약했어요.\"}");
         when(confirmations.confirm(eq("tok"), any(UserHeaders.class), any())).thenReturn(relayed);
-        when(followUp.record(any(UserHeaders.class), eq(relayed)))
+        when(followUp.remember(any(UserHeaders.class), eq(relayed)))
                 .thenReturn("{\"action\":\"CREATE\",\"reservationId\":7,\"message\":\"예약했어요.\",\"suggestions\":[\"입실 번호 보여 줘\"]}");
 
         // when / then

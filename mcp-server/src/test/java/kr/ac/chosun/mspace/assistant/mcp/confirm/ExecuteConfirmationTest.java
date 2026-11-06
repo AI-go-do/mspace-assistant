@@ -71,7 +71,8 @@ class ExecuteConfirmationTest {
         clock.now = Instant.parse("2026-11-03T07:00:10Z");
 
         // when / then
-        assertThatThrownBy(() -> execute.execute(token, ME, List.of()))
+        List<String> noParticipants = List.of();
+        assertThatThrownBy(() -> execute.execute(token, ME, noParticipants))
                 .isInstanceOf(CoreApiException.class)
                 .hasMessageContaining("이미 지났어요")
                 .extracting("code").isEqualTo("RESERVATION_INVALID_LENGTH");
