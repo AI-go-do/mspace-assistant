@@ -5,7 +5,6 @@ import java.util.List;
 import kr.ac.chosun.mspace.assistant.mcp.common.Credentials;
 import kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.MyReservation;
-import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationStatus;
 import kr.ac.chosun.mspace.assistant.mcp.reservation.application.ReservationQueryPort;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;

@@ -59,7 +59,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
 
         // when
         CallToolResult result = connect(Map.of("X-User-Id", "1"))
-                .callTool(new CallToolRequest("my_reservations", Map.of()));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build());
 
         // then
         assertThat(result.isError()).isFalse();
@@ -78,7 +78,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
 
         // when
         String body = text(connect(Map.of("X-User-Id", "1"))
-                .callTool(new CallToolRequest("my_reservations", Map.of())));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build()));
 
         // then
         assertThat(body).doesNotContain("482913", "accessCode", "나*준", "김*연", "participants");
@@ -90,7 +90,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
         core.stubFor(get("/api/reservations/me").willReturn(okJson("[]")));
 
         CallToolResult result = connect(Map.of("X-User-Id", "1"))
-                .callTool(new CallToolRequest("my_reservations", Map.of()));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build());
 
         assertThat(result.isError()).isFalse();
         assertThat(text(result)).contains("\"reservations\":[]");
@@ -100,7 +100,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
     @DisplayName("사용자 헤더 없이 부르면 코어를 부르지 않고 오류 결과 (로그인 필요)")
     void noCredential() {
         CallToolResult result = connect(Map.of())
-                .callTool(new CallToolRequest("my_reservations", Map.of()));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build());
 
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("로그인이 필요합니다");
@@ -115,7 +115,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
                 .withBody("{\"code\":\"UNAUTHORIZED\",\"message\":\"로그인이 필요합니다\"}")));
 
         CallToolResult result = connect(Map.of("X-User-Id", "999"))
-                .callTool(new CallToolRequest("my_reservations", Map.of()));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build());
 
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("로그인이 필요합니다");
@@ -127,7 +127,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
         core.stubFor(get("/api/reservations/me").willReturn(okJson("[]").withFixedDelay(2_000)));
 
         CallToolResult result = connect(Map.of("X-User-Id", "1"))
-                .callTool(new CallToolRequest("my_reservations", Map.of()));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build());
 
         assertThat(result.isError()).isTrue();
         assertThat(text(result)).contains("예약 서버에 연결하지 못했어요");
@@ -154,7 +154,7 @@ class MyReservationsToolTest extends McpToolTestSupport {
 
         // when
         String body = text(connect(Map.of("X-User-Id", "1"))
-                .callTool(new CallToolRequest("my_reservations", Map.of())));
+                .callTool(CallToolRequest.builder("my_reservations").arguments(Map.of()).build()));
 
         // then
         assertThat(body).doesNotContain("\"id\":20").contains("\"id\":21", "\"id\":22");

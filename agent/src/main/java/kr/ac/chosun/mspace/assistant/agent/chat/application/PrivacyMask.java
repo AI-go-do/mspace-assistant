@@ -14,8 +14,10 @@ public final class PrivacyMask {
     private static final Pattern PHONE = Pattern.compile(
             "(?<!\\d)(?:\\+82[-\\s.]?(?:\\(0\\)[-\\s.]?)?1|01)[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)");
     /** 일반 전화: 02-123-4567, 062-230-1234, 070-1234-5678, +82 62-230-1234, +82-(0)62-230-1234 (지역번호 02·031~064·070) */
-    private static final Pattern LANDLINE = Pattern.compile(
-            "(?<!\\d)(?:\\+82[-\\s.]?(?:\\(0\\)[-\\s.]?)?|0)(?:2|[3-6][1-5]|70)[-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)");
+    private static final String LANDLINE_REST = "(?:2|[3-6][1-5]|70)[-\\s.]?\\d{3,4}[-\\s.]?\\d{4}(?!\\d)";
+    private static final Pattern LANDLINE = Pattern.compile("(?<!\\d)0" + LANDLINE_REST);
+    /** 국가 번호(+82, +82-(0)) 붙은 일반 전화. 한 식으로 쓰면 정규식이 너무 복잡해져 둘로 나눈다 */
+    private static final Pattern LANDLINE_INTL = Pattern.compile("(?<!\\d)\\+82[-\\s.]?(?:\\(0\\)[-\\s.]?)?" + LANDLINE_REST);
 
     /** 입실 번호 6자리. 학생이 "482913 맞아?"처럼 채팅에 적어도 외부 AI로 보내지 않는다 */
     private static final Pattern ACCESS_CODE = Pattern.compile("(?<!\\d)\\d{6}(?!\\d)");
@@ -27,7 +29,9 @@ public final class PrivacyMask {
         if (text == null) {
             return null;
         }
-        String masked = LANDLINE.matcher(PHONE.matcher(text).replaceAll("[전화번호]")).replaceAll("[전화번호]");
+        String masked = PHONE.matcher(text).replaceAll("[전화번호]");
+        masked = LANDLINE_INTL.matcher(masked).replaceAll("[전화번호]");
+        masked = LANDLINE.matcher(masked).replaceAll("[전화번호]");
         masked = STUDENT_ID.matcher(masked).replaceAll("[학번]");
         return ACCESS_CODE.matcher(masked).replaceAll("[입실 번호]");
     }

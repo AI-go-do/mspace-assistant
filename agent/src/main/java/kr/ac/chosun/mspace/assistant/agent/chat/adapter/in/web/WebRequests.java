@@ -35,7 +35,7 @@ final class WebRequests {
         return ResponseEntity.status(status).body(Map.of("code", code, "message", message));
     }
 
-    static ResponseEntity<Object> unauthorized() {
+    static ResponseEntity<Object> loginRequired() {
         return error(HttpStatus.UNAUTHORIZED, UNAUTHORIZED, LOGIN_REQUIRED);
     }
 }
