@@ -15,7 +15,9 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentLoop;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemoryProperties;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.Persona;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.UserHeaders;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
@@ -166,6 +168,51 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("성향 조용히: 빈방 결과여도 답 아래 빠른 답장 버튼을 붙이지 않는다 (먼저 권하지 않음)")
+    void quietDropsSuggestions() {
+        var llm = new ScriptedLlm()
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-03", "from", "14:00")))
+                .then(say("2번 방이 비어 있어요"));
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+        var personas = new kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore();
+        personas.save(MemberKey.of(ME), Persona.QUIET);
+
+        ChatResult result = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), null, personas)
+                .run(ME, List.of(), "내일 오후 2시 빈방 있어?");
+
+        assertThat(result.reply()).isEqualTo("2번 방이 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
+        assertThat(result.suggestions()).isEmpty();
+        assertThat(llm.lastSystem).contains("성향: 조용히");
+    }
+
+    @Test
+    @DisplayName("성향(설계 5.v): \"잔소리 모드로\"는 모델 없이 저장하고 바로 답하며, 다음 채팅의 지시문에 그 성향 규칙이 붙는다")
+    void personaShortcutAndPrompt() {
+        var llm = new ScriptedLlm().then(say("다 비어 있어요"));
+        var tools = new FakeTools(Map.of());
+        var personas = new kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore();
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), null, personas);
+
+        ChatResult changed = loop.run(ME, List.of(), "잔소리 모드로 해 줘");
+        ChatResult next = loop.run(ME, List.of(), "오늘 빈방");
+
+        assertThat(changed.reply()).startsWith("비서 성향을 '잔소리'로 바꿨어요.");
+        assertThat(changed.tools()).containsExactly("persona");
+        assertThat(changed.suggestions()).containsExactly("조용히 모드로 바꿔 줘", "알아서 모드로 바꿔 줘");
+        assertThat(next.reply()).isEqualTo("다 비어 있어요");
+        assertThat(llm.seen).as("성향 바꾸기에는 모델이 안 불림").hasSize(1);
+        assertThat(llm.lastSystem).contains("성향: 잔소리").doesNotContain("성향: 알아서");
+        assertThat(personas.load(MemberKey.of(ME))).isEqualTo(Persona.NAGGING);
+        ChatResult other = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), null, personas)
+                .run(new UserHeaders(Map.of("X-User-Id", "2")), List.of(), "오늘 빈방");
+        assertThat(other.reply()).isNotNull();
+        assertThat(llm.lastSystem).as("고른 적 없는 학생은 기본").contains("성향: 알아서");
+    }
+
+    @Test
     @DisplayName("모델이 꼬리말을 흉내 내 써도 코드가 하나만 붙이고, 도구 없는 답의 가짜 꼬리말은 지운다 (#74)")
     void footerOnlyOnce() {
         var imitating = new ScriptedLlm()
@@ -227,8 +274,8 @@ class AgentLoopTest {
                 .contains("꼬리말이 없는 답은 조회한 것이 아니니")
                 .contains("확인하지 않았다고 사과하지 않는다")
                 .contains("\"잠시만 기다려 주세요\"")
-                .contains("note·message 문장은 바꿔 말하지 않고");
-        assertThat(llm.lastSystem).contains("room_status로 지금 비어 있는 방을 보고", "start_now_reservation으로 제안한다");
+                .contains("note·message 문장은 바꿔 말하지 않고")
+                .contains("room_status로 지금 비어 있는 방을 보고", "start_now_reservation으로 제안한다");
     }
 
     @Test
@@ -727,8 +774,9 @@ class AgentLoopTest {
         };
 
         // when, then
-        org.assertj.core.api.Assertions.assertThatThrownBy(
-                        () -> loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "안녕"))
+        AgentLoop agent = loop(llm, new FakeTools(Map.of()));
+        List<LlmMessage> noHistory = List.of();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> agent.run(ME, noHistory, "안녕"))
                 .isInstanceOf(LlmException.class);
     }
 

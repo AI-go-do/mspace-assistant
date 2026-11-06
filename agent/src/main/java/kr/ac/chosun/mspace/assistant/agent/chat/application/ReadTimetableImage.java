@@ -114,10 +114,14 @@ public class ReadTimetableImage {
                 }
             }
         }
-        String note = out.isEmpty()
-                ? "시간표를 읽지 못했어요. 더 선명한 사진으로 다시 올리거나 직접 입력해 주세요."
-                : dropped > 0 ? "읽지 못한 칸이 " + dropped + "개 있어요. 확인하고 고쳐 주세요."
-                : "읽은 결과예요. 맞는지 확인한 뒤 저장해 주세요.";
+        String note;
+        if (out.isEmpty()) {
+            note = "시간표를 읽지 못했어요. 더 선명한 사진으로 다시 올리거나 직접 입력해 주세요.";
+        } else if (dropped > 0) {
+            note = "읽지 못한 칸이 " + dropped + "개 있어요. 확인하고 고쳐 주세요.";
+        } else {
+            note = "읽은 결과예요. 맞는지 확인한 뒤 저장해 주세요.";
+        }
         return new Draft(List.copyOf(out), dropped, note);
     }
 

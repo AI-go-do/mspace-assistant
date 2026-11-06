@@ -85,31 +85,35 @@ public final class ProposalParser {
         boolean changed = false;
         if (node instanceof Map<?, ?> map) {
             for (var entry : ((Map<Object, Object>) map).entrySet()) {
-                if (entry.getValue() instanceof String s) {
-                    String masked = PrivacyMask.mask(s);
-                    if (!masked.equals(s)) {
-                        entry.setValue(masked);
-                        changed = true;
-                    }
-                } else {
-                    changed |= maskStrings(entry.getValue());
+                Object masked = maskValue(entry.getValue());
+                if (masked != null) {
+                    entry.setValue(masked);
+                    changed = true;
                 }
             }
         } else if (node instanceof List<?> list) {
             var items = (List<Object>) list;
             for (int i = 0; i < items.size(); i++) {
-                if (items.get(i) instanceof String s) {
-                    String masked = PrivacyMask.mask(s);
-                    if (!masked.equals(s)) {
-                        items.set(i, masked);
-                        changed = true;
-                    }
-                } else {
-                    changed |= maskStrings(items.get(i));
+                Object masked = maskValue(items.get(i));
+                if (masked != null) {
+                    items.set(i, masked);
+                    changed = true;
                 }
             }
         }
         return changed;
+    }
+
+    /**
+     * 값 하나. 문자열이 가려지면 바꿀 값을, 안쪽 객체·목록이면 그 안을 바로 고치고 바뀌었으면 원래 객체를 돌려준다(같은 객체라 그대로 넣어도 된다).
+     * 바뀐 것이 없으면 null
+     */
+    private static Object maskValue(Object value) {
+        if (value instanceof String s) {
+            String masked = PrivacyMask.mask(s);
+            return masked.equals(s) ? null : masked;
+        }
+        return maskStrings(value) ? value : null;
     }
 
     /** accessCode 키를 안쪽 객체·목록까지 모두 지운다. 하나라도 지웠으면 true */

@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
@@ -67,6 +69,7 @@ class ChatControllerTest {
 
         @Override
         public void shutdown() {
+            // 손으로 돌리는 executor라 멈출 스레드가 없다
         }
 
         @Override
@@ -98,16 +101,20 @@ class ChatControllerTest {
     final DailyBriefing dailyBriefing = mock(DailyBriefing.class);
     final ConfirmationGateway confirmations = mock(ConfirmationGateway.class);
     final ConfirmationFollowUp followUp = mock(ConfirmationFollowUp.class);
+    final InMemoryPersonaStore personas = new InMemoryPersonaStore();
 
     @BeforeEach
     void setUp() {
         ChatJobProperties jobProps = new ChatJobProperties(0, 0, null, null, null);
         ChatJobs jobs = new ChatJobs(jobProps, Clock.systemUTC(), executor);
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
-        ChatController controller = new ChatController(agent, confirmations, followUp,
-                mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory,
-                timetable, dailyBriefing);
-        mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc = MockMvcBuilders.standaloneSetup(
+                        new ChatController(agent, props, jobs, jobProps, memory),
+                        new ConfirmationController(confirmations, followUp, mock(AccessCodeGateway.class), props),
+                        new ScheduleController(mock(ScheduleGateway.class), timetable, props),
+                        new AssistantSettingsController(dailyBriefing, personas, props))
+                .setControllerAdvice(new AgentErrors())
+                .build();
         when(agent.run(any(UserHeaders.class), anyList(), anyString()))
                 .thenReturn(new ChatResult("3번 방이 비어 있어요", List.of(), List.of(), 1, false, List.of("find_available_rooms"), List.of(), List.of()));
     }
@@ -247,7 +254,7 @@ class ChatControllerTest {
     void parseScheduleImage() throws Exception {
         // given
         byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
-        when(timetable.read(eq("image/png"), eq(png))).thenReturn(new ReadTimetableImage.Draft(
+        when(timetable.read("image/png", png)).thenReturn(new ReadTimetableImage.Draft(
                 List.of(new ReadTimetableImage.ClassDraft("MON", "09:00", "10:30", "자료구조")), 1, "읽지 못한 칸이 1개 있어요."));
 
         // when · then
@@ -318,7 +325,7 @@ class ChatControllerTest {
         // given
         var relayed = new ConfirmationGateway.Relayed(201, "{\"action\":\"CREATE\",\"reservationId\":7,\"message\":\"예약했어요.\"}");
         when(confirmations.confirm(eq("tok"), any(UserHeaders.class), any())).thenReturn(relayed);
-        when(followUp.record(any(UserHeaders.class), eq(relayed)))
+        when(followUp.remember(any(UserHeaders.class), eq(relayed)))
                 .thenReturn("{\"action\":\"CREATE\",\"reservationId\":7,\"message\":\"예약했어요.\",\"suggestions\":[\"입실 번호 보여 줘\"]}");
 
         // when / then
@@ -327,5 +334,36 @@ class ChatControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.suggestions[0]").value("입실 번호 보여 줘"));
+    }
+
+    @Test
+    @DisplayName("비서 성향: 고른 적 없으면 기본(알아서), PUT으로 바꾸면 그 학생만 바뀌고 GET에 선택지 3개가 같이 온다")
+    void persona() throws Exception {
+        mvc.perform(get("/api/agent/persona")).andExpect(status().isUnauthorized());
+
+        mvc.perform(get("/api/agent/persona").header("Authorization", "Bearer owner"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.style").value("ACTIVE"))
+                .andExpect(jsonPath("$.options.length()").value(3))
+                .andExpect(jsonPath("$.options[2].style").value("NAGGING"));
+
+        mvc.perform(put("/api/agent/persona").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"style\":\"nagging\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.style").value("NAGGING"))
+                .andExpect(jsonPath("$.label").value("잔소리"))
+                .andExpect(header().string("Cache-Control", "no-store"));
+        mvc.perform(get("/api/agent/persona").header("Authorization", "Bearer owner"))
+                .andExpect(jsonPath("$.style").value("NAGGING"));
+        mvc.perform(get("/api/agent/persona").header("Authorization", "Bearer other"))
+                .andExpect(jsonPath("$.style").value("ACTIVE"));
+
+        mvc.perform(put("/api/agent/persona").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"style\":\"LOUD\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PERSONA"));
+        mvc.perform(put("/api/agent/persona").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
     }
 }

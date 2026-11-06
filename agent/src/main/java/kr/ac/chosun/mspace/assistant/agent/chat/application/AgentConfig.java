@@ -2,7 +2,9 @@ package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
 import java.time.Clock;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisConversationMemory;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisPersonaStore;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ImageReader;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -46,5 +48,14 @@ class AgentConfig {
             return new RedisConversationMemory(redis.getObject(), props);
         }
         return new InMemoryConversationMemory(props, clock);
+    }
+
+    /** 비서 성향 보관 (설계 5.v). 대화 맥락과 같은 저장소를 쓴다: redis면 Redis(TTL 없음), 아니면 메모리 */
+    @Bean
+    PersonaStore personaStore(MemoryProperties props, ObjectProvider<StringRedisTemplate> redis) {
+        if (props.enabled() && "redis".equals(props.store())) {
+            return new RedisPersonaStore(redis.getObject());
+        }
+        return new InMemoryPersonaStore();
     }
 }

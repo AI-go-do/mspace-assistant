@@ -11,9 +11,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import java.util.Map;
+import java.util.stream.Stream;
 import kr.ac.chosun.mspace.assistant.mcp.McpToolTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /** usage_rules를 진짜 MCP 클라이언트로 부른다. 코어 GET /api/rules(core #57)는 WireMock */
 class UsageRulesToolTest extends McpToolTestSupport {
@@ -64,77 +68,41 @@ class UsageRulesToolTest extends McpToolTestSupport {
         core.verify(getRequestedFor(urlEqualTo("/api/rules")).withHeader("X-User-Id", equalTo("1")));
     }
 
-    @Test
-    @DisplayName("core 응답에 reservation이 없으면 규칙을 지어내지 않게 오류로 안내한다")
-    void missingReservationIsError() {
-        // given
-        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
-                .withHeader("Content-Type", "application/json").withBody("{}")));
-
-        // when
-        CallToolResult result = call(USER, "usage_rules", Map.of());
-
-        // then
-        assertThat(result.isError()).isTrue();
-        assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
-    }
-
-    @Test
-    @DisplayName("core 응답에 숫자가 하나라도 빠지면 0으로 안내하지 않고 오류로 안내한다")
-    void missingNumberIsError() {
-        // given: noShowMinutes가 빠진 응답
-        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
-                .withHeader("Content-Type", "application/json").withBody("""
+    static Stream<Arguments> brokenRules() {
+        return Stream.of(
+                Arguments.of("reservation이 없음", "{}"),
+                Arguments.of("숫자(noShowMinutes)가 하나 빠짐", """
                         {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
                           "checkinOpenBeforeMinutes":10,"instantNoShowMinutes":10,
                           "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
                          "conduct":[{"key":"FOOD","title":"음식","rule":"r","penalty":"p"}],
-                         "reminders":{"checkin":"a","checkout":"b"}}""")));
-
-        // when
-        CallToolResult result = call(USER, "usage_rules", Map.of());
-
-        // then
-        assertThat(result.isError()).isTrue();
-        assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
-    }
-
-    @Test
-    @DisplayName("숫자는 다 있어도 이용 수칙(conduct)이 빠지면 규칙 없이 답하지 않고 오류로 알린다")
-    void missingConductIsError() {
-        // given: conduct가 없는 응답
-        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
-                .withHeader("Content-Type", "application/json").withBody("""
+                         "reminders":{"checkin":"a","checkout":"b"}}"""),
+                Arguments.of("이용 수칙(conduct)이 빠짐", """
                         {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
                           "checkinOpenBeforeMinutes":10,"noShowMinutes":15,"instantNoShowMinutes":10,
                           "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
-                         "reminders":{"checkin":"a","checkout":"b"}}""")));
-
-        // when
-        CallToolResult result = call(USER, "usage_rules", Map.of());
-
-        // then
-        assertThat(result.isError()).isTrue();
-        assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
-    }
-
-    @Test
-    @DisplayName("수칙 한 줄에 내용(rule)이 빠져 있어도 규칙 없이 답하지 않고 오류로 알린다")
-    void missingConductRuleIsError() {
-        // given: 수칙 항목에 rule이 없는 응답
-        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
-                .withHeader("Content-Type", "application/json").withBody("""
+                         "reminders":{"checkin":"a","checkout":"b"}}"""),
+                Arguments.of("수칙 한 줄에 내용(rule)이 빠짐", """
                         {"reservation":{"bookingWindowDays":7,"slotMinutes":30,"maxMinutes":120,
                           "checkinOpenBeforeMinutes":10,"noShowMinutes":15,"instantNoShowMinutes":10,
                           "extension":{"maxCount":1,"openBeforeMinutes":10,"maxMinutes":120,"chainGapMinutes":30}},
                          "conduct":[{"key":"FOOD","title":"음식","penalty":"p"}],
-                         "reminders":{"checkin":"a","checkout":"b"}}""")));
+                         "reminders":{"checkin":"a","checkout":"b"}}"""));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("brokenRules")
+    @DisplayName("core 응답에 규칙이 하나라도 빠지면(reservation·숫자·수칙·수칙 내용) 0이나 지어낸 규칙으로 안내하지 않고 오류로 알린다")
+    void brokenRulesAreError(String missing, String body) {
+        // given
+        core.stubFor(get("/api/rules").willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json").withBody(body)));
 
         // when
         CallToolResult result = call(USER, "usage_rules", Map.of());
 
         // then
-        assertThat(result.isError()).isTrue();
+        assertThat(result.isError()).as(missing).isTrue();
         assertThat(text(result)).contains("이용 규칙을 불러오지 못했어요");
     }
 

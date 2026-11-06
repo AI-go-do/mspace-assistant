@@ -22,9 +22,11 @@ class CorePropertiesTest {
         assertThatCode(() -> props("https://dev-mspace.java21.net", true).checkTransport()).doesNotThrowAnyException();
         assertThatCode(() -> props("http://localhost:8080", true).checkTransport()).doesNotThrowAnyException();
         assertThatCode(() -> props("http://127.0.0.1:8080", true).checkTransport()).doesNotThrowAnyException();
-        assertThatThrownBy(() -> props("http://core:8080", true).checkTransport())
+        CoreProperties byName = props("http://core:8080", true);
+        CoreProperties byIp = props("http://203.0.113.10:8080", true);
+        assertThatThrownBy(byName::checkTransport)
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("https가 아니에요").hasMessageContaining("core");
-        assertThatThrownBy(() -> props("http://203.0.113.10:8080", true).checkTransport()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(byIp::checkTransport).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

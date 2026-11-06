@@ -35,6 +35,10 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class DailyBriefing {
 
+    private static final String CLASSES = "classes";
+    private static final String START_AT = "startAt";
+    private static final String END_AT = "endAt";
+    private static final String ROOM_NAME = "roomName";
     private static final Logger log = LoggerFactory.getLogger(DailyBriefing.class);
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final Set<String> ACTIVE = Set.of("BOOKED", "IN_USE");
@@ -99,7 +103,7 @@ public class DailyBriefing {
      */
     private Options options(ToolGateway.Session session, JsonNode scheduleNode, Reservations reservations, ZonedDateTime now) {
         if (scheduleNode == null || "NO_SCHEDULE".equals(scheduleNode.path("code").asString(null))
-                || scheduleNode.path("classes").isEmpty()) {
+                || scheduleNode.path(CLASSES).isEmpty()) {
             return Options.NONE;
         }
         if (reservations.items() != null && reservations.items().stream().anyMatch(ReservationItem::owner)) {
@@ -112,26 +116,36 @@ public class DailyBriefing {
             return Options.NONE;
         }
         JsonNode found = call(session, "find_available_rooms", Map.of("date", now.toLocalDate().toString()));
-        AfterClass afterClass = null;
-        if (afterFrom != null) {
-            String hhmm = hhmm(afterFrom);
-            if (found == null) {
-                afterClass = new AfterClass(hhmm, null, null, null, 0, null, AFTER_CLASS_FAILED);
-            } else {
-                Candidate best = pick(found, afterFrom.toOffsetDateTime(), null);
-                afterClass = best == null ? new AfterClass(hhmm, null, null, null, 0, null, AFTER_CLASS_NONE)
-                        : new AfterClass(hhmm, best.roomName(), hhmm(best.start()), hhmm(best.end()), best.minutes(), best.suggestion(), null);
-            }
+        return new Options(freePeriod(found, gap), afterClass(found, afterFrom));
+    }
+
+    /** 수업 끝나고 쓸 수 있는 가장 이른 칸. 시작을 모르면 null, 조회 실패·빈 칸 없음은 note */
+    private AfterClass afterClass(JsonNode found, ZonedDateTime afterFrom) {
+        if (afterFrom == null) {
+            return null;
         }
-        FreePeriod freePeriod = null;
-        if (gap != null && found != null) {
-            Candidate best = pick(found, gap.from().toOffsetDateTime(), gap.to().toOffsetDateTime());
-            if (best != null) {
-                freePeriod = new FreePeriod(hhmm(gap.from()), hhmm(gap.to()), best.roomName(), hhmm(best.start()), hhmm(best.end()),
-                        best.minutes(), best.suggestion());
-            }
+        String hhmm = hhmm(afterFrom);
+        if (found == null) {
+            return new AfterClass(hhmm, null, null, null, 0, null, AFTER_CLASS_FAILED);
         }
-        return new Options(freePeriod, afterClass);
+        Candidate best = pick(found, afterFrom.toOffsetDateTime(), null);
+        if (best == null) {
+            return new AfterClass(hhmm, null, null, null, 0, null, AFTER_CLASS_NONE);
+        }
+        return new AfterClass(hhmm, best.roomName(), hhmm(best.start()), hhmm(best.end()), best.minutes(), best.suggestion(), null);
+    }
+
+    /** 가장 긴 공강에 쓸 수 있는 칸. 공강이 없거나 조회 실패·빈 칸 없음이면 null (브리핑에서 빼면 된다) */
+    private FreePeriod freePeriod(JsonNode found, Window gap) {
+        if (gap == null || found == null) {
+            return null;
+        }
+        Candidate best = pick(found, gap.from().toOffsetDateTime(), gap.to().toOffsetDateTime());
+        if (best == null) {
+            return null;
+        }
+        return new FreePeriod(hhmm(gap.from()), hhmm(gap.to()), best.roomName(), hhmm(best.start()), hhmm(best.end()),
+                best.minutes(), best.suggestion());
     }
 
     /** 수업 끝 + 여유(searchFromAt). 오늘이 아니면(밤늦은 수업) null. 지났으면 지금 칸, 그마저 내일이면 null */
@@ -153,9 +167,9 @@ public class DailyBriefing {
      */
     private Window longestFreePeriod(JsonNode scheduleNode, ZonedDateTime now, ZonedDateTime nowCeil) {
         List<OffsetDateTime[]> classes = new ArrayList<>();
-        for (JsonNode c : scheduleNode.path("classes")) {
-            OffsetDateTime start = parse(c.path("startAt").asString(null));
-            OffsetDateTime end = parse(c.path("endAt").asString(null));
+        for (JsonNode c : scheduleNode.path(CLASSES)) {
+            OffsetDateTime start = parse(c.path(START_AT).asString(null));
+            OffsetDateTime end = parse(c.path(END_AT).asString(null));
             if (start != null && end != null) {
                 classes.add(new OffsetDateTime[] {start, end});
             }
@@ -185,35 +199,39 @@ public class DailyBriefing {
     /** from 뒤(to가 있으면 그 안)에서 가장 좋은 칸. 없으면 null */
     private Candidate pick(JsonNode found, OffsetDateTime from, OffsetDateTime to) {
         Candidate best = null;
-        Duration max = Duration.ofHours(rules.maxHours());
-        Duration slot = Duration.ofMinutes(rules.slotMinutes());
         for (JsonNode room : found.path("rooms")) {
             for (JsonNode r : room.path("free")) {
-                OffsetDateTime start = parse(r.path("startAt").asString(null));
-                OffsetDateTime end = parse(r.path("endAt").asString(null));
-                if (start == null || end == null) {
-                    continue;
-                }
-                if (start.toInstant().isBefore(from.toInstant())) {
-                    start = from;
-                }
-                if (to != null && end.toInstant().isAfter(to.toInstant())) {
-                    end = to;
-                }
-                Duration length = Duration.between(start, end);
-                if (length.compareTo(max) > 0) {
-                    length = max;
-                }
-                if (length.compareTo(slot) < 0) {
-                    continue;
-                }
-                Candidate c = new Candidate(room.path("roomId").asLong(0), room.path("roomName").asString(""), start, length);
-                if (best == null || c.beats(best)) {
+                Candidate c = candidate(room, r, from, to);
+                if (c != null && (best == null || c.beats(best))) {
                     best = c;
                 }
             }
         }
         return best;
+    }
+
+    /** 빈 구간 하나를 from~to로 자르고 최대 2시간으로 줄인 칸. 모양이 깨졌거나 한 칸(30분)보다 짧으면 null */
+    private Candidate candidate(JsonNode room, JsonNode range, OffsetDateTime from, OffsetDateTime to) {
+        OffsetDateTime start = parse(range.path(START_AT).asString(null));
+        OffsetDateTime end = parse(range.path(END_AT).asString(null));
+        if (start == null || end == null) {
+            return null;
+        }
+        if (start.toInstant().isBefore(from.toInstant())) {
+            start = from;
+        }
+        if (to != null && end.toInstant().isAfter(to.toInstant())) {
+            end = to;
+        }
+        Duration max = Duration.ofHours(rules.maxHours());
+        Duration length = Duration.between(start, end);
+        if (length.compareTo(max) > 0) {
+            length = max;
+        }
+        if (length.compareTo(Duration.ofMinutes(rules.slotMinutes())) < 0) {
+            return null;
+        }
+        return new Candidate(room.path("roomId").asLong(0), room.path(ROOM_NAME).asString(""), start, length);
     }
 
     private record Candidate(long roomId, String roomName, OffsetDateTime start, Duration length) {
@@ -293,9 +311,9 @@ public class DailyBriefing {
             return new Schedule(List.of(), null, "아직 넣은 시간표가 없어요. 넣어 두면 수업 끝나는 시각에 맞춰 빈방을 찾아 드려요.");
         }
         List<ClassItem> classes = new ArrayList<>();
-        for (JsonNode c : node.path("classes")) {
-            classes.add(new ClassItem(c.path("name").asString(""), hhmm(c.path("startAt").asString(null)),
-                    hhmm(c.path("endAt").asString(null))));
+        for (JsonNode c : node.path(CLASSES)) {
+            classes.add(new ClassItem(c.path("name").asString(""), hhmm(c.path(START_AT).asString(null)),
+                    hhmm(c.path(END_AT).asString(null))));
         }
         return new Schedule(classes, hhmm(node.path("lastClassEndAt").asString(null)), null);
     }
@@ -307,19 +325,18 @@ public class DailyBriefing {
         }
         List<ReservationItem> items = new ArrayList<>();
         for (JsonNode r : node.path("reservations")) {
-            if (!ACTIVE.contains(r.path("status").asString(""))) {
+            OffsetDateTime start = parse(r.path(START_AT).asString(null));
+            OffsetDateTime end = parse(r.path(END_AT).asString(null));
+            // core 상태 갱신이 늦어도 끝난 예약은 안내하지 않는다
+            boolean ended = end != null && !end.toInstant().isAfter(now.toInstant());
+            if (ended || !ACTIVE.contains(r.path("status").asString(""))) {
                 continue;
-            }
-            OffsetDateTime start = parse(r.path("startAt").asString(null));
-            OffsetDateTime end = parse(r.path("endAt").asString(null));
-            if (end != null && !end.toInstant().isAfter(now.toInstant())) {
-                continue; // core 상태 갱신이 늦어도 끝난 예약은 안내하지 않는다
             }
             // 오늘 시작했거나, 전날 시작해 지금도 이어지는(자정 넘김) 예약은 오늘 예약
             boolean today = start != null && (start.atZoneSameInstant(SEOUL).toLocalDate().equals(now.toLocalDate())
                     || !start.toInstant().isAfter(now.toInstant()));
-            items.add(new ReservationItem(r.path("id").asLong(0), r.path("roomName").asString(""),
-                    r.path("startAt").asString(null), r.path("endAt").asString(null), r.path("status").asString(""),
+            items.add(new ReservationItem(r.path("id").asLong(0), r.path(ROOM_NAME).asString(""),
+                    r.path(START_AT).asString(null), r.path(END_AT).asString(null), r.path("status").asString(""),
                     r.path("owner").asBoolean(false), today));
         }
         // 오늘 것 먼저, 그 안에서는 시작이 빠른 순 (도구는 끝나지 않은 예약끼리의 순서를 보장하지 않는다)
@@ -337,7 +354,7 @@ public class DailyBriefing {
         for (JsonNode r : node.path("rooms")) {
             String latest = r.path("latestEndAt").asString(null);
             if (latest != null) {
-                names.add(r.path("roomName").asString(""));
+                names.add(r.path(ROOM_NAME).asString(""));
                 if (earliestLimit == null || latest.compareTo(earliestLimit) < 0) {
                     earliestLimit = latest;
                 }
@@ -351,54 +368,74 @@ public class DailyBriefing {
         StringBuilder sb = new StringBuilder();
         sb.append(now.getMonthValue()).append("월 ").append(now.getDayOfMonth()).append("일 ").append(dayName(now))
                 .append("요일 브리핑이에요. ");
-        // 수업
+        appendClasses(sb, schedule);
+        appendOptions(sb, freePeriod, afterClass);
+        appendReservations(sb, reservations);
+        appendRooms(sb, rooms);
+        return sb.toString().trim();
+    }
+
+    /** 수업 */
+    private static void appendClasses(StringBuilder sb, Schedule schedule) {
         if (schedule.classes() == null) {
             sb.append(schedule.note()).append(' ');
-        } else if (schedule.classes().isEmpty()) {
-            sb.append(schedule.note() != null ? schedule.note() : "오늘은 수업이 없어요.").append(' ');
-        } else {
-            sb.append("오늘 수업은 ");
-            for (int i = 0; i < schedule.classes().size(); i++) {
-                ClassItem c = schedule.classes().get(i);
-                sb.append(i > 0 ? ", " : "").append(c.name()).append(' ').append(c.start()).append('–').append(c.end());
-            }
-            sb.append(' ').append(count(schedule.classes().size())).append("예요. 마지막 수업은 ").append(schedule.lastClassEnd())
-                    .append("에 끝나요. ");
+            return;
         }
-        // 공강에 쓸 수 있는 칸
+        if (schedule.classes().isEmpty()) {
+            sb.append(schedule.note() != null ? schedule.note() : "오늘은 수업이 없어요.").append(' ');
+            return;
+        }
+        sb.append("오늘 수업은 ");
+        for (int i = 0; i < schedule.classes().size(); i++) {
+            ClassItem c = schedule.classes().get(i);
+            sb.append(i > 0 ? ", " : "").append(c.name()).append(' ').append(c.start()).append('–').append(c.end());
+        }
+        sb.append(' ').append(count(schedule.classes().size())).append("예요. 마지막 수업은 ").append(schedule.lastClassEnd())
+                .append("에 끝나요. ");
+    }
+
+    /** 공강에 쓸 수 있는 칸, 수업 끝나고 쓸 수 있는 칸 */
+    private static void appendOptions(StringBuilder sb, FreePeriod freePeriod, AfterClass afterClass) {
         if (freePeriod != null) {
             sb.append("공강 ").append(freePeriod.periodStart()).append('–').append(freePeriod.periodEnd()).append("에는 ")
                     .append(freePeriod.roomName()).append("을 ").append(freePeriod.start()).append("부터 ")
                     .append(lengthText(freePeriod.minutes())).append(" 쓸 수 있어요. ");
         }
-        // 수업 끝나고 쓸 수 있는 칸
-        if (afterClass != null) {
-            if (afterClass.note() != null) {
-                sb.append(afterClass.note()).append(' ');
-            } else {
-                sb.append("수업 끝나고 ").append(afterClass.start()).append("부터 ").append(afterClass.roomName()).append("을 ")
-                        .append(lengthText(afterClass.minutes())).append(" 쓸 수 있어요. ");
-            }
+        if (afterClass == null) {
+            return;
         }
-        // 예약
+        if (afterClass.note() != null) {
+            sb.append(afterClass.note()).append(' ');
+        } else {
+            sb.append("수업 끝나고 ").append(afterClass.start()).append("부터 ").append(afterClass.roomName()).append("을 ")
+                    .append(lengthText(afterClass.minutes())).append(" 쓸 수 있어요. ");
+        }
+    }
+
+    /** 예약 (가장 앞 한 건 + 나머지 건수) */
+    private static void appendReservations(StringBuilder sb, Reservations reservations) {
         if (reservations.items() == null) {
             sb.append(reservations.note()).append(' ');
-        } else if (reservations.items().isEmpty()) {
-            sb.append("잡아 둔 예약은 없어요. ");
-        } else {
-            ReservationItem r = reservations.items().getFirst();
-            String when = r.today() ? "오늘 " : "다음 예약은 " + monthDay(r.startAt()) + " ";
-            sb.append(r.today() ? "오늘 예약은 " : when).append(r.roomName()).append(' ').append(hhmm(r.startAt())).append('–')
-                    .append(hhmm(r.endAt()));
-            if ("IN_USE".equals(r.status())) {
-                sb.append("(사용 중)");
-            }
-            sb.append(r.owner() ? "이고 대표자예요. " : "이에요. ");
-            if (reservations.items().size() > 1) {
-                sb.append("그 뒤로 ").append(reservations.items().size() - 1).append("건이 더 있어요. ");
-            }
+            return;
         }
-        // 빈 방
+        if (reservations.items().isEmpty()) {
+            sb.append("잡아 둔 예약은 없어요. ");
+            return;
+        }
+        ReservationItem r = reservations.items().getFirst();
+        sb.append(r.today() ? "오늘 예약은 " : "다음 예약은 " + monthDay(r.startAt()) + " ").append(r.roomName()).append(' ')
+                .append(hhmm(r.startAt())).append('–').append(hhmm(r.endAt()));
+        if ("IN_USE".equals(r.status())) {
+            sb.append("(사용 중)");
+        }
+        sb.append(r.owner() ? "이고 대표자예요. " : "이에요. ");
+        if (reservations.items().size() > 1) {
+            sb.append("그 뒤로 ").append(reservations.items().size() - 1).append("건이 더 있어요. ");
+        }
+    }
+
+    /** 지금 빈 방 */
+    private static void appendRooms(StringBuilder sb, Rooms rooms) {
         if (rooms.availableNames() == null) {
             sb.append(rooms.note());
         } else if (rooms.availableNames().isEmpty()) {
@@ -407,7 +444,6 @@ public class DailyBriefing {
             sb.append("지금 바로 쓸 수 있는 방은 ").append(String.join(", ", rooms.availableNames())).append(' ')
                     .append(count(rooms.availableNames().size())).append("예요.");
         }
-        return sb.toString().trim();
     }
 
     private static String count(int n) {

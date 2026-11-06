@@ -60,7 +60,11 @@ class GeminiImageReaderTest {
     @Test
     @DisplayName("키가 없으면 부르지 않고 LLM_NOT_CONFIGURED")
     void noKey() {
-        assertThatThrownBy(() -> reader(" ").read("i", "image/png", IMAGE))
+        // given
+        GeminiImageReader noKey = reader(" ");
+
+        // when · then
+        assertThatThrownBy(() -> noKey.read("i", "image/png", IMAGE))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_NOT_CONFIGURED");
         assertThat(gemini.getAllServeEvents()).isEmpty();
     }
@@ -68,16 +72,22 @@ class GeminiImageReaderTest {
     @Test
     @DisplayName("429는 LLM_RATE_LIMITED, 5xx·빈 답은 LLM_UNAVAILABLE")
     void errorMapping() {
+        // given
+        GeminiImageReader keyed = reader("k");
+
+        // when · then: 429
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(429)));
-        assertThatThrownBy(() -> reader("k").read("i", "image/png", IMAGE))
+        assertThatThrownBy(() -> keyed.read("i", "image/png", IMAGE))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_RATE_LIMITED");
 
+        // when · then: 5xx
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(500)));
-        assertThatThrownBy(() -> reader("k").read("i", "image/png", IMAGE))
+        assertThatThrownBy(() -> keyed.read("i", "image/png", IMAGE))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
 
+        // when · then: 빈 답
         gemini.stubFor(post(PATH).willReturn(okJson("{\"candidates\":[]}")));
-        assertThatThrownBy(() -> reader("k").read("i", "image/png", IMAGE))
+        assertThatThrownBy(() -> keyed.read("i", "image/png", IMAGE))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
     }
 }

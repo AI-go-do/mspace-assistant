@@ -279,6 +279,26 @@
         }
       ],
       "note": "모델을 안 거치는 지름길. 도구 이름이 briefing 하나뿐이고(모델이 my_schedule·room_status를 따로 부르면 실패) 답이 '… 브리핑이에요.'로 시작해야 통과. 시간은 수백 ms"
+    },
+    {
+      "id": "Q18",
+      "group": "성향",
+      "text": "잔소리 모드로 해 줘",
+      "expect": [
+        {
+          "tools_count": {
+            "persona": 1
+          },
+          "tools_none": [
+            "find_available_rooms",
+            "room_status"
+          ],
+          "reply_any": [
+            "잔소리"
+          ]
+        }
+      ],
+      "note": "모델을 안 거치는 지름길. tools가 persona 하나뿐이고 답에 '잔소리'가 있어야 통과. 다음 질문부터 지시문에 성향 규칙이 붙는다"
     }
   ]
 }

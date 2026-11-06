@@ -59,7 +59,7 @@ public class FindAvailableRooms {
         RoomDay day = port.findDay(date, credential);
         boolean crossesMidnight = from != null && to != null && !to.isAfter(from);
         OffsetDateTime windowStart = from == null ? null : at(date, from);
-        OffsetDateTime windowEnd = to == null ? null : crossesMidnight ? at(date.plusDays(1), LocalTime.MIDNIGHT) : at(date, to);
+        OffsetDateTime windowEnd = windowEnd(date, to, crossesMidnight);
 
         List<FreeRoom> rooms = new ArrayList<>();
         List<Alternative> candidates = new ArrayList<>();
@@ -87,14 +87,31 @@ public class FindAvailableRooms {
             }
         }
         List<Alternative> alternatives = rooms.isEmpty() ? pick(candidates, windowStart) : List.of();
-        String note = rooms.isEmpty() && !alternatives.isEmpty() ? ALTERNATIVES_NOTE
-                : rooms.isEmpty()
-                ? (headcount != null && !anyRoomFitsHeadcount && !day.rooms().isEmpty()
-                        ? HEADCOUNT_NOTE.formatted(headcount, capacities(day.rooms()),
-                                headcount > day.rooms().stream().mapToInt(RoomSlots::maxPeople).max().orElse(0) ? TOO_MANY : TOO_FEW)
-                        : NONE_NOTE)
-                : crossesMidnight ? MIDNIGHT_NOTE : null;
+        String note;
+        if (!rooms.isEmpty()) {
+            note = crossesMidnight ? MIDNIGHT_NOTE : null;
+        } else if (!alternatives.isEmpty()) {
+            note = ALTERNATIVES_NOTE;
+        } else if (headcount != null && !anyRoomFitsHeadcount && !day.rooms().isEmpty()) {
+            note = headcountNote(headcount, day.rooms());
+        } else {
+            note = NONE_NOTE;
+        }
         return new AvailableRooms(day.date(), rooms, note, alternatives);
+    }
+
+    /** 자정을 넘기면 끝은 다음 날 0시까지만 본다 (시작 날짜만 조회) */
+    private static OffsetDateTime windowEnd(LocalDate date, LocalTime to, boolean crossesMidnight) {
+        if (to == null) {
+            return null;
+        }
+        return crossesMidnight ? at(date.plusDays(1), LocalTime.MIDNIGHT) : at(date, to);
+    }
+
+    /** 인원에 맞는 방이 없을 때: 방별 인원 범위와 너무 많은지·적은지 */
+    private static String headcountNote(int headcount, List<RoomSlots> all) {
+        boolean tooMany = headcount > all.stream().mapToInt(RoomSlots::maxPeople).max().orElse(0);
+        return HEADCOUNT_NOTE.formatted(headcount, capacities(all), tooMany ? TOO_MANY : TOO_FEW);
     }
 
     /**
@@ -110,10 +127,14 @@ public class FindAvailableRooms {
             if (latest.isBefore(earliest)) {
                 continue;
             }
-            OffsetDateTime start = wanted.isBefore(earliest) ? earliest : wanted.isAfter(latest) ? latest : wanted;
+            OffsetDateTime start = wanted.isBefore(earliest) ? earliest : earliestOf(wanted, latest);
             found.add(new Alternative(room.roomId(), room.roomName(), start, start.plus(length)));
         }
         return found;
+    }
+
+    private static OffsetDateTime earliestOf(OffsetDateTime a, OffsetDateTime b) {
+        return a.isAfter(b) ? b : a;
     }
 
     /** 지난 시각 now를 구간 시작 기준 30분 칸으로 올린다 */
