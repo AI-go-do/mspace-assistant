@@ -32,14 +32,23 @@ analysis_id=$(api "ce/task?id=$task_id" | jq -r '.task.analysisId // empty')
 
 # Community 서버는 브랜치·PR을 나눠 담지 못하고 프로젝트 하나에 덮어쓴다. 그래서 값을 읽기 전과 뒤에
 # 프로젝트의 마지막 분석이 이 분석인지 확인해, 다른 분석(develop push 등)의 값으로 판정하지 않게 한다
-latest() { api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty'; }
-not_mine() { echo "그 사이 다른 분석(develop push 등)이 끝나 프로젝트 값이 바뀌었어요. 이 build를 다시 실행해 주세요"; exit 1; }
-[ "$(latest)" = "$analysis_id" ] || not_mine
+# 공용 토큰에 분석 목록을 볼 권한이 없으면(403) 이 확인은 건너뛰고 경고만 남긴다 (11-06 #81: 겹친 분석이 없는데도 매번 실패)
+latest() { api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty' || true; }
+check_mine() {
+  local now; now=$(latest)
+  if [ -z "$now" ]; then
+    echo "경고: 분석 목록을 읽지 못해(권한 없음 등) 겹친 분석 확인은 건너뛰어요"; return 0
+  fi
+  [ "$now" = "$analysis_id" ] && return 0
+  echo "그 사이 다른 분석(develop push 등)이 끝나 프로젝트 값이 바뀌었어요 (이 분석 $analysis_id, 마지막 분석 $now). 이 build를 다시 실행해 주세요"
+  exit 1
+}
+check_mine
 
 # 2) 새 코드 값 읽기. 새 코드 지표는 period.value에 들어 있다. 덮을 새 줄이 없으면 커버리지 값이 없을 수 있다
 measures=$(api "measures/component?component=$SONAR_PROJECT&metricKeys=new_coverage,new_duplicated_lines_density,new_lines_to_cover,new_violations,new_bugs,new_vulnerabilities,new_reliability_rating,new_security_rating") \
   || { echo "Sonar 지표를 읽지 못했어요"; exit 1; }
-[ "$(latest)" = "$analysis_id" ] || not_mine
+check_mine
 val() { echo "$measures" | jq -r --arg k "$1" '[.component.measures[] | select(.metric == $k) | (.period.value // .value)][0] // empty'; }
 coverage=$(val new_coverage)
 duplication=$(val new_duplicated_lines_density)
