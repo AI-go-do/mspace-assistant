@@ -66,16 +66,29 @@ val() {
   fi
   echo "$out" | sed '$d' | jq -r --arg k "$1" '[.component.measures[]? | select(.metric == $k) | (.period.value // .value)][0] // empty'
 }
-# 앞의 것을 먼저 읽고, 없으면 뒤의 것(새 품질 모델 MQR 이름)을 읽는다
-val_any() { local v k; for k in "$@"; do v=$(val "$k"); [ -n "$v" ] && { echo "$v"; return 0; }; done; return 0; }
+# 건수 지표(new_bugs·new_vulnerabilities)가 없으면 새 코드 이슈 목록에서 유형 BUG·VULNERABILITY 수를 센다
+# 새 품질 모델(MQR)의 신뢰성·보안 이슈 수는 코드 스멜도 섞여 있어 쓰지 않는다 (코드 스멜은 막지 않는 팀 규칙)
+count_type() {
+  local out code
+  out=$(curl -sS -m 30 -u "$SONAR_TOKEN:" -w '\n%{http_code}' \
+        "$SONAR_HOST_URL/api/issues/search?componentKeys=$SONAR_PROJECT&inNewCodePeriod=true&resolved=false&types=$1&ps=1" 2>&1) || true
+  code=$(echo "$out" | tail -n1)
+  if [ "$code" != "200" ]; then
+    echo "참고: 유형 $1 이슈 수를 읽지 못했어요 (상태 $code: $(echo "$out" | sed '$d' | head -c 200))" >&2
+    return 0
+  fi
+  echo "$out" | sed '$d' | jq -r '.total // empty'
+}
 coverage=$(val new_coverage)
 duplication=$(val new_duplicated_lines_density)
 to_cover=$(val new_lines_to_cover)
 issues=$(val new_violations)
-bugs=$(val_any new_bugs new_software_quality_reliability_issues)
-vulns=$(val_any new_vulnerabilities new_software_quality_security_issues)
-rel=$(val_any new_reliability_rating new_software_quality_reliability_rating)   # 1.0=A … 5.0=E
-sec=$(val_any new_security_rating new_software_quality_security_rating)
+bugs=$(val new_bugs)
+[ -n "$bugs" ] || bugs=$(count_type BUG)
+vulns=$(val new_vulnerabilities)
+[ -n "$vulns" ] || vulns=$(count_type VULNERABILITY)
+rel=$(val new_reliability_rating)   # 1.0=A … 5.0=E
+sec=$(val new_security_rating)
 check_mine
 
 echo "새 코드 커버리지: ${coverage:-없음}% (기준 ${MIN_COVERAGE}% 이상, 덮을 새 줄 ${to_cover:-0}줄)"
