@@ -96,7 +96,10 @@ jobs:
           echo "== 검토 안 된 보안 핫스팟"
           # inNewCodePeriod는 서버 버전에 따라 없는 매개변수라 빼고, 검토 안 된 것 전부를 본다
           api "hotspots/search?projectKey=mspace-assistant&status=TO_REVIEW&ps=500" \
-            | jq -r '"총 \(.paging.total)건", (.hotspots[] | "\(.vulnerabilityProbability)\t\(.ruleKey // .securityCategory)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")' || true
+            | jq -r '"총 \(.paging.total)건", (.hotspots[] | "\(.vulnerabilityProbability)\t\(.ruleKey // .securityCategory)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")' \
+            || { echo "(hotspots API를 못 읽어 이슈 API의 SECURITY_HOTSPOT 유형으로 다시 봐요. 서버 버전에 따라 안 될 수 있어요)"
+                 api "issues/search?componentKeys=mspace-assistant&types=SECURITY_HOTSPOT&resolved=false&ps=500" \
+                   | jq -r '"총 \(.total)건", (.issues[] | "\(.rule)\t\(.component | sub("^mspace-assistant:"; "")):\(.line // "-")\t\(.message)")' || true; }
           echo "== 새 코드 커버리지가 낮은 파일 (상위 15)"
           api "measures/component_tree?component=mspace-assistant&metricKeys=new_coverage,new_uncovered_lines&qualifiers=FIL&ps=500" \
             | jq -r '[.components[] | {p: .path, m: ([.measures[] | {(.metric): (.period.value // .value)}] | add)} | select(.m.new_coverage != null)]
