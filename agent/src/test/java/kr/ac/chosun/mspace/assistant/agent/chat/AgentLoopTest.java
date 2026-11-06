@@ -238,7 +238,7 @@ class AgentLoopTest {
 
         ChatResult result = loop(llm, tools).run(ME, List.of(), "지금 빈 방");
 
-        assertThat(result.reply()).isEqualTo("지금 바로 쓰기으로 바로 잡을 수 있어요\n\n(예약 시스템 15:00 조회 기준)");
+        assertThat(result.reply()).isEqualTo("지금 바로 쓰기로 바로 잡을 수 있어요\n\n(예약 시스템 15:00 조회 기준)");
     }
 
     @Test
