@@ -188,6 +188,39 @@
         }
       ],
       "note": "장면 C 앞부분: 시간표를 보고(my_schedule) 빈방까지 찾아야(find_available_rooms) 통과. 둘 다 불러야 해요. '내일 없으면 모레' 넘어감은 내일이 꽉 찬 날에만 생기니 자동 판정 밖이에요 — 그날은 결과 표 why의 도구 목록(my_schedule,find_available_rooms,my_schedule,find_available_rooms)으로 회차마다 봐요"
+    },
+    {
+      "id": "Q14",
+      "group": "시간표",
+      "text": "이번 주에 수업 끝나고 2시간 쓸 수 있는 날 알려 줘",
+      "expect": [
+        {
+          "tools_count": {
+            "week_plan": 1
+          },
+          "tools_none": [
+            "find_available_rooms"
+          ],
+          "not_stopped": true
+        }
+      ],
+      "note": "week_plan을 정확히 한 번 부르고 최대 횟수에서 멈추지 않아야 통과. 여러 번 부르거나 날짜마다 find_available_rooms로 돌면 이 기능(한 번에 보기)이 실패한 거예요"
+    },
+    {
+      "id": "Q15",
+      "group": "조회",
+      "text": "내일 오후 2시부터 2시간 빈방 있어? 없으면 가까운 시간도 알려 줘",
+      "expect": [
+        {
+          "tools_any": [
+            "find_available_rooms"
+          ],
+          "tools_none": [
+            "room_status",
+            "week_plan"
+          ]
+        }
+      ]
     }
   ]
 }

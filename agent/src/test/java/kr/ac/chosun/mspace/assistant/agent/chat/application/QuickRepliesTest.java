@@ -41,6 +41,23 @@ class QuickRepliesTest {
     }
 
     @Test
+    @DisplayName("주간 계획(week_plan): 첫 번째 쓸 수 있는 날을 '날짜 시각 방 잡아 줘'로, 없으면 길이 줄이기")
+    void weekPlan() {
+        // given
+        List<Seen> some = List.of(ok("week_plan", "{\"days\":[{\"date\":\"2026-11-05\",\"option\":null,\"reason\":\"빈 시간 없음\"},"
+                + "{\"date\":\"2026-11-06\",\"option\":{\"roomId\":2,\"roomName\":\"2번 방\",\"startAt\":\"2026-11-06T15:30:00+09:00\",\"endAt\":\"2026-11-06T17:30:00+09:00\"}}]}"));
+        List<Seen> none = List.of(ok("week_plan", "{\"days\":[{\"date\":\"2026-11-05\",\"option\":null}]}"));
+
+        // when
+        List<String> a = QuickReplies.suggest(some, false);
+        List<String> b = QuickReplies.suggest(none, false);
+
+        // then
+        assertThat(a).containsExactly("11월 6일 15:30 2번 방 잡아 줘", "다른 날도 볼게");
+        assertThat(b).containsExactly("1시간으로 다시 볼게", "내 예약 보여 줘");
+    }
+
+    @Test
     @DisplayName("빈방 없음 + 서버 대안(alternatives): 앞의 두 개를 '시각 방 잡아 줘' 버튼으로")
     void roomsAlternatives() {
         // given

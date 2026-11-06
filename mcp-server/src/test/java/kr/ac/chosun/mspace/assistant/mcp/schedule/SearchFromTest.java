@@ -17,7 +17,7 @@ class SearchFromTest {
     @CsvSource({"14:50,15:30", "15:00,15:30", "15:01,16:00", "17:45,18:30", "23:40,00:30"})
     void roundsUp(String end, String expected) {
         // given
-        var schedule = new MySchedule(new InMemoryScheduleRepository(), new ScheduleProperties("memory", 30, 30, 0, 0),
+        var schedule = new MySchedule(new InMemoryScheduleRepository(), new ScheduleProperties("memory", 30, 30, 0, 0, 7, null),
                 Clock.systemUTC());
 
         // when
@@ -32,7 +32,7 @@ class SearchFromTest {
     @CsvSource({"14:50,15:00", "15:00,15:00"})
     void zeroBuffer(String end, String expected) {
         // given
-        var schedule = new MySchedule(new InMemoryScheduleRepository(), new ScheduleProperties("memory", 0, 30, 0, 0),
+        var schedule = new MySchedule(new InMemoryScheduleRepository(), new ScheduleProperties("memory", 0, 30, 0, 0, 7, null),
                 Clock.systemUTC());
 
         // when

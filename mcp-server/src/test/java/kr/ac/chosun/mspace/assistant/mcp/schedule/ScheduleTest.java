@@ -2,6 +2,10 @@ package kr.ac.chosun.mspace.assistant.mcp.schedule;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.anyRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -250,5 +254,42 @@ class ScheduleTest extends McpToolTestSupport {
         String header = b64.encodeToString("{\"alg\":\"HS256\"}".getBytes(StandardCharsets.UTF_8));
         String payload = b64.encodeToString(("{\"sub\":\"" + sub + "\",\"iat\":" + iat + "}").getBytes(StandardCharsets.UTF_8));
         return "Bearer " + header + "." + payload + ".sig";
+    }
+
+    /** core 하루치: 1번 방만, 그날 전부 비어 있음 */
+    static String emptyDay(String date) {
+        StringBuilder slots = new StringBuilder();
+        for (int i = 0; i < 48; i++) {
+            java.time.LocalTime t = java.time.LocalTime.MIDNIGHT.plusMinutes(30L * i);
+            String end = i == 47 ? LocalDate.parse(date).plusDays(1) + "T00:00:00+09:00" : date + "T" + t.plusMinutes(30) + ":00+09:00";
+            slots.append(i > 0 ? "," : "").append("{\"startAt\":\"").append(date).append("T").append(t)
+                    .append(":00+09:00\",\"endAt\":\"").append(end).append("\",\"available\":true}");
+        }
+        return "{\"date\":\"" + date + "\",\"slotMinutes\":30,\"rooms\":[{\"roomId\":1,\"roomName\":\"1번 방\",\"minPeople\":3,\"maxPeople\":5,\"slots\":["
+                + slots + "]}]}";
+    }
+
+    @Test
+    @DisplayName("week_plan은 7일을 한 번에: 날마다 core 하루치를 조회해 수업 끝난 뒤 가장 이른 칸을 준다")
+    void weekPlan() throws Exception {
+        // given
+        Map<String, String> me = student();
+        send("PUT", me, FRIDAY);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        for (int i = 0; i < 7; i++) {
+            String date = today.plusDays(i).toString();
+            core.stubFor(get(urlPathEqualTo("/api/rooms/availability")).withQueryParam("date", com.github.tomakehurst.wiremock.client.WireMock.equalTo(date))
+                    .willReturn(okJson(emptyDay(date))));
+        }
+
+        // when
+        Tool tool = connect(me).listTools().tools().stream().filter(t -> t.name().equals("week_plan")).findFirst().orElseThrow();
+        CallToolResult result = call(me, "week_plan", Map.of("minutes", 90));
+
+        // then
+        assertThat(tool.annotations().readOnlyHint()).isTrue();
+        assertThat(result.isError()).isFalse();
+        assertThat(text(result)).contains("\"minutes\":90", "\"days\":[", "\"roomName\":\"1번 방\"").doesNotContain("NO_SCHEDULE");
+        core.verify(7, getRequestedFor(urlPathEqualTo("/api/rooms/availability")));
     }
 }
