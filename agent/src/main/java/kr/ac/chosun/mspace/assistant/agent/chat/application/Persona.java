@@ -1,5 +1,6 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -80,8 +81,10 @@ public enum Persona {
         if (message == null) {
             return Optional.empty();
         }
-        Matcher m = REQUEST.matcher(message);
-        if (!m.find() || NEGATION.matcher(message.substring(m.end())).find()) {
+        // 분해형 한글(ㅈ+ㅗ+ㅇ…)도 완성형으로 맞춘 뒤 본다. 안 맞추면 매치된 글자가 아래 switch의 완성형과 달라 기본 성향이 저장된다
+        String text = Normalizer.normalize(message, Normalizer.Form.NFC);
+        Matcher m = REQUEST.matcher(text);
+        if (!m.find() || NEGATION.matcher(text.substring(m.end())).find()) {
             return Optional.empty(); // "잔소리 모드로 바꾸지 마"는 바꾸라는 말이 아니다 → 모델에 넘긴다
         }
         return Optional.of(switch (m.group(1)) {

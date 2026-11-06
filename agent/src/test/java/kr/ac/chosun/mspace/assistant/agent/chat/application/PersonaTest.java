@@ -34,4 +34,17 @@ class PersonaTest {
         assertThat(Persona.DEFAULT).isEqualTo(Persona.ACTIVE);
         assertThat(Persona.all()).hasSize(3);
     }
+
+    @Test
+    @DisplayName("분해형 한글로 쓴 \"잔소리 모드로\"도 잔소리로 바꾼다 (기본 성향으로 잘못 저장하지 않는다)")
+    void decomposedHangul() {
+        // given
+        String decomposed = java.text.Normalizer.normalize("잔소리 모드로 바꿔 줘", java.text.Normalizer.Form.NFD);
+
+        // when
+        var persona = Persona.requested(decomposed);
+
+        // then
+        org.assertj.core.api.Assertions.assertThat(persona).contains(Persona.NAGGING);
+    }
 }

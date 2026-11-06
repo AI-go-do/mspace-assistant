@@ -105,11 +105,13 @@ class GeminiLlmClientTest {
     @Test
     @DisplayName("429(호출 한도) → 잠시 후 다시·예약 화면 안내")
     void rateLimited() {
+        // given
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(429)));
-
         GeminiLlmClient keyed = client("k");
         List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
         List<ToolSpec> noTools = List.of();
+
+        // when · then
         assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_RATE_LIMITED");
     }
@@ -186,11 +188,13 @@ class GeminiLlmClientTest {
     @Test
     @DisplayName("응답이 늦으면(타임아웃 2초) 응답 없음으로 끝난다")
     void timeout() {
+        // given
         gemini.stubFor(post(PATH).willReturn(okJson("{}").withFixedDelay(3_000)));
-
         GeminiLlmClient keyed = client("k");
         List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
         List<ToolSpec> noTools = List.of();
+
+        // when · then
         assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
     }
@@ -289,6 +293,8 @@ class GeminiLlmClientTest {
         GeminiLlmClient keyed = client("k");
         List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
         List<ToolSpec> noTools = List.of();
+
+        // when · then
         assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
     }
