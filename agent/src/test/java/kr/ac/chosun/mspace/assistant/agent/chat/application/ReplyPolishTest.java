@@ -85,11 +85,13 @@ class ReplyPolishTest {
         // given
         String spaces = "a" + " ".repeat(200_000) + "b";
         String letters = "a".repeat(200_000) + "_" + "b".repeat(200_000) + "@" + "c".repeat(100_000);
+        String manyFooters = "본문" + " (입력한 시간표 기준)".repeat(20_000);
 
         // when, then: 2초 안에 끝나고 결과는 그대로
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
             assertThat(ReplyPolish.stripFooters(spaces)).isEqualTo(spaces);
             assertThat(ReplyPolish.hideToolNames(letters)).isEqualTo(letters);
+            assertThat(ReplyPolish.stripFooters(manyFooters)).isEqualTo("본문");
         });
     }
 }

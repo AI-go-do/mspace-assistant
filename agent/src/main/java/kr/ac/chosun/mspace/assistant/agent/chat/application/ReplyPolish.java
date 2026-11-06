@@ -61,20 +61,21 @@ final class ReplyPolish {
         if (text == null) {
             return null;
         }
-        String out = text;
+        // 끝 위치만 줄여 가다 마지막에 한 번만 자른다 (꼬리말이 여러 개여도 문자열을 매번 복사하지 않게)
+        int end = text.length();
         int cut;
-        while ((cut = footerStart(out)) >= 0) {
-            out = out.substring(0, cut);
+        while ((cut = footerStart(text, end)) >= 0) {
+            end = cut;
         }
-        return out;
+        return end == text.length() ? text : text.substring(0, end);
     }
 
     /**
-     * 끝에 붙은 꼬리말 하나의 시작 위치(앞 공백 포함). 없으면 -1.
+     * text[0, limit) 끝에 붙은 꼬리말 하나의 시작 위치(앞 공백 포함). 없으면 -1.
      * 뒤에서부터 한 번만 훑어 길이에 비례하는 시간만 쓴다: 공백 → [. 。] → ")" → 안쪽 글 → "(" → 앞 공백
      */
-    static int footerStart(String text) {
-        int end = skipSpaceBack(text, text.length());
+    static int footerStart(String text, int limit) {
+        int end = skipSpaceBack(text, limit);
         if (end > 0 && (text.charAt(end - 1) == '.' || text.charAt(end - 1) == '。')) {
             end--;
         }
