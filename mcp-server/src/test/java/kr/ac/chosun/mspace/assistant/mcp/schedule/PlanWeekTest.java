@@ -137,4 +137,42 @@ class PlanWeekTest {
         assertThatThrownBy(() -> plan.plan(USER, 45, null)).isInstanceOf(CoreApiException.class).hasMessageContaining("30분 단위");
         assertThatThrownBy(() -> plan.plan(USER, 270, null)).isInstanceOf(CoreApiException.class);
     }
+
+    @Test
+    @DisplayName("하루 조회가 실패하면 그날만 reason에 적고 나머지는 돌려준다. 401은 전체 오류로 올린다")
+    void oneDayFails() {
+        // given: 둘째 날 core 5xx, 나머지 비어 있음
+        Clock clock = Clock.fixed(TODAY.atTime(8, 0).atZone(SeoulTime.ZONE).toInstant(), SeoulTime.ZONE);
+        FindAvailableRooms flaky = new FindAvailableRooms((date, credential) -> {
+            if (date.equals(TODAY.plusDays(1))) {
+                throw new CoreApiException("CORE_UNAVAILABLE", "예약 시스템에 닿지 못했어요.", 503);
+            }
+            return day(date);
+        });
+        FindAvailableRooms unauthorized = new FindAvailableRooms((date, credential) -> {
+            throw new CoreApiException("UNAUTHORIZED", "로그인이 필요해요.", 401);
+        });
+        var plan = new PlanWeek(new MySchedule(repo(TIMETABLE), PROPS, clock), flaky, PROPS, clock);
+        var denied = new PlanWeek(new MySchedule(repo(TIMETABLE), PROPS, clock), unauthorized, PROPS, clock);
+
+        // when
+        WeekPlan result = plan.plan(USER, 60, null);
+
+        // then
+        assertThat(result.days()).hasSize(3);
+        assertThat(result.days().get(0).option()).isNotNull();
+        assertThat(result.days().get(1).option()).isNull();
+        assertThat(result.days().get(1).reason()).contains("조회에 실패");
+        assertThat(result.days().get(2).option()).isNotNull();
+        assertThatThrownBy(() -> denied.plan(USER, 60, null)).isInstanceOf(CoreApiException.class).hasMessageContaining("로그인");
+    }
+
+    static RoomDay day(LocalDate date) {
+        List<RoomDay.Slot> slots = new ArrayList<>();
+        for (int i = 0; i < 48; i++) {
+            OffsetDateTime s = date.atStartOfDay(SeoulTime.ZONE).plusMinutes(30L * i).toOffsetDateTime();
+            slots.add(new RoomDay.Slot(s, s.plusMinutes(30), true));
+        }
+        return new RoomDay(date, List.of(new RoomDay.RoomSlots(1, "1번 방", 3, 5, slots)));
+    }
 }
