@@ -39,21 +39,33 @@ public class AgentLoop {
     private final Clock clock;
     private final ConversationMemory memory;
     private final MemoryProperties memoryProps;
+    private final DailyBriefing briefing;
+
+    /** "브리핑"이 들어간 말은 모델 없이 오늘 브리핑으로 바로 답한다 (설계 5.z) */
+    static final String BRIEFING_WORD = "브리핑";
+    static final String BRIEFING_TOOL = "briefing";
 
     /** 기억 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock) {
         this(llm, tools, props, clock, ConversationMemory.NONE, new MemoryProperties(false, null, null, 0));
     }
 
-    @Autowired
+    /** 브리핑 지름길 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
                      ConversationMemory memory, MemoryProperties memoryProps) {
+        this(llm, tools, props, clock, memory, memoryProps, null);
+    }
+
+    @Autowired
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
+                     ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing) {
         this.llm = llm;
         this.tools = tools;
         this.props = props;
         this.clock = clock;
         this.memory = memory;
         this.memoryProps = memoryProps;
+        this.briefing = briefing;
     }
 
     /**
@@ -74,7 +86,7 @@ public class AgentLoop {
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         ChatResult result;
         try {
-            result = converse(headers, conversation);
+            result = isBriefingRequest(message) ? briefingShortcut(headers) : converse(headers, conversation);
         } catch (RuntimeException e) {
             memory.restoreNotes(key, notes); // 이번 차례를 저장하지 못하니 꺼낸 글을 되돌려 다음 채팅이 받게 한다
             throw e;
@@ -83,6 +95,22 @@ public class AgentLoop {
         conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(result.reply()), List.of()));
         memory.save(key, trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));
         return result;
+    }
+
+    /**
+     * "오늘 브리핑 해 줘", "브리핑"처럼 브리핑을 부르는 말. 모델을 거치면 같은 도구 셋을 매번 다른 순서·문장으로 부르는데,
+     * 첫 화면 카드와 같은 {@link DailyBriefing}을 그대로 쓰면 모델 호출 0(무료 한도 절약), 수백 ms, 문장이 늘 같아 시연이 안정적이다.
+     * 답은 대화 맥락에 남아 다음 질문("그럼 2번 방 잡아 줘")의 근거가 된다
+     */
+    boolean isBriefingRequest(String message) {
+        return briefing != null && message != null && message.contains(BRIEFING_WORD);
+    }
+
+    private ChatResult briefingShortcut(UserHeaders headers) {
+        long started = System.nanoTime();
+        DailyBriefing.Briefing b = briefing.today(headers);
+        log.info("briefing shortcut {}ms", (System.nanoTime() - started) / 1_000_000);
+        return new ChatResult(b.text(), List.of(), List.of(), 0, false, List.of(BRIEFING_TOOL), b.hints(), b.suggestions());
     }
 
     /** 화면이 보낸 글은 학생이 고쳐 보낼 수 있어 비서 차례도 가린다 */

@@ -259,6 +259,26 @@
         }
       ],
       "note": "계정에 최근 끝낸 예약이 있으면 방·시각을 묻지 않고 확인 카드까지(1번) 또는 그 시간이 차서 대안 안내(2번). 끝낸 예약이 없는 계정이면 되풀이할 예약이 없다고 말하고 날짜·시각을 물어야(3번) 통과. 어느 쪽이든 첫 도구 호출이 my_reservations여야(first_tool) 해요"
+    },
+    {
+      "id": "Q17",
+      "group": "브리핑",
+      "text": "오늘 브리핑 해 줘",
+      "expect": [
+        {
+          "tools_count": {
+            "briefing": 1
+          },
+          "tools_none": [
+            "my_schedule",
+            "room_status"
+          ],
+          "reply_any": [
+            "브리핑이에요"
+          ]
+        }
+      ],
+      "note": "모델을 안 거치는 지름길. 도구 이름이 briefing 하나뿐이고(모델이 my_schedule·room_status를 따로 부르면 실패) 답이 '… 브리핑이에요.'로 시작해야 통과. 시간은 수백 ms"
     }
   ]
 }
