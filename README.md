@@ -21,7 +21,7 @@ M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Bo
 | 모듈 | 포트 | 열어 둔 것 |
 |---|---|---|
 | `mcp-server` | 8090 | MCP `/mcp` (읽기 6 `find_available_rooms`·`room_status`·`my_reservations`·`usage_rules`·`my_schedule`·`week_plan`, 쓰기 5 `create`·`start_now`·`cancel`·`checkout`·`continue`), 확인 실행 `POST /api/confirmations/{token}` |
-| `agent` | 8091 | 채팅 접수 `POST /api/agent/chat`(202 + jobId) → 결과 조회 `GET /api/agent/chat/{jobId}`(폴링), 새 대화 `DELETE /api/agent/chat/history`, 확인 `POST /api/agent/confirmations/{token}`, 입실 번호 카드 `GET /api/agent/reservations/{id}/access-code`, 내 시간표 `GET·PUT·DELETE /api/agent/schedule`, 시간표 캡처 읽기 `POST /api/agent/schedule/parse`(초안만, 저장은 PUT), 오늘 브리핑 `GET /api/agent/briefing`(시간표·예약·빈 방 한 문단, 모델 안 거침) |
+| `agent` | 8091 | 채팅 접수 `POST /api/agent/chat`(202 + jobId) → 결과 조회 `GET /api/agent/chat/{jobId}`(폴링), 새 대화 `DELETE /api/agent/chat/history`, 확인 `POST /api/agent/confirmations/{token}`, 입실 번호 카드 `GET /api/agent/reservations/{id}/access-code`, 내 시간표 `GET·PUT·DELETE /api/agent/schedule`, 시간표 캡처 읽기 `POST /api/agent/schedule/parse`(초안만, 저장은 PUT), 오늘 브리핑 `GET /api/agent/briefing`(시간표·예약·빈 방·수업 뒤 쓸 수 있는 칸 한 문단 + 한 번에 잡기 버튼 문장, 모델 안 거침) |
 
 ## 로컬 실행
 ```bash

@@ -45,7 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
  *   <li>POST /api/agent/confirmations/{token}: 학생이 [확인]을 누름 → mcp-server 확인 API로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  *   <li>GET·PUT·DELETE /api/agent/schedule: 내 시간표 화면 → mcp-server /api/schedule/me로 그대로 넘김 (모델 없음)</li>
- *   <li>GET /api/agent/briefing: 오늘 브리핑(수업·내 예약·지금 빈 방 + 읽어 줄 문장). 모델 없음, 도구 3개 직접 호출</li>
+ *   <li>GET /api/agent/briefing: 오늘 브리핑(수업·수업 뒤 쓸 수 있는 칸·내 예약·지금 빈 방 + 읽어 줄 문장 + 한 번에 잡기 버튼 문장). 모델 없음, 도구 3~4개 직접 호출</li>
  *   <li>POST /api/agent/schedule/parse: 시간표 캡처(multipart image)를 모델이 읽어 classes 초안으로. 저장은 안 함 → 화면이 확인 카드 → PUT</li>
  * </ul>
  */
