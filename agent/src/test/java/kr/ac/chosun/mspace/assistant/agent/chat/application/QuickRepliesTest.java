@@ -130,22 +130,28 @@ class QuickRepliesTest {
     }
 
     @Test
-    @DisplayName("내 예약: 사용 중이면 연장·퇴실, 예약만 있으면 입실 번호·취소, 없으면 빈방 찾기")
+    @DisplayName("내 예약: 사용 중이면 연장·퇴실, 예약만 있으면 입실 번호·취소, 끝낸 예약만 있으면 '지난번처럼', 없으면 빈방 찾기")
     void reservations() {
         // given
         List<Seen> inUse = List.of(ok("my_reservations", "{\"reservations\":[{\"status\":\"IN_USE\"},{\"status\":\"BOOKED\"}]}"));
         List<Seen> booked = List.of(ok("my_reservations", "{\"reservations\":[{\"status\":\"BOOKED\"}]}"));
         List<Seen> empty = List.of(ok("my_reservations", "{\"reservations\":[]}"));
+        List<Seen> finished = List.of(ok("my_reservations", "{\"reservations\":[{\"status\":\"CHECKED_OUT\"},{\"status\":\"CANCELED\"}]}"));
+        List<Seen> canceledOnly = List.of(ok("my_reservations", "{\"reservations\":[{\"status\":\"CANCELED\"},{\"status\":\"NO_SHOW\"}]}"));
 
         // when
         List<String> a = QuickReplies.suggest(inUse, false);
         List<String> b = QuickReplies.suggest(booked, false);
         List<String> c = QuickReplies.suggest(empty, false);
+        List<String> d = QuickReplies.suggest(finished, false);
+        List<String> e = QuickReplies.suggest(canceledOnly, false);
 
         // then
         assertThat(a).containsExactly("30분 연장해 줘", "퇴실할게");
         assertThat(b).containsExactly("입실 번호 보여 줘", "이 예약 취소해 줘");
         assertThat(c).containsExactly("내일 오후 2시 빈방 있어?", "지금 빈 방 있어?");
+        assertThat(d).containsExactly("지난번처럼 다시 잡아 줘", "지금 빈 방 있어?");
+        assertThat(e).as("취소·노쇼만 있으면 되풀이할 예약이 아니다").isEqualTo(c);
     }
 
     @Test
