@@ -1,6 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -25,6 +27,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>모델을 거치지 않는다: 도구 3개(my_schedule, my_reservations, room_status)를 직접 부르고 문장은 코드가 만든다.
  *       빠르고(모델 호출 0), 공짜고, 지어내지 않는다. 화면의 [듣기]는 {@code text}를 speechSynthesis로 읽으면 된다</li>
  *   <li>도구 하나가 실패해도 나머지는 보여 준다. 실패한 칸은 {@code null}과 note로 남긴다</li>
+ *   <li>수업이 있는 날 대표자 예약이 없으면 {@code find_available_rooms}를 한 번 더 불러 "수업 끝나고 쓸 수 있는 가장 이른 칸"을
+ *       고르고, 화면 버튼용 문장({@code suggestions}, "15:30 2번 방 2시간 잡아 줘")을 준다. 누르면 채팅으로 가서 확인 카드까지 간다</li>
  *   <li>번호·학번·이름은 도구 결과에 없다(게이트웨이가 가림). 문장에도 방·시각만 들어간다</li>
  * </ul>
  */
@@ -35,14 +39,24 @@ public class DailyBriefing {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final Set<String> ACTIVE = Set.of("BOOKED", "IN_USE");
 
+    static final String AFTER_CLASS_FAILED = "수업 뒤 빈방을 확인하지 못했어요.";
+    static final String AFTER_CLASS_NONE = "수업 끝나고 오늘 쓸 수 있는 방은 없어요.";
+
     private final ToolGateway tools;
     private final Clock clock;
     private final JsonMapper json;
+    private final AgentProperties.Rules rules;
 
-    public DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json) {
+    @Autowired
+    public DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json, AgentProperties props) {
+        this(tools, clock, json, props.rules());
+    }
+
+    DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json, AgentProperties.Rules rules) {
         this.tools = tools;
         this.clock = clock;
         this.json = json;
+        this.rules = rules;
     }
 
     public Briefing today(UserHeaders headers) {
@@ -50,13 +64,111 @@ public class DailyBriefing {
         LocalDate today = now.toLocalDate();
         List<String> hints = new ArrayList<>();
         try (ToolGateway.Session session = tools.open(headers)) {
-            Schedule schedule = schedule(call(session, "my_schedule", Map.of("date", today.toString())), hints);
+            JsonNode scheduleNode = call(session, "my_schedule", Map.of("date", today.toString()));
+            Schedule schedule = schedule(scheduleNode, hints);
             Reservations reservations = reservations(call(session, "my_reservations", Map.of()), now);
             Rooms rooms = rooms(call(session, "room_status", Map.of()));
-            String text = text(now, schedule, reservations, rooms);
-            return new Briefing(today.toString(), dayName(now), now.toOffsetDateTime().toString(), schedule, reservations, rooms,
-                    text, List.copyOf(hints));
+            AfterClass afterClass = afterClass(session, scheduleNode, reservations, now);
+            String text = text(now, schedule, afterClass, reservations, rooms);
+            List<String> suggestions = afterClass != null && afterClass.suggestion() != null ? List.of(afterClass.suggestion()) : List.of();
+            return new Briefing(today.toString(), dayName(now), now.toOffsetDateTime().toString(), schedule, afterClass, reservations,
+                    rooms, text, List.copyOf(hints), suggestions);
         }
+    }
+
+    /**
+     * 수업 끝나고(searchFromAt부터) 오늘 쓸 수 있는 가장 이른 칸. 안 보는 경우(null): 시간표 없음·오늘 수업 없음·searchFromAt이
+     * 오늘이 아님(밤늦은 수업)·이미 대표자로 잡은 예약이 있음(대표자 동시 1건이라 core가 거절한다).
+     * 고르기: 가장 이른 시작 → 그 시작에서 가장 긴 길이(최대 2시간) → 방 번호. 지금이 수업 끝보다 늦으면 지금(칸 올림)부터 본다
+     */
+    private AfterClass afterClass(ToolGateway.Session session, JsonNode scheduleNode, Reservations reservations, ZonedDateTime now) {
+        if (scheduleNode == null || "NO_SCHEDULE".equals(scheduleNode.path("code").asString(null))
+                || scheduleNode.path("classes").isEmpty()) {
+            return null;
+        }
+        OffsetDateTime searchFrom = parse(scheduleNode.path("searchFromAt").asString(null));
+        if (searchFrom == null || !searchFrom.atZoneSameInstant(SEOUL).toLocalDate().equals(now.toLocalDate())) {
+            return null;
+        }
+        if (reservations.items() != null && reservations.items().stream().anyMatch(ReservationItem::owner)) {
+            return null;
+        }
+        ZonedDateTime from = searchFrom.atZoneSameInstant(SEOUL);
+        ZonedDateTime nowCeil = ceilToSlot(now);
+        if (nowCeil.isAfter(from)) {
+            from = nowCeil;
+            if (!from.toLocalDate().equals(now.toLocalDate())) {
+                return null; // 자정 직전: 오늘 칸이 없다
+            }
+        }
+        String hhmm = "%02d:%02d".formatted(from.getHour(), from.getMinute());
+        Map<String, Object> args = new java.util.LinkedHashMap<>();
+        args.put("date", now.toLocalDate().toString());
+        args.put("from", hhmm);
+        JsonNode found = call(session, "find_available_rooms", args);
+        if (found == null) {
+            return new AfterClass(hhmm, null, null, null, 0, null, AFTER_CLASS_FAILED);
+        }
+        Candidate best = null;
+        Duration max = Duration.ofHours(rules.maxHours());
+        Duration slot = Duration.ofMinutes(rules.slotMinutes());
+        for (JsonNode room : found.path("rooms")) {
+            for (JsonNode r : room.path("free")) {
+                OffsetDateTime start = parse(r.path("startAt").asString(null));
+                OffsetDateTime end = parse(r.path("endAt").asString(null));
+                if (start == null || end == null) {
+                    continue;
+                }
+                if (start.toInstant().isBefore(from.toInstant())) {
+                    start = from.toOffsetDateTime();
+                }
+                Duration length = Duration.between(start, end);
+                if (length.compareTo(max) > 0) {
+                    length = max;
+                }
+                if (length.compareTo(slot) < 0) {
+                    continue;
+                }
+                Candidate c = new Candidate(room.path("roomId").asLong(0), room.path("roomName").asString(""), start, length);
+                if (best == null || c.beats(best)) {
+                    best = c;
+                }
+            }
+        }
+        if (best == null) {
+            return new AfterClass(hhmm, null, null, null, 0, null, AFTER_CLASS_NONE);
+        }
+        int minutes = (int) best.length().toMinutes();
+        String start = hhmm(best.start().toString());
+        String suggestion = start + " " + best.roomName() + " " + lengthText(minutes) + " 잡아 줘";
+        return new AfterClass(hhmm, best.roomName(), start, hhmm(best.start().plus(best.length()).toString()), minutes, suggestion, null);
+    }
+
+    private record Candidate(long roomId, String roomName, OffsetDateTime start, Duration length) {
+        /** 더 이른 시작 → 같은 시작이면 더 긴 길이 → 같으면 작은 방 번호 */
+        boolean beats(Candidate other) {
+            int byStart = start.toInstant().compareTo(other.start.toInstant());
+            if (byStart != 0) {
+                return byStart < 0;
+            }
+            int byLength = length.compareTo(other.length);
+            return byLength != 0 ? byLength > 0 : roomId < other.roomId;
+        }
+    }
+
+    /** 120 → "2시간", 90 → "1시간 30분", 30 → "30분" */
+    static String lengthText(int minutes) {
+        int h = minutes / 60;
+        int m = minutes % 60;
+        if (h == 0) {
+            return m + "분";
+        }
+        return m == 0 ? h + "시간" : h + "시간 " + m + "분";
+    }
+
+    private static ZonedDateTime ceilToSlot(ZonedDateTime t) {
+        ZonedDateTime floor = t.withSecond(0).withNano(0).withMinute(t.getMinute() < 30 ? 0 : 30);
+        return floor.isBefore(t) ? floor.plusMinutes(30) : floor;
     }
 
     /** 도구 결과 JSON. 오류면 null (문장에서 "불러오지 못했어요") */
@@ -137,7 +249,7 @@ public class DailyBriefing {
         return new Rooms(names, hhmm(earliestLimit), null);
     }
 
-    static String text(ZonedDateTime now, Schedule schedule, Reservations reservations, Rooms rooms) {
+    static String text(ZonedDateTime now, Schedule schedule, AfterClass afterClass, Reservations reservations, Rooms rooms) {
         StringBuilder sb = new StringBuilder();
         sb.append(now.getMonthValue()).append("월 ").append(now.getDayOfMonth()).append("일 ").append(dayName(now))
                 .append("요일 브리핑이에요. ");
@@ -154,6 +266,15 @@ public class DailyBriefing {
             }
             sb.append(' ').append(count(schedule.classes().size())).append("예요. 마지막 수업은 ").append(schedule.lastClassEnd())
                     .append("에 끝나요. ");
+        }
+        // 수업 끝나고 쓸 수 있는 칸
+        if (afterClass != null) {
+            if (afterClass.note() != null) {
+                sb.append(afterClass.note()).append(' ');
+            } else {
+                sb.append("수업 끝나고 ").append(afterClass.start()).append("부터 ").append(afterClass.roomName()).append("을 ")
+                        .append(lengthText(afterClass.minutes())).append(" 쓸 수 있어요. ");
+            }
         }
         // 예약
         if (reservations.items() == null) {
@@ -229,8 +350,19 @@ public class DailyBriefing {
      * @param text  화면에 보여 주고 [듣기]로 읽어 줄 한 문단. 방·시각만 들어 있다
      * @param hints OPEN_SCHEDULE: 시간표가 없으니 [내 시간표 넣기] 버튼
      */
-    public record Briefing(String date, String dayOfWeek, String generatedAt, Schedule schedule, Reservations reservations,
-                           Rooms rooms, String text, List<String> hints) {
+    public record Briefing(String date, String dayOfWeek, String generatedAt, Schedule schedule, AfterClass afterClass,
+                           Reservations reservations, Rooms rooms, String text, List<String> hints, List<String> suggestions) {
+    }
+
+    /**
+     * 수업 끝나고 쓸 수 있는 가장 이른 칸. null이면 안 본 것(시간표 없음·오늘 수업 없음·대표자 예약 있음).
+     *
+     * @param searchFrom 본 시작 시각(HH:mm). 수업 끝 + 여유, 지났으면 지금 칸
+     * @param suggestion 화면 버튼 글. 누르면 채팅에 그대로 보내 확인 카드까지 간다. 칸이 없으면 null
+     * @param note       칸이 없거나(AFTER_CLASS_NONE) 못 봤을 때(AFTER_CLASS_FAILED)
+     */
+    public record AfterClass(String searchFrom, String roomName, String start, String end, int minutes, String suggestion,
+                             String note) {
     }
 
     /** classes가 null이면 불러오지 못한 것, 비어 있으면 시간표 없음 또는 그날 수업 없음(note로 구분) */
