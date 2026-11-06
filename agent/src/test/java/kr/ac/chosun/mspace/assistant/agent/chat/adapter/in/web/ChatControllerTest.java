@@ -31,6 +31,7 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatJobs;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationFollowUp;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing;
@@ -95,13 +96,15 @@ class ChatControllerTest {
     MockMvc mvc;
     final ReadTimetableImage timetable = mock(ReadTimetableImage.class);
     final DailyBriefing dailyBriefing = mock(DailyBriefing.class);
+    final ConfirmationGateway confirmations = mock(ConfirmationGateway.class);
+    final ConfirmationFollowUp followUp = mock(ConfirmationFollowUp.class);
 
     @BeforeEach
     void setUp() {
         ChatJobProperties jobProps = new ChatJobProperties(0, 0, null, null, null);
         ChatJobs jobs = new ChatJobs(jobProps, Clock.systemUTC(), executor);
         AgentProperties props = new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 0);
-        ChatController controller = new ChatController(agent, mock(ConfirmationGateway.class),
+        ChatController controller = new ChatController(agent, confirmations, followUp,
                 mock(AccessCodeGateway.class), mock(ScheduleGateway.class), props, jobs, jobProps, memory,
                 timetable, dailyBriefing);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
@@ -307,5 +310,22 @@ class ChatControllerTest {
         anonymous.andExpect(status().isUnauthorized());
         verify(dailyBriefing).today(any(UserHeaders.class));
         verifyNoMoreInteractions(dailyBriefing);
+    }
+
+    @Test
+    @DisplayName("확인 누름: mcp-server 결과를 후처리(맥락 기록·suggestions)한 본문으로 200 no-store. 상태 코드는 그대로")
+    void confirmGoesThroughFollowUp() throws Exception {
+        // given
+        var relayed = new ConfirmationGateway.Relayed(201, "{\"action\":\"CREATE\",\"reservationId\":7,\"message\":\"예약했어요.\"}");
+        when(confirmations.confirm(eq("tok"), any(UserHeaders.class), any())).thenReturn(relayed);
+        when(followUp.record(any(UserHeaders.class), eq(relayed)))
+                .thenReturn("{\"action\":\"CREATE\",\"reservationId\":7,\"message\":\"예약했어요.\",\"suggestions\":[\"입실 번호 보여 줘\"]}");
+
+        // when / then
+        mvc.perform(post("/api/agent/confirmations/tok").header("Authorization", "Bearer owner")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"participantStudentIds\":[]}"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.suggestions[0]").value("입실 번호 보여 줘"));
     }
 }

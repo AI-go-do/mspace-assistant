@@ -64,11 +64,21 @@ public class AgentLoop {
      */
     public ChatResult run(UserHeaders headers, List<LlmMessage> history, String message) {
         String key = MemberKey.of(headers);
-        List<LlmMessage> remembered = memory.load(key);
-        List<LlmMessage> conversation = new ArrayList<>(
-                trim(remembered.isEmpty() ? masked(history) : remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
+        List<LlmMessage> remembered = new ArrayList<>(memory.load(key));
+        List<LlmMessage> notes = memory.takeNotes(key); // 확인 카드 결과처럼 채팅 밖에서 생긴 글 (설계 4장 "확인 뒤")
+        if (remembered.isEmpty()) {
+            remembered.addAll(masked(history)); // 서버 기억이 없으면 화면 기록 (미룬 글이 있어도 그 앞 맥락은 화면이 들고 있다)
+        }
+        remembered.addAll(notes);
+        List<LlmMessage> conversation = new ArrayList<>(trim(remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
-        ChatResult result = converse(headers, conversation);
+        ChatResult result;
+        try {
+            result = converse(headers, conversation);
+        } catch (RuntimeException e) {
+            memory.restoreNotes(key, notes); // 이번 차례를 저장하지 못하니 꺼낸 글을 되돌려 다음 채팅이 받게 한다
+            throw e;
+        }
         // 모델 답도 다음 요청에 외부 AI로 다시 가니 학생 말과 같은 규칙으로 가려 둔다
         conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(result.reply()), List.of()));
         memory.save(key, trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));

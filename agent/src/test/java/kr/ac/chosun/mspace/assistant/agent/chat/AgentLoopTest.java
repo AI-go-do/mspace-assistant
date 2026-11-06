@@ -38,6 +38,8 @@ class AgentLoopTest {
         final Deque<LlmReply> replies = new ArrayDeque<>();
         final List<List<LlmMessage>> seen = new ArrayList<>();
         String lastSystem;
+        /** 모델이 답하기 직전에 끼어드는 일 (채팅 중에 [확인]이 들어오는 상황 재현) */
+        Runnable beforeReply;
 
         ScriptedLlm then(LlmReply reply) {
             replies.add(reply);
@@ -48,6 +50,9 @@ class AgentLoopTest {
         public LlmReply chat(String system, List<LlmMessage> conversation, List<ToolSpec> tools) {
             lastSystem = system;
             seen.add(List.copyOf(conversation));
+            if (beforeReply != null) {
+                beforeReply.run();
+            }
             return replies.isEmpty() ? new LlmReply("(끝)", List.of()) : replies.poll();
         }
     }

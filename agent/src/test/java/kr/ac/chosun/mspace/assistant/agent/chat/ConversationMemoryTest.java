@@ -201,4 +201,81 @@ class ConversationMemoryTest {
         assertThat(soon).hasSize(1);
         assertThat(later).isEmpty();
     }
+
+    @Test
+    @DisplayName("확인 카드 결과(미룬 글)는 다음 채팅이 시작할 때 대화에 붙고, 채팅이 끝날 때 함께 저장된다. 지우면 미룬 글도 사라진다")
+    void notesJoinNextChat() {
+        // given
+        var memory = new InMemoryConversationMemory(MEMORY, CLOCK);
+        var tools = new FakeTools(Map.of());
+        var llm = new ScriptedLlm().then(say("1번 방 예약할까요?")).then(say("7번 예약을 취소할까요?")).then(say("처음"));
+        var loop = loop(llm, tools, memory, 20, 20_000);
+        List<LlmMessage> note = List.of(new LlmMessage.User("[화면] 확인 카드의 [확인]을 눌렀어요."),
+                new LlmMessage.Assistant("예약했어요. (예약 7번, BOOKED)", List.of()));
+
+        // when
+        loop.run(ME, List.of(), "내일 2시 1번 방");
+        memory.addNote(MemberKey.of(ME), note); // 채팅 밖에서 [확인]
+        loop.run(ME, List.of(), "방금 잡은 거 취소해 줘");
+        memory.addNote(MemberKey.of(ME), note);
+        memory.clear(MemberKey.of(ME));
+        loop.run(ME, List.of(), "새 대화");
+
+        // then
+        assertThat(llm.seen.get(1)).containsExactly(new LlmMessage.User("내일 2시 1번 방"),
+                new LlmMessage.Assistant("1번 방 예약할까요?", List.of()), note.get(0), note.get(1),
+                new LlmMessage.User("방금 잡은 거 취소해 줘"));
+        assertThat(llm.seen.get(2)).containsExactly(new LlmMessage.User("새 대화")); // 지운 뒤라 미룬 글도 없다
+        assertThat(memory.load(MemberKey.of(ME))).containsExactly(new LlmMessage.User("새 대화"),
+                new LlmMessage.Assistant("처음", List.of()));
+        assertThat(memory.takeNotes(MemberKey.of(ME))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("채팅이 도는 중에 [확인]이 끼어들어도 잃지 않는다: 채팅이 대화를 통째로 저장해도 미룬 글은 따로 있어 다음 채팅에 붙는다")
+    void noteSurvivesOverlappingChat() {
+        // given: 모델 호출 중(첫 답을 만들기 전)에 확인 결과가 들어온다
+        var memory = new InMemoryConversationMemory(MEMORY, CLOCK);
+        var tools = new FakeTools(Map.of());
+        List<LlmMessage> note = List.of(new LlmMessage.User("[화면] 확인"), new LlmMessage.Assistant("예약했어요. (예약 7번, BOOKED)", List.of()));
+        var llm = new ScriptedLlm().then(say("예약할까요?")).then(say("취소할까요?"));
+        llm.beforeReply = () -> memory.addNote(MemberKey.of(ME), note);
+        var loop = loop(llm, tools, memory, 20, 20_000);
+
+        // when
+        loop.run(ME, List.of(), "내일 2시 1번 방");
+        llm.beforeReply = null;
+        loop.run(ME, List.of(), "방금 잡은 거 취소해 줘");
+
+        // then
+        assertThat(llm.seen.get(1)).containsSequence(note.get(0), note.get(1), new LlmMessage.User("방금 잡은 거 취소해 줘"));
+    }
+
+    @Test
+    @DisplayName("모델 오류로 채팅이 실패하면 꺼냈던 미룬 글을 되돌려 놓는다(그 사이 쌓인 글보다 앞). 서버 기억이 없고 미룬 글만 있으면 화면 기록 뒤에 붙인다")
+    void restoresNotesOnFailureAndKeepsClientHistory() {
+        // given
+        var memory = new InMemoryConversationMemory(MEMORY, CLOCK);
+        var tools = new FakeTools(Map.of());
+        List<LlmMessage> first = List.of(new LlmMessage.User("[화면] 확인"), new LlmMessage.Assistant("예약했어요. (예약 7번, BOOKED)", List.of()));
+        List<LlmMessage> second = List.of(new LlmMessage.User("[화면] 확인"), new LlmMessage.Assistant("취소했어요. (예약 7번, CANCELED)", List.of()));
+        var llm = new ScriptedLlm().then(say("답"));
+        llm.beforeReply = () -> {
+            memory.addNote(MemberKey.of(ME), second); // 모델이 도는 동안 또 하나
+            throw new kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException("LLM_UNAVAILABLE", "down");
+        };
+        var loop = loop(llm, tools, memory, 20, 20_000);
+        List<LlmMessage> client = List.of(new LlmMessage.User("화면이 든 옛말"), new LlmMessage.Assistant("옛 답", List.of()));
+        memory.addNote(MemberKey.of(ME), first);
+
+        // when
+        assertThatThrownBy(() -> loop.run(ME, client, "취소해 줘")).isInstanceOf(RuntimeException.class);
+        llm.beforeReply = null;
+        loop.run(ME, client, "다시 취소해 줘");
+
+        // then
+        assertThat(llm.seen.get(0)).containsExactly(client.get(0), client.get(1), first.get(0), first.get(1), new LlmMessage.User("취소해 줘"));
+        assertThat(llm.seen.get(1)).containsExactly(client.get(0), client.get(1), first.get(0), first.get(1), second.get(0), second.get(1),
+                new LlmMessage.User("다시 취소해 줘"));
+    }
 }
