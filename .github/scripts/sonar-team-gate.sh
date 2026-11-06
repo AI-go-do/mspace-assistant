@@ -59,6 +59,12 @@ fail=0
 if [ -n "$coverage" ] && awk -v a="$coverage" -v b="$MIN_COVERAGE" 'BEGIN{exit !(a < b)}'; then
   echo "실패: 새 코드 커버리지가 ${MIN_COVERAGE}%보다 낮아요"; fail=1
 fi
+# 지표가 빠진 채로 통과하지 않게: 덮을 새 줄 수는 늘 있어야 하고, 새 줄이 있으면 중복 값도 있어야 한다
+if [ -z "$to_cover" ]; then
+  echo "실패: 새 코드 줄 수(new_lines_to_cover)를 읽지 못했어요"; fail=1
+elif [ "$to_cover" != "0" ] && [ -z "$duplication" ]; then
+  echo "실패: 새 코드 중복 값을 읽지 못했어요"; fail=1
+fi
 if [ -z "$coverage" ] && [ "${to_cover:-0}" != "0" ]; then
   echo "실패: 덮을 새 줄이 있는데 커버리지 값이 없어요 (JaCoCo 보고서가 안 올라갔을 수 있음)"; fail=1
 fi
