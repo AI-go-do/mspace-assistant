@@ -1,9 +1,11 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class ReplyPolishTest {
 
@@ -53,5 +55,46 @@ class ReplyPolishTest {
                 .isEqualTo("예약 취소와 이용 규칙이 있어요");
         assertThat(ReplyPolish.hideToolNames("밑줄 없는 답")).isEqualTo("밑줄 없는 답");
         assertThat(ReplyPolish.TOOL_WORDS).as("mcp-server 도구 12개 + briefing").hasSize(13);
+    }
+
+    @Test
+    @DisplayName("밑줄 꼴이 어긋나거나 낱말에 붙은 snake_case는 그대로 두고, 따옴표는 같이 지운다")
+    void toolNameEdges() {
+        // given
+        String quoted = "'week_plan'과 \"my_schedule\"을 보세요";
+        String malformed = "a__b, _room, room_, Room_status, room_status2, x/room_status, 가room_status";
+        String addresses = "www.mspace.example/my_page 와 a.b_c@x 는 그대로, 끝은 room_status";
+        String notFooter = "본문 (예약 시스템 15:00 다른 말)";
+
+        // when
+        String quotedOut = ReplyPolish.hideToolNames(quoted);
+        String malformedOut = ReplyPolish.hideToolNames(malformed);
+        String addressesOut = ReplyPolish.hideToolNames(addresses);
+        String notFooterOut = ReplyPolish.stripFooters(notFooter);
+
+        // then
+        assertThat(quotedOut).isEqualTo("주간 계획과 내 시간표를 보세요");
+        assertThat(malformedOut).as("이중 밑줄·앞뒤 밑줄·대문자·숫자·경로·한글에 붙은 것은 그대로").isEqualTo(malformed);
+        assertThat(addressesOut).isEqualTo("www.mspace.example/my_page 와 a.b_c@x 는 그대로, 끝은 지금 빈 방");
+        assertThat(notFooterOut).as("괄호 안이 꼬리말이 아니면 그대로").isEqualTo(notFooter);
+    }
+
+    @Test
+    @DisplayName("공백·글자가 아주 길게 이어진 답도 금방 처리한다 (정규식 되짚기로 느려지지 않음)")
+    void longInputStaysFast() {
+        // given
+        String spaces = "a" + " ".repeat(200_000) + "b";
+        String letters = "a".repeat(200_000) + "_" + "b".repeat(200_000) + "@" + "c".repeat(100_000);
+        String manyFooters = "본문" + " (입력한 시간표 기준)".repeat(20_000);
+        String manyTokensAndMails = "room_status a@b.co https://x.kr/a_b ".repeat(20_000);
+        String expectedMany = "지금 빈 방 a@b.co https://x.kr/a_b ".repeat(20_000);
+
+        // when, then: 2초 안에 끝나고 결과는 그대로
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            assertThat(ReplyPolish.stripFooters(spaces)).isEqualTo(spaces);
+            assertThat(ReplyPolish.hideToolNames(letters)).isEqualTo(letters);
+            assertThat(ReplyPolish.stripFooters(manyFooters)).isEqualTo("본문");
+            assertThat(ReplyPolish.hideToolNames(manyTokensAndMails)).isEqualTo(expectedMany);
+        });
     }
 }
