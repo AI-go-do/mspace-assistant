@@ -318,6 +318,8 @@ public class AgentLoop {
      * "(예약 시스템 15:00 조회 · 입력한 시간표 기준)"
      */
     String grounded(String text, Instant lookedUpAt, boolean usedSchedule) {
+        // 모델이 앞선 답을 흉내 내 꼬리말을 직접 쓰면 지우고(두 번 붙던 문제, #74), 도구 이름은 학생 말로 바꾼다
+        text = ReplyPolish.polish(text);
         if ((lookedUpAt == null && !usedSchedule) || text == null || text.isBlank()) {
             return text;
         }
@@ -400,6 +402,9 @@ public class AgentLoop {
                   근거를 묻거나 다시 확인해 달라면 그 자리에서 도구를 불러 답한다.
                 - "잠시만 기다려 주세요", "확인해 드릴게요"처럼 나중에 하겠다는 말은 하지 않는다. 네 답이 나가면
                   대화 차례가 끝나므로, 할 일은 이번 답 안에서 도구를 불러 끝낸다.
+                - 꼬리말 "(예약 시스템 … 조회 기준)"은 네가 쓰지 않는다. 코드가 도구를 부른 답 끝에 한 번 붙인다.
+                - 답에 도구 이름(find_available_rooms 같은 영문 snake_case)을 쓰지 않는다. 학생 말로 쓴다:
+                  빈방 찾기, 지금 빈 방, 내 예약, 이용 규칙, 예약, 지금 바로 쓰기, 예약 취소, 퇴실, 연장, 내 시간표, 주간 계획.
                 """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays())
                 + persona.promptRule() + "\n";
     }
