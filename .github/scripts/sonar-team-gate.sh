@@ -32,12 +32,19 @@ analysis_id=$(api "ce/task?id=$task_id" | jq -r '.task.analysisId // empty')
 
 # Community 서버는 브랜치·PR을 나눠 담지 못하고 프로젝트 하나에 덮어쓴다. 그래서 값을 읽기 전과 뒤에
 # 프로젝트의 마지막 분석이 이 분석인지 확인해, 다른 분석(develop push 등)의 값으로 판정하지 않게 한다
-# 공용 토큰에 분석 목록을 볼 권한이 없으면(403) 이 확인은 건너뛰고 경고만 남긴다 (11-06 #81: 겹친 분석이 없는데도 매번 실패)
-latest() { api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty' || true; }
+# 마지막 분석 id는 분석 목록(project_analyses)에서 읽고, 권한이 없으면(403) 프로젝트 작업 현황(ce/component,
+# 프로젝트 보기 권한으로 열림)의 마지막 완료 작업에서 읽는다 (11-06 #81: 분석 목록이 막혀 매번 실패)
+# 둘 다 못 읽을 때만 확인을 건너뛰고 경고를 남긴다
+latest() {
+  local k
+  k=$(api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty' || true)
+  [ -n "$k" ] || k=$(api "ce/component?component=$SONAR_PROJECT" | jq -r '.current.analysisId // empty' || true)
+  echo "$k"
+}
 check_mine() {
   local now; now=$(latest)
   if [ -z "$now" ]; then
-    echo "경고: 분석 목록을 읽지 못해(권한 없음 등) 겹친 분석 확인은 건너뛰어요"; return 0
+    echo "경고: 마지막 분석 id를 읽지 못해(권한 없음 등) 겹친 분석 확인은 건너뛰어요"; return 0
   fi
   [ "$now" = "$analysis_id" ] && return 0
   echo "그 사이 다른 분석(develop push 등)이 끝나 프로젝트 값이 바뀌었어요 (이 분석 $analysis_id, 마지막 분석 $now). 이 build를 다시 실행해 주세요"
