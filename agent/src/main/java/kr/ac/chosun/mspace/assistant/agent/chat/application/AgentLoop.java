@@ -171,15 +171,17 @@ public class AgentLoop {
                     toolNames.add(call.name());
                     long started = System.nanoTime();
                     ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
-                    if (!outcome.isError() && SCHEDULE_TOOL.equals(call.name())) {
+                    boolean schedule = SCHEDULE_TOOL.equals(call.name()) || WEEK_PLAN_TOOL.equals(call.name());
+                    if (!outcome.isError() && schedule) {
                         // 시간표가 없다는 답(NO_SCHEDULE)은 시간표를 본 근거가 아니다. 대신 화면에 [내 시간표] 버튼 신호를 준다
                         boolean noSchedule = NO_SCHEDULE.matcher(outcome.json()).find();
                         usedSchedule |= !noSchedule;
                         if (noSchedule && !hints.contains(ChatResult.HINT_OPEN_SCHEDULE)) {
                             hints.add(ChatResult.HINT_OPEN_SCHEDULE);
                         }
-                    } else if (!outcome.isError()) {
-                        lookedUpAt = now;
+                    }
+                    if (!outcome.isError() && !SCHEDULE_TOOL.equals(call.name())) {
+                        lookedUpAt = now; // week_plan도 예약 시스템(빈방)을 본 결과라 조회 시각을 남긴다
                     }
                     log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
                             (System.nanoTime() - started) / 1_000_000);
@@ -257,6 +259,7 @@ public class AgentLoop {
     }
 
     static final String SCHEDULE_TOOL = "my_schedule";
+    static final String WEEK_PLAN_TOOL = "week_plan";
 
     /** 최상위 "code":"NO_SCHEDULE"만. 과목명에 같은 글자가 있어도 시간표 없음으로 보지 않는다 */
 
@@ -296,6 +299,9 @@ public class AgentLoop {
                   다음 날로 넘어가지 않는 경우: 빈방이 없는 이유가 인원(결과 note에 인원 안내)이면 날짜가 아니라 인원을
                   바꾸라고 안내한다. 다음 날이 조회 범위(오늘부터 %4$d일) 밖이면 부르지 말고 그렇다고 말한다. 다음 날
                   searchFromAt의 날짜가 그 다음 날로 넘어가면(밤늦은 수업) 그 시각으로 찾지 말고 학생에게 시각을 묻는다.
+                - "이번 주에 언제 비어", "수업 끝나고 2시간 쓸 수 있는 날", "다음 주 중에"처럼 여러 날을 물으면 날짜마다
+                  my_schedule·find_available_rooms를 반복하지 말고 week_plan 한 번으로 본다(길이는 minutes로). days의 option이
+                  있는 날을 날짜·시각·방 그대로 나열하고, 없는 날은 reason을 전한다. 하루만 물으면 week_plan을 쓰지 않는다.
                 - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
                 - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면

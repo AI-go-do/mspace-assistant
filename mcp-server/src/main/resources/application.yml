@@ -56,6 +56,9 @@ mspace:
     slot-minutes: 30
     max-classes: 40
     max-name-chars: 30
+    # week_plan: 오늘부터 며칠을, 수업 없는 날은 몇 시부터 볼지
+    plan-days: 7
+    plan-from-time: "09:00"
 
 logging:
   level:

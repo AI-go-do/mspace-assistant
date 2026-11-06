@@ -52,6 +52,7 @@
 | `checkout_reservation` | **쓰기** | `POST /api/reservations/{id}/checkout` | FR-RSV-008 |
 | `continue_reservation` | **쓰기** | `POST /api/reservations/{id}/continue` (core #51). 30분 단위 최대 2시간, 1회, 끝나기 10분 전부터 | FR-RSV-105 |
 | `my_schedule` | 읽기 | 없음. 학생이 화면에서 넣은 시간표(mcp-server 저장소, `SCHEDULE_STORE=redis`면 `agent:schedule:<학생 키>`). 넣기는 REST `PUT /api/agent/schedule`(모델 못 부름). **구현됨**(#63) | FR-AGT-102 |
+| `week_plan` | 읽기 | 없음. 오늘부터 7일을 날마다 `my_schedule` → `find_available_rooms`로 이어 붙여 "수업 끝나고 쓸 수 있는 가장 이른 칸" 하나씩. **구현됨**(11/6) | FR-AGT-102 |
 | `list_notices`, `class_changes` | 읽기 | 학사 정보 수집기 (나중) | FR-AGT-102 |
 
 - 도구별 입력·출력·오류는 [도구 명세](docs/도구-명세.md), 두 단계 확인은 [설계](docs/설계.md)에 있어요

@@ -61,6 +61,7 @@ final class QuickReplies {
                     ? noRooms(r.path("date").asString(null), r.path("note").asString(""), lastAllowed)
                     : List.of("첫 번째로 나온 방 잡아 줘", "다른 시간도 볼게");
             case "my_reservations" -> reservations(r);
+            case "week_plan" -> weekPlan(r);
             case "room_status" -> r.path("availableCount").asInt(0) > 0
                     ? List.of("지금 바로 1시간 쓸게", "내 예약 보여 줘")
                     : List.of("오늘 저녁 빈방 봐 줘", "내 예약 보여 줘");
@@ -101,6 +102,19 @@ final class QuickReplies {
         } catch (RuntimeException e) {
             return "다음 날";
         }
+    }
+
+    /** 주간 계획: 첫 번째로 쓸 수 있는 날을 "11월 7일 15:30 2번 방 잡아 줘"로. 없으면 길이를 줄이게 */
+    private static List<String> weekPlan(JsonNode r) {
+        for (JsonNode d : r.path("days")) {
+            JsonNode o = d.path("option");
+            String start = o.path("startAt").asString("");
+            if (start.length() >= 16) {
+                return List.of(nextDay(java.time.LocalDate.parse(start.substring(0, 10)).minusDays(1).toString())
+                        + " " + start.substring(11, 16) + " " + o.path("roomName").asString("") + " 잡아 줘", "다른 날도 볼게");
+            }
+        }
+        return List.of("1시간으로 다시 볼게", "내 예약 보여 줘");
     }
 
     private static List<String> reservations(JsonNode r) {
