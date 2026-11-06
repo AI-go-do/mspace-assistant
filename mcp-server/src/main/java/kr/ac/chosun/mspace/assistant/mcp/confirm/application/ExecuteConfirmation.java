@@ -31,7 +31,7 @@ public class ExecuteConfirmation {
     public Executed execute(String token, UserCredential credential, List<String> participantStudentIds) {
         // 입력이 틀렸으면 토큰을 쓰지 않고 돌려보낸다(학생이 학번만 고쳐 다시 누를 수 있게)
         List<String> participants = participantStudentIds == null ? List.of()
-                : participantStudentIds.stream().map(s -> s == null ? "" : s.strip()).toList();
+                : participantStudentIds.stream().map(ExecuteConfirmation::stripOrEmpty).toList();
         switch (store.peek(token, credential)) {
             case PendingAction.Create c -> checkParticipants(c.headcount(), participants);
             case PendingAction.StartNow s -> {
@@ -50,8 +50,8 @@ public class ExecuteConfirmation {
                 yield new Executed("START_NOW", created.id(), created.status(), created.accessCode(), created.replayed(),
                         "지금부터 %s까지 예약했어요. 10분 안에 입실해 주세요.".formatted(created.endAt().toLocalTime()));
             }
-            case PendingAction.Cancel x -> changed("CANCEL", reservations.cancel(credential, x.reservationId()), "취소했어요.");
-            case PendingAction.Checkout x -> changed("CHECKOUT", reservations.checkout(credential, x.reservationId()),
+            case PendingAction.Cancel(long reservationId) -> changed("CANCEL", reservations.cancel(credential, reservationId), "취소했어요.");
+            case PendingAction.Checkout(long reservationId) -> changed("CHECKOUT", reservations.checkout(credential, reservationId),
                     "퇴실했어요. 방이 바로 비었어요.");
             case PendingAction.Continue(long reservationId, OffsetDateTime newEndAt) -> {
                 CreatedReservation created = reservations.continueUse(credential, reservationId, newEndAt, token);
@@ -60,6 +60,10 @@ public class ExecuteConfirmation {
                         "%s까지 연장했어요. 입실 번호가 새로 나왔어요.".formatted(created.endAt().toLocalTime()));
             }
         };
+    }
+
+    private static String stripOrEmpty(String s) {
+        return s == null ? "" : s.strip();
     }
 
     /** 즉시 시작은 확인을 누른 시각부터라, 제안 뒤 끝 시각이 지나 버렸으면 토큰을 쓰지 않고 다시 제안하게 한다 */

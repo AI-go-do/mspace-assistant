@@ -157,8 +157,8 @@ public class AgentLoop {
         List<LlmMessage> out = new ArrayList<>(history.size());
         for (LlmMessage m : history) {
             out.add(switch (m) {
-                case LlmMessage.User u -> new LlmMessage.User(PrivacyMask.mask(u.text()));
-                case LlmMessage.Assistant a -> new LlmMessage.Assistant(PrivacyMask.mask(a.text()), a.toolCalls());
+                case LlmMessage.User(String text) -> new LlmMessage.User(PrivacyMask.mask(text));
+                case LlmMessage.Assistant(String text, List<ToolCall> calls) -> new LlmMessage.Assistant(PrivacyMask.mask(text), calls);
                 case LlmMessage.ToolResult r -> r;
             });
         }
@@ -251,8 +251,10 @@ public class AgentLoop {
             progress.toolNames.add(call.name());
             long started = System.nanoTime();
             ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
-            log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
-                    (System.nanoTime() - started) / 1_000_000);
+            if (log.isInfoEnabled()) {
+                log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
+                        (System.nanoTime() - started) / 1_000_000);
+            }
             progress.add(call.name(), outcome, now);
             // 도구 결과는 게이트웨이가 이미 가렸다(JSON 문자열 값만). 여기서 JSON 전체에 정규식을 걸면
             // 6자리 숫자 값이 바뀌어 JSON이 깨진다 (ToolGateway.Outcome 참고)
@@ -305,11 +307,11 @@ public class AgentLoop {
             return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints),
                     suggestions);
         }
-    }
 
-    /** 조회할 수 있는 마지막 날: 오늘(서울) + 미리 예약 일수 - 1 */
-    private java.time.LocalDate lastAllowedDay() {
-        return java.time.LocalDate.now(clock.withZone(SEOUL)).plusDays(props.rules().advanceDays() - 1L);
+        /** 조회할 수 있는 마지막 날: 오늘(서울) + 미리 예약 일수 - 1 */
+        private java.time.LocalDate lastAllowedDay() {
+            return java.time.LocalDate.now(clock.withZone(SEOUL)).plusDays(props.rules().advanceDays() - 1L);
+        }
     }
 
     private boolean pastDeadline(Instant deadline, int calls) {

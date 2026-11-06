@@ -3,7 +3,7 @@ package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.INVALID_REQUEST;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.user;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.error;
-import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.unauthorized;
+import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.loginRequired;
 
 import java.net.URI;
 import java.util.List;
@@ -61,7 +61,7 @@ class ChatController {
     ResponseEntity<Object> chat(@RequestHeader HttpHeaders headers, @RequestBody ChatRequest request) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         if (request == null || request.message() == null || request.message().isBlank()) {
             return error(HttpStatus.BAD_REQUEST, INVALID_REQUEST, "말을 입력해 주세요.");
@@ -88,16 +88,16 @@ class ChatController {
                 .toList();
         String message = request.message();
         return switch (jobs.submit(user, () -> agent.run(user, history, message))) {
-            case ChatJobs.Submitted.Accepted a -> ResponseEntity.accepted()
-                    .location(URI.create("/api/agent/chat/" + a.jobId()))
+            case ChatJobs.Submitted.Accepted(String jobId) -> ResponseEntity.accepted()
+                    .location(URI.create("/api/agent/chat/" + jobId))
                     .cacheControl(CacheControl.noStore())
-                    .body(new Accepted(a.jobId(), ChatJobs.Status.PENDING, jobProps.pollAfter().toMillis()));
-            case ChatJobs.Submitted.Rejected r when "CHAT_IN_PROGRESS".equals(r.code()) ->
-                    error(HttpStatus.CONFLICT, r.code(), r.message());
+                    .body(new Accepted(jobId, ChatJobs.Status.PENDING, jobProps.pollAfter().toMillis()));
+            case ChatJobs.Submitted.Rejected(String code, String text) when "CHAT_IN_PROGRESS".equals(code) ->
+                    error(HttpStatus.CONFLICT, code, text);
             // 붐빌 때는 화면이 언제 다시 보낼지 알 수 있게 Retry-After(초)
-            case ChatJobs.Submitted.Rejected r -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            case ChatJobs.Submitted.Rejected(String code, String text) -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .header(HttpHeaders.RETRY_AFTER, String.valueOf(RETRY_AFTER_SECONDS))
-                    .body(error(HttpStatus.SERVICE_UNAVAILABLE, r.code(), r.message()).getBody());
+                    .body(error(HttpStatus.SERVICE_UNAVAILABLE, code, text).getBody());
         };
     }
 
@@ -106,7 +106,7 @@ class ChatController {
     ResponseEntity<Object> chatResult(@PathVariable String jobId, @RequestHeader HttpHeaders headers) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         return jobs.find(jobId, user)
                 .<ResponseEntity<Object>>map(view -> ResponseEntity.ok().cacheControl(CacheControl.noStore())
@@ -125,7 +125,7 @@ class ChatController {
     ResponseEntity<Object> clearHistory(@RequestHeader HttpHeaders headers) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         if (jobs.hasRunning(user)) {
             return error(HttpStatus.CONFLICT, "CHAT_IN_PROGRESS", "앞의 질문에 아직 답하는 중이에요. 답이 온 뒤에 지워 주세요.");

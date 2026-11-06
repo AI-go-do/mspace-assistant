@@ -65,25 +65,17 @@ public class FindAvailableRooms {
         List<Alternative> candidates = new ArrayList<>();
         boolean anyRoomFitsHeadcount = false;
         for (RoomSlots room : day.rooms()) {
-            if (headcount != null && (headcount < room.minPeople() || headcount > room.maxPeople())) {
-                continue;
-            }
-            anyRoomFitsHeadcount = true;
-            List<FreeRange> free = merge(room.slots());
-            if (windowStart != null && windowEnd != null) {
-                if (free.stream().noneMatch(r -> !r.startAt().isAfter(windowStart) && !r.endAt().isBefore(windowEnd))) {
+            if (fits(room, headcount)) {
+                anyRoomFitsHeadcount = true;
+                List<FreeRange> merged = merge(room.slots());
+                List<FreeRange> free = freeInWindow(merged, windowStart, windowEnd);
+                if (free == null) { // 원하는 시간 전체가 비어 있지 않음 → 가까운 대안 후보 (자정 넘김은 대안을 안 찾는다)
                     if (!crossesMidnight) {
-                        candidates.addAll(nearest(room, free, windowStart, Duration.between(windowStart, windowEnd)));
+                        candidates.addAll(nearest(room, merged, windowStart, Duration.between(windowStart, windowEnd)));
                     }
-                    continue;
+                } else if (!free.isEmpty()) {
+                    rooms.add(new FreeRoom(room.roomId(), room.roomName(), room.minPeople(), room.maxPeople(), free));
                 }
-            } else if (windowStart != null) {
-                free = free.stream().filter(r -> r.endAt().isAfter(windowStart)).toList();
-            } else if (windowEnd != null) {
-                free = free.stream().filter(r -> r.startAt().isBefore(windowEnd)).toList();
-            }
-            if (!free.isEmpty()) {
-                rooms.add(new FreeRoom(room.roomId(), room.roomName(), room.minPeople(), room.maxPeople(), free));
             }
         }
         List<Alternative> alternatives = rooms.isEmpty() ? pick(candidates, windowStart) : List.of();
@@ -98,6 +90,28 @@ public class FindAvailableRooms {
             note = NONE_NOTE;
         }
         return new AvailableRooms(day.date(), rooms, note, alternatives);
+    }
+
+    private static boolean fits(RoomSlots room, Integer headcount) {
+        return headcount == null || (headcount >= room.minPeople() && headcount <= room.maxPeople());
+    }
+
+    /**
+     * 시작·끝을 둘 다 주면 그 시간 전체를 덮는 빈 구간이 있어야 한다: 있으면 빈 구간 그대로, 없으면 null.
+     * 하나만 주면 그 뒤(또는 그 전)에 걸치는 구간만, 둘 다 없으면 하루 전체
+     */
+    private static List<FreeRange> freeInWindow(List<FreeRange> free, OffsetDateTime windowStart, OffsetDateTime windowEnd) {
+        if (windowStart != null && windowEnd != null) {
+            boolean covers = free.stream().anyMatch(r -> !r.startAt().isAfter(windowStart) && !r.endAt().isBefore(windowEnd));
+            return covers ? free : null;
+        }
+        if (windowStart != null) {
+            return free.stream().filter(r -> r.endAt().isAfter(windowStart)).toList();
+        }
+        if (windowEnd != null) {
+            return free.stream().filter(r -> r.startAt().isBefore(windowEnd)).toList();
+        }
+        return free;
     }
 
     /** 자정을 넘기면 끝은 다음 날 0시까지만 본다 (시작 날짜만 조회) */

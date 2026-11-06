@@ -3,7 +3,7 @@ package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.INVALID_IMAGE;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.user;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.error;
-import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.unauthorized;
+import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.loginRequired;
 
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
@@ -66,7 +66,7 @@ class ScheduleController {
                                     @RequestPart(value = "image", required = false) MultipartFile image) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         if (image == null || image.isEmpty()) {
             return error(HttpStatus.BAD_REQUEST, INVALID_IMAGE, "시간표 사진을 올려 주세요.");
@@ -89,7 +89,7 @@ class ScheduleController {
     private ResponseEntity<Object> relaySchedule(String method, HttpHeaders headers, String body) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         ConfirmationGateway.Relayed relayed = schedules.relay(method, user, body);
         if (relayed.status() == HttpStatus.NO_CONTENT.value()) {

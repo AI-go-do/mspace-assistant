@@ -78,15 +78,18 @@ public class OllamaLlmClient implements LlmClient {
         }
     }
 
+    private static final String CONTENT = "content";
+    private static final String FUNCTION = "function";
+
     private static List<Map<String, Object>> messages(String system, List<LlmMessage> conversation) {
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", orEmpty(system)));
+        messages.add(Map.of("role", "system", CONTENT, orEmpty(system)));
         for (LlmMessage m : conversation) {
             messages.add(switch (m) {
-                case LlmMessage.User(String text) -> Map.of("role", "user", "content", orEmpty(text));
+                case LlmMessage.User(String text) -> Map.of("role", "user", CONTENT, orEmpty(text));
                 case LlmMessage.Assistant(String text, List<ToolCall> toolCalls) -> assistant(text, toolCalls);
                 case LlmMessage.ToolResult(var callId, String name, String json, boolean isError) -> Map.of("role", "tool",
-                        "tool_name", orEmpty(name), "content", isError ? "{\"error\":" + json + "}" : orEmpty(json));
+                        "tool_name", orEmpty(name), CONTENT, isError ? "{\"error\":" + json + "}" : orEmpty(json));
             });
         }
         return messages;
@@ -95,10 +98,10 @@ public class OllamaLlmClient implements LlmClient {
     private static Map<String, Object> assistant(String text, List<ToolCall> toolCalls) {
         Map<String, Object> msg = new LinkedHashMap<>();
         msg.put("role", "assistant");
-        msg.put("content", orEmpty(text));
+        msg.put(CONTENT, orEmpty(text));
         if (!toolCalls.isEmpty()) {
             msg.put("tool_calls", toolCalls.stream()
-                    .map(c -> Map.of("function", Map.of("name", orEmpty(c.name()),
+                    .map(c -> Map.of(FUNCTION, Map.of("name", orEmpty(c.name()),
                             "arguments", c.arguments() == null ? Map.of() : c.arguments())))
                     .toList());
         }
@@ -107,7 +110,7 @@ public class OllamaLlmClient implements LlmClient {
 
     private static Map<String, Object> tool(ToolSpec spec) {
         // Map.of는 null을 받지 않는다. 설명·스키마가 빠진 도구 하나 때문에 대화 전체가 500이 되지 않게 빈 값으로 둔다
-        return Map.of("type", "function", "function", Map.of(
+        return Map.of("type", FUNCTION, FUNCTION, Map.of(
                 "name", orEmpty(spec.name()), "description", orEmpty(spec.description()),
                 "parameters", spec.inputSchema() == null ? Map.of("type", "object") : spec.inputSchema()));
     }
