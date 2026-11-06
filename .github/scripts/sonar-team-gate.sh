@@ -23,9 +23,18 @@ for _ in $(seq 1 60); do
   sleep 5
 done
 [ "$status" = SUCCESS ] || { echo "Sonar 분석 처리 시간이 5분을 넘었어요 (마지막 상태: $status)"; exit 1; }
+analysis_id=$(api "ce/task?id=$task_id" | jq -r '.task.analysisId // empty')
+[ -n "$analysis_id" ] || { echo "분석 id를 읽지 못했어요"; exit 1; }
+
+# Community 서버는 브랜치·PR을 나눠 담지 못하고 프로젝트 하나에 덮어쓴다. 그래서 값을 읽기 전과 뒤에
+# 프로젝트의 마지막 분석이 이 분석인지 확인해, 다른 분석(develop push 등)의 값으로 판정하지 않게 한다
+latest() { api "project_analyses/search?project=$SONAR_PROJECT&ps=1" | jq -r '.analyses[0].key // empty'; }
+not_mine() { echo "그 사이 다른 분석(develop push 등)이 끝나 프로젝트 값이 바뀌었어요. 이 build를 다시 실행해 주세요"; exit 1; }
+[ "$(latest)" = "$analysis_id" ] || not_mine
 
 # 2) 새 코드 값 읽기. 새 코드 지표는 period.value에 들어 있다. 덮을 새 줄이 없으면 커버리지 값이 없을 수 있다
 measures=$(api "measures/component?component=$SONAR_PROJECT&metricKeys=new_coverage,new_duplicated_lines_density,new_lines_to_cover,new_violations,new_bugs,new_vulnerabilities,new_reliability_rating,new_security_rating")
+[ "$(latest)" = "$analysis_id" ] || not_mine
 val() { echo "$measures" | jq -r --arg k "$1" '[.component.measures[] | select(.metric == $k) | (.period.value // .value)][0] // empty'; }
 coverage=$(val new_coverage)
 duplication=$(val new_duplicated_lines_density)
