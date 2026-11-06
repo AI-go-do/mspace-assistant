@@ -22,9 +22,23 @@ public interface ConversationMemory {
     void save(String memberKey, List<LlmMessage> conversation);
 
     /**
-     * 학생이 "새 대화"를 눌렀을 때. 지우지 못했으면 {@link Unavailable} — 지운 척 204를 주면 저장소가 돌아왔을 때 옛 대화가 되살아난다
+     * 학생이 "새 대화"를 눌렀을 때. 대화와 미룬 글을 모두 지운다. 지우지 못했으면 {@link Unavailable} — 지운 척 204를 주면
+     * 저장소가 돌아왔을 때 옛 대화가 되살아난다
      */
     void clear(String memberKey);
+
+    /**
+     * 채팅 밖에서 생긴 글(확인 카드 결과)을 미뤄 둔다. 다음 채팅이 {@link #takeNotes}로 꺼내 대화 앞에 붙인다.
+     * 대화 자체를 읽고 고쳐 저장하지 않는 이유: 같은 학생의 채팅이 돌고 있으면 그 채팅이 끝날 때 대화를 통째로 저장해서
+     * 중간에 끼운 글이 사라진다. 미뤄 둔 글은 따로 쌓이니 어느 쪽이 먼저 끝나도 잃지 않는다. 실패는 예외 없이 넘어간다
+     */
+    default void addNote(String memberKey, List<LlmMessage> note) {
+    }
+
+    /** 미뤄 둔 글을 쌓인 순서대로 꺼내고 비운다. 없거나 실패하면 빈 목록 */
+    default List<LlmMessage> takeNotes(String memberKey) {
+        return List.of();
+    }
 
     /** 저장소에 닿지 못해 지우지 못함. 읽기·저장 실패는 기억 없이 넘어가지만, 지우기 실패는 학생에게 알린다 */
     class Unavailable extends RuntimeException {

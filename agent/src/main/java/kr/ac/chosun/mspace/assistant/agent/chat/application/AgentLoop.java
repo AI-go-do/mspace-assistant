@@ -64,9 +64,13 @@ public class AgentLoop {
      */
     public ChatResult run(UserHeaders headers, List<LlmMessage> history, String message) {
         String key = MemberKey.of(headers);
-        List<LlmMessage> remembered = memory.load(key);
-        List<LlmMessage> conversation = new ArrayList<>(
-                trim(remembered.isEmpty() ? masked(history) : remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
+        List<LlmMessage> remembered = new ArrayList<>(memory.load(key));
+        List<LlmMessage> notes = memory.takeNotes(key); // 확인 카드 결과처럼 채팅 밖에서 생긴 글 (설계 4장 "확인 뒤")
+        if (remembered.isEmpty() && notes.isEmpty()) {
+            remembered.addAll(masked(history));
+        }
+        remembered.addAll(notes);
+        List<LlmMessage> conversation = new ArrayList<>(trim(remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         ChatResult result = converse(headers, conversation);
         // 모델 답도 다음 요청에 외부 AI로 다시 가니 학생 말과 같은 규칙으로 가려 둔다

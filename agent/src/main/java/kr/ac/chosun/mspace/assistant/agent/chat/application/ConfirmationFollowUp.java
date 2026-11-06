@@ -1,6 +1,5 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
-import java.util.ArrayList;
 import java.util.List;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import org.slf4j.Logger;
@@ -22,6 +21,9 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>입실 번호(accessCode)는 화면에만 간다. 맥락에는 action·예약 번호·문장만 넣고, 문장도 {@link PrivacyMask}로 거른다</li>
  * </ul>
  * 맥락 저장이 실패해도 확인 결과는 그대로 돌려준다(예약은 이미 됐으니 화면이 먼저다).
+ * <p>
+ * 대화를 읽어 고쳐 저장하지 않고 {@link ConversationMemory#addNote}로 미뤄 둔다. 같은 학생의 채팅이 돌고 있으면 그 채팅이
+ * 끝날 때 대화를 통째로 저장해서(설계 4장) 중간에 끼운 글이 사라지기 때문이다. 미뤄 둔 글은 다음 채팅이 시작할 때 꺼내 붙인다.
  */
 @Service
 public class ConfirmationFollowUp {
@@ -32,14 +34,10 @@ public class ConfirmationFollowUp {
     static final String FAILED_PREFIX = "확인을 처리하지 못했어요: ";
 
     private final ConversationMemory memory;
-    private final AgentProperties props;
-    private final MemoryProperties memoryProps;
     private final JsonMapper json;
 
-    public ConfirmationFollowUp(ConversationMemory memory, AgentProperties props, MemoryProperties memoryProps, JsonMapper json) {
+    public ConfirmationFollowUp(ConversationMemory memory, JsonMapper json) {
         this.memory = memory;
-        this.props = props;
-        this.memoryProps = memoryProps;
         this.json = json;
     }
 
@@ -80,10 +78,7 @@ public class ConfirmationFollowUp {
 
     private void remember(String key, String outcome) {
         try {
-            List<LlmMessage> conversation = new ArrayList<>(memory.load(key));
-            conversation.add(new LlmMessage.User(PRESSED));
-            conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(outcome), List.of()));
-            memory.save(key, AgentLoop.trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));
+            memory.addNote(key, List.of(new LlmMessage.User(PRESSED), new LlmMessage.Assistant(PrivacyMask.mask(outcome), List.of())));
         } catch (RuntimeException e) {
             log.warn("확인 결과를 대화 맥락에 남기지 못함: {}", e.getClass().getSimpleName());
         }

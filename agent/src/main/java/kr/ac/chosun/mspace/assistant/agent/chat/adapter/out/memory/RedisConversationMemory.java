@@ -21,6 +21,9 @@ public class RedisConversationMemory implements ConversationMemory {
 
     private static final Logger log = LoggerFactory.getLogger(RedisConversationMemory.class);
     static final String PREFIX = "agent:conv:";
+    /** 미룬 글(확인 결과) 목록. RPUSH로 쌓고 LPOP으로 한꺼번에 꺼낸다 (둘 다 원자적이라 끼우기·꺼내기가 섞여도 잃지 않는다) */
+    static final String NOTES_PREFIX = "agent:conv-notes:";
+    private static final long MAX_NOTES = 100;
 
     private final StringRedisTemplate redis;
     private final MemoryProperties props;
@@ -52,10 +55,37 @@ public class RedisConversationMemory implements ConversationMemory {
     @Override
     public void clear(String memberKey) {
         try {
-            redis.delete(PREFIX + memberKey);
+            redis.delete(List.of(PREFIX + memberKey, NOTES_PREFIX + memberKey));
         } catch (DataAccessException e) {
             log.warn("conversation memory clear failed type={}", e.getClass().getSimpleName());
             throw new Unavailable();
+        }
+    }
+
+    @Override
+    public void addNote(String memberKey, List<LlmMessage> note) {
+        try {
+            String key = NOTES_PREFIX + memberKey;
+            redis.opsForList().rightPush(key, ConversationJson.write(note));
+            redis.expire(key, props.ttl());
+        } catch (DataAccessException e) {
+            log.warn("conversation note add failed type={}", e.getClass().getSimpleName());
+        }
+    }
+
+    @Override
+    public List<LlmMessage> takeNotes(String memberKey) {
+        try {
+            List<String> popped = redis.opsForList().leftPop(NOTES_PREFIX + memberKey, MAX_NOTES);
+            if (popped == null || popped.isEmpty()) {
+                return List.of();
+            }
+            List<LlmMessage> out = new java.util.ArrayList<>();
+            popped.forEach(json -> out.addAll(ConversationJson.read(json)));
+            return out;
+        } catch (DataAccessException e) {
+            log.warn("conversation note take failed type={}", e.getClass().getSimpleName());
+            return List.of();
         }
     }
 }

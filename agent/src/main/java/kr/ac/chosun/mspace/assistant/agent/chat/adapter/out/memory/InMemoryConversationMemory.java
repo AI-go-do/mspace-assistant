@@ -19,6 +19,8 @@ public class InMemoryConversationMemory implements ConversationMemory {
     }
 
     private final Map<String, Entry> store = new ConcurrentHashMap<>();
+    /** 미룬 글(확인 결과). 학생별 목록을 compute로 통째로 바꿔 끼우기·꺼내기가 서로 섞이지 않는다 */
+    private final Map<String, Entry> notes = new ConcurrentHashMap<>();
     private final MemoryProperties props;
     private final Clock clock;
 
@@ -43,11 +45,30 @@ public class InMemoryConversationMemory implements ConversationMemory {
     @Override
     public void clear(String memberKey) {
         store.remove(memberKey);
+        notes.remove(memberKey);
+    }
+
+    @Override
+    public void addNote(String memberKey, List<LlmMessage> note) {
+        sweep();
+        notes.compute(memberKey, (k, old) -> {
+            List<LlmMessage> merged = new java.util.ArrayList<>(old == null ? List.of() : old.conversation());
+            merged.addAll(note);
+            return new Entry(List.copyOf(merged), clock.instant());
+        });
+    }
+
+    @Override
+    public List<LlmMessage> takeNotes(String memberKey) {
+        sweep();
+        Entry taken = notes.remove(memberKey);
+        return taken == null ? List.of() : taken.conversation();
     }
 
     private void sweep() {
         Instant cutoff = clock.instant().minus(props.ttl());
         store.entrySet().removeIf(e -> e.getValue().savedAt().isBefore(cutoff));
+        notes.entrySet().removeIf(e -> e.getValue().savedAt().isBefore(cutoff));
     }
 
     int size() {

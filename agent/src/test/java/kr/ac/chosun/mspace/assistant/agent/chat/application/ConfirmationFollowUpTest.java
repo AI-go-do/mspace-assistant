@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.List;
@@ -22,16 +21,12 @@ class ConfirmationFollowUpTest {
     static final UserHeaders ME = new UserHeaders(Map.of("Authorization", "Bearer t"));
     final ConversationMemory memory = mock(ConversationMemory.class);
     final JsonMapper json = JsonMapper.builder().build();
-    final ConfirmationFollowUp followUp = new ConfirmationFollowUp(memory,
-            new AgentProperties(null, List.of("Authorization"), 8, null, null, null, 0, 6),
-            new MemoryProperties(true, "memory", null, 0), json);
+    final ConfirmationFollowUp followUp = new ConfirmationFollowUp(memory, json);
 
     @Test
-    @DisplayName("예약 성공(201): 화면에는 입실 번호 그대로 + suggestions, 맥락에는 [확인] 누름 + '예약했어요. (예약 7번, BOOKED)'만 (번호 없음)")
+    @DisplayName("예약 성공(201): 화면에는 입실 번호 그대로 + suggestions, 미룬 글에는 [확인] 누름 + '예약했어요. (예약 7번, BOOKED)'만 (번호 없음). 대화를 읽어 덮지 않는다")
     void createRecorded() {
         // given
-        when(memory.load(anyString())).thenReturn(List.of(new LlmMessage.User("내일 2시 1번 방 잡아 줘"),
-                new LlmMessage.Assistant("1번 방 14:00–16:00 예약할까요?", List.of())));
         String body = "{\"action\":\"CREATE\",\"reservationId\":7,\"status\":\"BOOKED\",\"accessCode\":\"483920\",\"replayed\":false,\"message\":\"예약했어요.\"}";
 
         // when
@@ -43,18 +38,18 @@ class ConfirmationFollowUpTest {
         assertThat(node.path("suggestions")).extracting(n -> n.asString()).containsExactly("입실 번호 보여 줘", "내 예약 보여 줘");
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<LlmMessage>> saved = ArgumentCaptor.forClass(List.class);
-        verify(memory).save(anyString(), saved.capture());
-        assertThat(saved.getValue()).hasSize(4);
-        assertThat(saved.getValue().get(2)).isEqualTo(new LlmMessage.User(ConfirmationFollowUp.PRESSED));
-        assertThat(saved.getValue().get(3)).isEqualTo(new LlmMessage.Assistant("예약했어요. (예약 7번, BOOKED)", List.of()));
+        verify(memory).addNote(anyString(), saved.capture());
+        assertThat(saved.getValue()).containsExactly(new LlmMessage.User(ConfirmationFollowUp.PRESSED),
+                new LlmMessage.Assistant("예약했어요. (예약 7번, BOOKED)", List.of()));
         assertThat(saved.getValue().toString()).doesNotContain("483920");
+        verify(memory, org.mockito.Mockito.never()).load(anyString());
+        verify(memory, org.mockito.Mockito.never()).save(anyString(), org.mockito.ArgumentMatchers.anyList());
     }
 
     @Test
-    @DisplayName("실패(409 RESERVATION_TIME_TAKEN): suggestions 없이 본문 그대로, 맥락에는 '확인을 처리하지 못했어요: …'")
+    @DisplayName("실패(409 RESERVATION_TIME_TAKEN): suggestions 없이 본문 그대로, 미룬 글에는 '확인을 처리하지 못했어요: …'")
     void failureRecorded() {
         // given
-        when(memory.load(anyString())).thenReturn(List.of());
         String body = "{\"code\":\"RESERVATION_TIME_TAKEN\",\"message\":\"그 시간에 다른 예약이 있어요.\"}";
 
         // when
@@ -64,7 +59,7 @@ class ConfirmationFollowUpTest {
         assertThat(json.readTree(out).has("suggestions")).isFalse();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<LlmMessage>> saved = ArgumentCaptor.forClass(List.class);
-        verify(memory).save(anyString(), saved.capture());
+        verify(memory).addNote(anyString(), saved.capture());
         assertThat(saved.getValue()).containsExactly(new LlmMessage.User(ConfirmationFollowUp.PRESSED),
                 new LlmMessage.Assistant(ConfirmationFollowUp.FAILED_PREFIX + "그 시간에 다른 예약이 있어요.", List.of()));
     }
@@ -73,8 +68,7 @@ class ConfirmationFollowUpTest {
     @DisplayName("맥락 저장이 실패해도 확인 결과는 그대로 돌려준다. 로그인 없음·본문 해석 불가면 맥락을 건드리지 않는다")
     void memoryFailureAndOddBodies() {
         // given
-        when(memory.load(anyString())).thenReturn(List.of());
-        doThrow(new RuntimeException("redis down")).when(memory).save(anyString(), org.mockito.ArgumentMatchers.anyList());
+        doThrow(new RuntimeException("redis down")).when(memory).addNote(anyString(), org.mockito.ArgumentMatchers.anyList());
         String body = "{\"action\":\"CANCEL\",\"reservationId\":7,\"status\":\"CANCELED\",\"accessCode\":null,\"replayed\":false,\"message\":\"취소했어요.\"}";
 
         // when
@@ -86,7 +80,7 @@ class ConfirmationFollowUpTest {
         assertThat(json.readTree(out).path("suggestions")).extracting(n -> n.asString()).containsExactly("다른 시간 찾아 줘", "지금 빈 방 있어?");
         assertThat(json.readTree(anonymous).has("suggestions")).isFalse();
         assertThat(odd).isEqualTo("<html>bad gateway</html>");
-        verify(memory, org.mockito.Mockito.times(1)).load(anyString()); // 로그인 없는 요청·해석 불가 본문은 맥락을 안 읽는다
+        verify(memory, org.mockito.Mockito.times(1)).addNote(anyString(), org.mockito.ArgumentMatchers.anyList()); // 로그인 없는 요청·해석 불가 본문은 안 남긴다
     }
 
     @Test
