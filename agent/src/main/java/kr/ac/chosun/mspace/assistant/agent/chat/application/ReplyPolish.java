@@ -113,6 +113,7 @@ final class ReplyPolish {
         List<int[]> addresses = addressRanges(text);
         StringBuilder sb = new StringBuilder();
         int last = 0;
+        int cursor = 0;
         int i = 0;
         while (i < text.length()) {
             if (!isSnakeChar(text.charAt(i))) {
@@ -120,7 +121,12 @@ final class ReplyPolish {
                 continue;
             }
             int j = runEnd(text, i);
-            if (isToolToken(text, i, j) && !inside(addresses, i)) {
+            // i는 앞으로만 가므로 이미 지난 주소 범위는 다시 보지 않는다(범위 검사가 입력 길이에 비례)
+            while (cursor < addresses.size() && addresses.get(cursor)[1] <= i) {
+                cursor++;
+            }
+            boolean inAddress = cursor < addresses.size() && addresses.get(cursor)[0] <= i;
+            if (!inAddress && isToolToken(text, i, j)) {
                 j = replaceToken(text, sb, last, i, j);
                 last = j;
             }
@@ -204,7 +210,10 @@ final class ReplyPolish {
         return null;
     }
 
-    /** URL(http://, https://, www. 부터 공백 전까지)과 메일 주소(local@a.b) 위치. 이 안의 snake_case는 바꾸지 않는다 */
+    /**
+     * URL(http://, https://, www. 부터 공백 전까지)과 메일 주소(local@a.b) 위치. 이 안의 snake_case는 바꾸지 않는다.
+     * 시작 위치로 정렬하고 겹치는 범위는 합쳐서 돌려준다(hideToolNames가 커서로 한 번만 훑게)
+     */
     static List<int[]> addressRanges(String text) {
         List<int[]> ranges = new ArrayList<>();
         for (String prefix : URL_PREFIXES) {
@@ -230,7 +239,21 @@ final class ReplyPolish {
             }
             at = text.indexOf('@', at + 1);
         }
-        return ranges;
+        return merged(ranges);
+    }
+
+    private static List<int[]> merged(List<int[]> ranges) {
+        ranges.sort((a, b) -> Integer.compare(a[0], b[0]));
+        List<int[]> out = new ArrayList<>();
+        for (int[] r : ranges) {
+            int[] prev = out.isEmpty() ? null : out.get(out.size() - 1);
+            if (prev != null && r[0] <= prev[1]) {
+                prev[1] = Math.max(prev[1], r[1]);
+            } else {
+                out.add(new int[] {r[0], r[1]});
+            }
+        }
+        return out;
     }
 
     private static boolean isMailLocal(char c) {
@@ -263,15 +286,6 @@ final class ReplyPolish {
             }
         }
         return labels >= 2 ? end : -1;
-    }
-
-    private static boolean inside(List<int[]> ranges, int at) {
-        for (int[] r : ranges) {
-            if (at >= r[0] && at < r[1]) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** 앞말의 끝 글자 받침에 맞는 조사 (으로/로는 ㄹ 받침이면 로) */
