@@ -58,6 +58,22 @@ class QuickRepliesTest {
     }
 
     @Test
+    @DisplayName("빈방 없음 + 서버 대안(alternatives): 앞의 두 개를 '시각 방 잡아 줘' 버튼으로")
+    void roomsAlternatives() {
+        // given
+        List<Seen> seen = List.of(ok("find_available_rooms", "{\"date\":\"2026-11-06\",\"rooms\":[],\"alternatives\":["
+                + "{\"roomId\":2,\"roomName\":\"2번 방\",\"startAt\":\"2026-11-06T15:00:00+09:00\",\"endAt\":\"2026-11-06T17:00:00+09:00\"},"
+                + "{\"roomId\":1,\"roomName\":\"1번 방\",\"startAt\":\"2026-11-06T11:00:00+09:00\",\"endAt\":\"2026-11-06T13:00:00+09:00\"},"
+                + "{\"roomId\":1,\"roomName\":\"1번 방\",\"startAt\":\"2026-11-06T17:00:00+09:00\",\"endAt\":\"2026-11-06T19:00:00+09:00\"}]}"));
+
+        // when
+        List<String> got = QuickReplies.suggest(seen, false);
+
+        // then
+        assertThat(got).containsExactly("15:00 2번 방 잡아 줘", "11:00 1번 방 잡아 줘", "다른 시간도 볼게");
+    }
+
+    @Test
     @DisplayName("빈방 없음: 인원 때문이면 날짜 대신 인원을 바꾸게, 빈 결과는 버튼 없음")
     void roomsHeadcountAndEmpty() {
         // given

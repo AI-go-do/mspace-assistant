@@ -58,7 +58,7 @@ final class QuickReplies {
         }
         return switch (last.tool()) {
             case "find_available_rooms" -> r.path("rooms").isEmpty()
-                    ? noRooms(r.path("date").asString(null), r.path("note").asString(""), lastAllowed)
+                    ? alternativesOr(r, lastAllowed)
                     : List.of("첫 번째로 나온 방 잡아 줘", "다른 시간도 볼게");
             case "my_reservations" -> reservations(r);
             case "week_plan" -> weekPlan(r);
@@ -74,6 +74,26 @@ final class QuickReplies {
 
     /** mcp-server FindAvailableRooms.HEADCOUNT_NOTE의 앞부분. 인원 때문에 비면 날짜를 바꿔도 같은 결과라 인원을 고르게 한다 */
     static final String HEADCOUNT_MARK = "명이 쓸 수 있는 방이 없어요";
+
+    /** 서버가 고른 가까운 대안(alternatives)이 있으면 앞의 두 개를 "15:00 2번 방 잡아 줘"로. 없으면 날짜·인원 버튼 */
+    private static List<String> alternativesOr(JsonNode r, java.time.LocalDate lastAllowed) {
+        List<String> picks = new java.util.ArrayList<>();
+        for (JsonNode a : r.path("alternatives")) {
+            String start = a.path("startAt").asString("");
+            String room = a.path("roomName").asString("");
+            if (start.length() >= 16 && !room.isBlank()) {
+                picks.add(start.substring(11, 16) + " " + room + " 잡아 줘");
+            }
+            if (picks.size() == 2) {
+                break;
+            }
+        }
+        if (!picks.isEmpty()) {
+            picks.add("다른 시간도 볼게");
+            return List.copyOf(picks);
+        }
+        return noRooms(r.path("date").asString(null), r.path("note").asString(""), lastAllowed);
+    }
 
     private static List<String> noRooms(String date, String note, java.time.LocalDate lastAllowed) {
         if (note.contains(HEADCOUNT_MARK)) {
