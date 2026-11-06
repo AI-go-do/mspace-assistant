@@ -67,7 +67,7 @@ public abstract class McpToolTestSupport {
     }
 
     protected CallToolResult call(Map<String, String> headers, String tool, Map<String, Object> args) {
-        return connect(headers).callTool(new CallToolRequest(tool, args));
+        return connect(headers).callTool(CallToolRequest.builder(tool).arguments(args).build());
     }
 
     protected static String text(CallToolResult result) {

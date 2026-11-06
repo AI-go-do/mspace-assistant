@@ -180,7 +180,13 @@ class GeminiLlmClientTest {
     @Test
     @DisplayName("키가 없으면 Gemini를 부르지 않고 '준비되지 않았어요'")
     void notConfigured() {
-        assertThatThrownBy(() -> client("").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+        // given
+        GeminiLlmClient noKey = client("");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+
+        // when · then
+        assertThatThrownBy(() -> noKey.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_NOT_CONFIGURED");
         gemini.verify(0, postRequestedFor(urlEqualTo(PATH)));
     }

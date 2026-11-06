@@ -345,7 +345,7 @@ class AgentLoopTest {
         assertThat(result.stoppedByLimit()).isTrue();
         assertThat(result.reply()).contains("시간이 너무 오래 걸려서");
         assertThat(result.confirmations()).hasSize(1);
-        assertThat(llm.seen.size()).isLessThan(4);
+        assertThat(llm.seen).hasSizeLessThan(4);
     }
 
     @Test
