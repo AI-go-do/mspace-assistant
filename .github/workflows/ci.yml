@@ -81,6 +81,9 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        # shell: bash를 적어야 pipefail이 켜진다(기본 셸은 bash -e만). 그래야 API가 실패했을 때 jq가 빈 입력으로
+        # 성공해 버리지 않고 || 뒤 대체 조회가 돈다
+        shell: bash
         run: |
           curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=mspace-assistant" \
             | python3 -c 'import json,sys; s=json.load(sys.stdin)["projectStatus"]; print("게이트:", s["status"]); [print(c["status"], c["metricKey"], "실제", c.get("actualValue"), c["comparator"], c.get("errorThreshold")) for c in s["conditions"]]' \
