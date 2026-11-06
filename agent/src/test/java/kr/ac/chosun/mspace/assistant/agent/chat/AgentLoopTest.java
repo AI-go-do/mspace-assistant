@@ -168,6 +168,25 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("성향 조용히: 빈방 결과여도 답 아래 빠른 답장 버튼을 붙이지 않는다 (먼저 권하지 않음)")
+    void quietDropsSuggestions() {
+        var llm = new ScriptedLlm()
+                .then(tool("find_available_rooms", Map.of("date", "2026-11-03", "from", "14:00")))
+                .then(say("2번 방이 비어 있어요"));
+        var tools = new FakeTools(Map.of("find_available_rooms", new ToolGateway.Outcome(FREE, false)));
+        var personas = new kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore();
+        personas.save(MemberKey.of(ME), Persona.QUIET);
+
+        ChatResult result = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), null, personas)
+                .run(ME, List.of(), "내일 오후 2시 빈방 있어?");
+
+        assertThat(result.reply()).isEqualTo("2번 방이 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
+        assertThat(result.suggestions()).isEmpty();
+        assertThat(llm.lastSystem).contains("성향: 조용히");
+    }
+
+    @Test
     @DisplayName("성향(설계 5.v): \"잔소리 모드로\"는 모델 없이 저장하고 바로 답하며, 다음 채팅의 지시문에 그 성향 규칙이 붙는다")
     void personaShortcutAndPrompt() {
         var llm = new ScriptedLlm().then(say("다 비어 있어요"));

@@ -59,12 +59,21 @@ def reset_history(agent):
     for attempt in range(5):
         status, body = call("DELETE", agent + "/api/agent/chat/history")
         if status in (204, 200):
+            reset_persona(agent)
             return
         if status == 409:
             time.sleep(1 + attempt)
             continue
         sys.exit(f"대화 기록을 지우지 못했어요 (status {status} {body.get('code')}). 측정을 멈춰요")
     sys.exit("대화 기록을 지우지 못했어요 (계속 409 CHAT_IN_PROGRESS). 측정을 멈춰요")
+
+
+def reset_persona(agent):
+    """비서 성향을 기본(ACTIVE)으로. 성향은 "새 대화"로 안 지워져서 Q18(잔소리 모드) 뒤 다음 회차가 잔소리 성향으로 돌지 않게 한다.
+    성향 API가 없는 옛 서버(404)면 그냥 넘어간다"""
+    status, body = call("PUT", agent + "/api/agent/persona", {"style": "ACTIVE"})
+    if status not in (200, 404):
+        sys.exit(f"비서 성향을 되돌리지 못했어요 (status {status} {body.get('code')}). 측정을 멈춰요")
 
 
 def chat(agent, text, poll_limit):

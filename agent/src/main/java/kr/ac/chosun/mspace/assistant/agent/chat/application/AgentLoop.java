@@ -106,7 +106,13 @@ public class AgentLoop {
             } else if (isBriefingRequest(message)) {
                 result = briefingShortcut(headers);
             } else {
-                result = converse(headers, conversation, personas.load(key));
+                Persona persona = personas.load(key);
+                result = converse(headers, conversation, persona);
+                if (persona == Persona.QUIET && !result.suggestions().isEmpty()) {
+                    // 조용히: 먼저 권하지 않는다. 답 아래 빠른 답장 버튼도 지운다 (확인 카드·입실 번호 카드는 그대로)
+                    result = new ChatResult(result.reply(), result.confirmations(), result.accessCodeCards(), result.toolCalls(),
+                            result.stoppedByLimit(), result.tools(), result.hints(), List.of());
+                }
             }
         } catch (RuntimeException e) {
             memory.restoreNotes(key, notes); // 이번 차례를 저장하지 못하니 꺼낸 글을 되돌려 다음 채팅이 받게 한다

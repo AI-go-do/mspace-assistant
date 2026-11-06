@@ -38,6 +38,9 @@ public enum Persona {
     private static final Pattern REQUEST = Pattern.compile(
             "(조용|수동|능동|알아서|잔소리).{0,6}?(모드|성향|비서|스타일)");
 
+    /** 요청 뒤의 부정: 바꾸지 마, 하지 말고, 싫어, 안 해, 그만 */
+    private static final Pattern NEGATION = Pattern.compile("지\\s*마|말아|말고|싫|안\\s*해|안\\s*할|그만|아니");
+
     private final String label;
     private final String description;
     private final String promptRule;
@@ -79,8 +82,8 @@ public enum Persona {
             return Optional.empty();
         }
         Matcher m = REQUEST.matcher(message);
-        if (!m.find()) {
-            return Optional.empty();
+        if (!m.find() || NEGATION.matcher(message.substring(m.end())).find()) {
+            return Optional.empty(); // "잔소리 모드로 바꾸지 마"는 바꾸라는 말이 아니다 → 모델에 넘긴다
         }
         return Optional.of(switch (m.group(1)) {
             case "조용", "수동" -> QUIET;
