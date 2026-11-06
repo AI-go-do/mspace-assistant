@@ -8,6 +8,7 @@ import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.AccessCodeCard;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult.Confirmation;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
@@ -40,6 +41,11 @@ public class AgentLoop {
     private final ConversationMemory memory;
     private final MemoryProperties memoryProps;
     private final DailyBriefing briefing;
+    private final PersonaStore personas;
+
+    /** 성향 바꾸기 지름길의 도구 이름 (결과 tools, 측정용) */
+    static final String PERSONA_TOOL = "persona";
+    static final String PERSONA_REPLY = "비서 성향을 '%s'로 바꿨어요. %s";
 
     /** "브리핑"이 들어간 말은 모델 없이 오늘 브리핑으로 바로 답한다 (설계 5.z) */
     static final String BRIEFING_WORD = "브리핑";
@@ -56,9 +62,17 @@ public class AgentLoop {
         this(llm, tools, props, clock, memory, memoryProps, null);
     }
 
-    @Autowired
+    /** 성향 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
                      ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing) {
+        this(llm, tools, props, clock, memory, memoryProps, briefing, PersonaStore.NONE);
+    }
+
+    @Autowired
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
+                     ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing,
+                     PersonaStore personas) {
+        this.personas = personas;
         this.llm = llm;
         this.tools = tools;
         this.props = props;
@@ -86,7 +100,20 @@ public class AgentLoop {
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
         ChatResult result;
         try {
-            result = isBriefingRequest(message) ? briefingShortcut(headers) : converse(headers, conversation);
+            Optional<Persona> wanted = Persona.requested(message);
+            if (wanted.isPresent()) {
+                result = personaShortcut(key, wanted.get());
+            } else if (isBriefingRequest(message)) {
+                result = briefingShortcut(headers);
+            } else {
+                Persona persona = personas.load(key);
+                result = converse(headers, conversation, persona);
+                if (persona == Persona.QUIET && !result.suggestions().isEmpty()) {
+                    // 조용히: 먼저 권하지 않는다. 답 아래 빠른 답장 버튼도 지운다 (확인 카드·입실 번호 카드는 그대로)
+                    result = new ChatResult(result.reply(), result.confirmations(), result.accessCodeCards(), result.toolCalls(),
+                            result.stoppedByLimit(), result.tools(), result.hints(), List.of());
+                }
+            }
         } catch (RuntimeException e) {
             memory.restoreNotes(key, notes); // 이번 차례를 저장하지 못하니 꺼낸 글을 되돌려 다음 채팅이 받게 한다
             throw e;
@@ -104,6 +131,18 @@ public class AgentLoop {
      */
     boolean isBriefingRequest(String message) {
         return briefing != null && message != null && message.contains(BRIEFING_WORD);
+    }
+
+    /**
+     * "잔소리 모드로 해 줘"처럼 성향을 고르는 말. 모델 없이 저장하고 바로 답한다(설계 5.v). 저장 실패는 예외로 올라가
+     * 503 MEMORY_UNAVAILABLE — 바뀐 척하지 않는다. 빠른 답장에는 나머지 성향으로 바꾸는 말을 둔다
+     */
+    private ChatResult personaShortcut(String key, Persona persona) {
+        personas.save(key, persona);
+        List<String> suggestions = Persona.all().stream().filter(p -> p != persona)
+                .map(p -> p.label() + " 모드로 바꿔 줘").toList();
+        return new ChatResult(PERSONA_REPLY.formatted(persona.label(), persona.description()), List.of(), List.of(), 0,
+                false, List.of(PERSONA_TOOL), List.of(), suggestions);
     }
 
     private ChatResult briefingShortcut(UserHeaders headers) {
@@ -152,7 +191,7 @@ public class AgentLoop {
         return conversation.subList(start, conversation.size());
     }
 
-    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation) {
+    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona) {
         List<Confirmation> confirmations = new ArrayList<>();
         List<AccessCodeCard> accessCodeCards = new ArrayList<>();
         int calls = 0;
@@ -167,7 +206,7 @@ public class AgentLoop {
         Instant deadline = clock.instant().plus(props.chatTimeout());
 
         try (ToolGateway.Session session = tools.open(headers)) {
-            String system = systemPrompt();
+            String system = systemPrompt(persona);
             while (true) {
                 if (calls > 0 && pastDeadline(deadline, calls)) {
                     return result(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
@@ -309,6 +348,11 @@ public class AgentLoop {
     static final String BOTH_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 · 입력한 시간표 기준)";
 
     String systemPrompt() {
+        return systemPrompt(Persona.DEFAULT);
+    }
+
+    /** 성향(설계 5.v)은 지시문 끝에 한 토막으로 붙는다. 안전 규칙은 성향과 상관없이 같다 */
+    String systemPrompt(Persona persona) {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
         AgentProperties.Rules rules = props.rules();
         String today = "%s(%s) %02d:%02d".formatted(now.toLocalDate(),
@@ -367,6 +411,7 @@ public class AgentLoop {
                 - 꼬리말 "(예약 시스템 … 조회 기준)"은 네가 쓰지 않는다. 코드가 도구를 부른 답 끝에 한 번 붙인다.
                 - 답에 도구 이름(find_available_rooms 같은 영문 snake_case)을 쓰지 않는다. 학생 말로 쓴다:
                   빈방 찾기, 지금 빈 방, 내 예약, 이용 규칙, 예약, 지금 바로 쓰기, 예약 취소, 퇴실, 연장, 내 시간표, 주간 계획.
-                """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays());
+                """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays())
+                + persona.promptRule() + "\n";
     }
 }

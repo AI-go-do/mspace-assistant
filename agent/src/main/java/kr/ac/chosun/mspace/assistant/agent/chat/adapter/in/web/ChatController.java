@@ -14,6 +14,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.ConfirmationGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.Persona;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.PersonaStore;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ReadTimetableImage;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ScheduleGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
@@ -48,6 +50,7 @@ import org.springframework.web.multipart.MultipartFile;
  *   <li>GET /api/agent/reservations/{id}/access-code: 입실 번호 카드 → mcp-server로 그대로 넘김 (모델 없음, 대표자만)</li>
  *   <li>GET·PUT·DELETE /api/agent/schedule: 내 시간표 화면 → mcp-server /api/schedule/me로 그대로 넘김 (모델 없음)</li>
  *   <li>GET /api/agent/briefing: 오늘 브리핑(수업·수업 뒤 쓸 수 있는 칸·내 예약·지금 빈 방 + 읽어 줄 문장 + 한 번에 잡기 버튼 문장). 모델 없음, 도구 3~4개 직접 호출</li>
+ *   <li>GET·PUT /api/agent/persona: 비서 성향(조용히·알아서·잔소리) 보기·바꾸기. 모델 없음, 학생별 저장 (설계 5.v)</li>
  *   <li>POST /api/agent/schedule/parse: 시간표 캡처(multipart image)를 모델이 읽어 classes 초안으로. 저장은 안 함 → 화면이 확인 카드 → PUT</li>
  * </ul>
  */
@@ -68,11 +71,13 @@ class ChatController {
     private final ConversationMemory memory;
     private final ReadTimetableImage timetableImage;
     private final DailyBriefing briefing;
+    private final PersonaStore personas;
 
     ChatController(AgentLoop agent, ConfirmationGateway confirmations, ConfirmationFollowUp followUp,
                    AccessCodeGateway accessCodes, ScheduleGateway schedules, AgentProperties props, ChatJobs jobs,
                    ChatJobProperties jobProps, ConversationMemory memory, ReadTimetableImage timetableImage,
-                   DailyBriefing briefing) {
+                   DailyBriefing briefing, PersonaStore personas) {
+        this.personas = personas;
         this.agent = agent;
         this.confirmations = confirmations;
         this.followUp = followUp;
@@ -196,6 +201,31 @@ class ChatController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(briefing.today(user));
     }
 
+    /** 비서 성향 보기. 고른 적 없으면 기본(알아서) */
+    @GetMapping("/api/agent/persona")
+    ResponseEntity<?> persona(@RequestHeader HttpHeaders headers) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요.");
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(PersonaView.of(personas.load(MemberKey.of(user))));
+    }
+
+    /** 비서 성향 바꾸기. 본문 {style: QUIET|ACTIVE|NAGGING}. 저장 실패는 503 MEMORY_UNAVAILABLE(바뀐 척하지 않는다) */
+    @PutMapping("/api/agent/persona")
+    ResponseEntity<?> changePersona(@RequestHeader HttpHeaders headers, @RequestBody(required = false) PersonaRequest request) {
+        UserHeaders user = user(headers);
+        if (user.isEmpty()) {
+            return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요.");
+        }
+        java.util.Optional<Persona> persona = Persona.parse(request == null ? null : request.style());
+        if (persona.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_PERSONA", "성향은 QUIET, ACTIVE, NAGGING 중 하나예요.");
+        }
+        personas.save(MemberKey.of(user), persona.get());
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(PersonaView.of(persona.get()));
+    }
+
     /** 내 시간표 보기. 없으면 mcp-server의 404 NO_SCHEDULE 그대로 */
     @GetMapping("/api/agent/schedule")
     ResponseEntity<?> schedule(@RequestHeader HttpHeaders headers) {
@@ -298,5 +328,19 @@ class ChatController {
     }
 
     record Pending(String jobId, ChatJobs.Status status, long pollAfterMs) {
+    }
+
+    record PersonaRequest(String style) {
+    }
+
+    /** 지금 성향 + 고를 수 있는 전체 (화면이 라디오 버튼으로 그린다) */
+    record PersonaView(String style, String label, String description, List<PersonaOption> options) {
+        static PersonaView of(Persona p) {
+            return new PersonaView(p.name(), p.label(), p.description(),
+                    Persona.all().stream().map(o -> new PersonaOption(o.name(), o.label(), o.description())).toList());
+        }
+    }
+
+    record PersonaOption(String style, String label, String description) {
     }
 }
