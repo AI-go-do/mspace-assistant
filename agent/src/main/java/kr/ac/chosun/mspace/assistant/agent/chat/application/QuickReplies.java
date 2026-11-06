@@ -137,19 +137,25 @@ final class QuickReplies {
         return List.of("1시간으로 다시 볼게", "내 예약 보여 줘");
     }
 
+    /** 끝나지 않은 예약이 없고 최근에 끝낸 예약이 있으면 "지난번처럼" (모델이 방·시각을 그 예약에서 가져온다) */
     private static List<String> reservations(JsonNode r) {
         boolean inUse = false;
         boolean booked = false;
+        boolean finished = false;
         for (JsonNode x : r.path("reservations")) {
             String st = x.path("status").asString("");
             inUse |= "IN_USE".equals(st);
             booked |= "BOOKED".equals(st);
+            finished |= "CHECKED_OUT".equals(st) || "AUTO_CHECKED_OUT".equals(st);
         }
         if (inUse) {
             return List.of("30분 연장해 줘", "퇴실할게");
         }
         if (booked) {
             return List.of("입실 번호 보여 줘", "이 예약 취소해 줘");
+        }
+        if (finished) {
+            return List.of("지난번처럼 다시 잡아 줘", "지금 빈 방 있어?");
         }
         return List.of("내일 오후 2시 빈방 있어?", "지금 빈 방 있어?");
     }

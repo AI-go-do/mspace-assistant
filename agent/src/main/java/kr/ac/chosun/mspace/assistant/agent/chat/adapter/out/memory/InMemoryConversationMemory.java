@@ -59,6 +59,20 @@ public class InMemoryConversationMemory implements ConversationMemory {
     }
 
     @Override
+    public void restoreNotes(String memberKey, List<LlmMessage> taken) {
+        if (taken.isEmpty()) {
+            return;
+        }
+        notes.compute(memberKey, (k, old) -> {
+            List<LlmMessage> merged = new java.util.ArrayList<>(taken);
+            if (old != null) {
+                merged.addAll(old.conversation());
+            }
+            return new Entry(List.copyOf(merged), clock.instant());
+        });
+    }
+
+    @Override
     public List<LlmMessage> takeNotes(String memberKey) {
         sweep();
         Entry taken = notes.remove(memberKey);

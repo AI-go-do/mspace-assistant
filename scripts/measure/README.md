@@ -41,6 +41,7 @@ AGENT=http://localhost:8091 USER_ID=1 python3 -I scripts/measure/measure.py --on
 | `no_tool` | 도구를 하나도 안 불러야 함 (인사, 범위 밖) |
 | `tools_count` | 도구별 정확한 호출 횟수 (예: `{"week_plan": 1}`. 여러 번 부르거나 안 부르면 실패) |
 | `not_stopped` | 최대 횟수에서 멈추지 않았어야 함 (`stoppedByLimit`이 거짓) |
+| `first_tool` | 첫 도구 호출이 이것이어야 함 (예: "지난번처럼"은 `my_reservations`부터) |
 | `confirm_tool` | 확인 카드의 도구 이름 |
 | `needs_participants` | 카드가 받을 학번 수 (3명 → 2) |
 | `reply_any` | 답에 이 말 중 하나 |

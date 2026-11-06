@@ -78,13 +78,19 @@ public class AgentLoop {
         String key = MemberKey.of(headers);
         List<LlmMessage> remembered = new ArrayList<>(memory.load(key));
         List<LlmMessage> notes = memory.takeNotes(key); // 확인 카드 결과처럼 채팅 밖에서 생긴 글 (설계 4장 "확인 뒤")
-        if (remembered.isEmpty() && notes.isEmpty()) {
-            remembered.addAll(masked(history));
+        if (remembered.isEmpty()) {
+            remembered.addAll(masked(history)); // 서버 기억이 없으면 화면 기록 (미룬 글이 있어도 그 앞 맥락은 화면이 들고 있다)
         }
         remembered.addAll(notes);
         List<LlmMessage> conversation = new ArrayList<>(trim(remembered, props.maxHistoryTurns(), memoryProps.maxChars()));
         conversation.add(new LlmMessage.User(PrivacyMask.mask(message)));
-        ChatResult result = isBriefingRequest(message) ? briefingShortcut(headers) : converse(headers, conversation);
+        ChatResult result;
+        try {
+            result = isBriefingRequest(message) ? briefingShortcut(headers) : converse(headers, conversation);
+        } catch (RuntimeException e) {
+            memory.restoreNotes(key, notes); // 이번 차례를 저장하지 못하니 꺼낸 글을 되돌려 다음 채팅이 받게 한다
+            throw e;
+        }
         // 모델 답도 다음 요청에 외부 AI로 다시 가니 학생 말과 같은 규칙으로 가려 둔다
         conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(result.reply()), List.of()));
         memory.save(key, trim(conversation, props.maxHistoryTurns(), memoryProps.maxChars()));
@@ -336,6 +342,12 @@ public class AgentLoop {
                   있는 날을 날짜·시각·방 그대로 나열하고, 없는 날은 reason을 전한다. 하루만 물으면 week_plan을 쓰지 않는다.
                   week_plan은 오늘부터 from~to까지만 본다. 학생이 물은 범위("다음 주")와 겹치는 날만 답하고, 결과 밖의
                   날짜는 아직 볼 수 없다고 말한다(물은 범위가 to 뒤면 to까지만 봤다고 먼저 말한다).
+                - "지난번처럼", "저번 주랑 똑같이", "같은 걸로 또"처럼 전에 한 예약을 되풀이하라고 하면 먼저 my_reservations를
+                  부르고, 가장 최근에 끝난 예약(CHECKED_OUT·AUTO_CHECKED_OUT, 없으면 BOOKED)의 방·시작 시각·길이를 그대로 쓴다.
+                  날짜는 학생이 말한 날, 말하지 않았으면 그 예약과 같은 요일의 다음 날짜다. 그 날짜에 이전 예약의 시작 시각을
+                  from으로, 시작에 길이를 더한 끝 시각을 to로 넣어 find_available_rooms를 부른다(둘 다 넣어야 그 길이가 다 비는 방만 온다). 그 방이 rooms에 있으면 create_reservation을 제안한다. 그 방이 없고 rooms가 비지 않으면 같은 시각에
+                  되는 rooms의 다른 방을 안내한다. rooms가 비면 alternatives를 그대로 안내한다. 되풀이할 예약이 없으면
+                  그렇다고 말하고 날짜·시각을 묻는다. 방·시각을 학생에게 되묻지 않는다.
                 - 예약은 %d분 단위, 1회 최대 %d시간, 시작이 오늘부터 %d일 안이다.
                 - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면

@@ -69,8 +69,10 @@ class RedisConversationMemoryTest {
         List<LlmMessage> again = memory.takeNotes("m:42");
 
         // then
+        memory.restoreNotes("m:42", first);
         verify(lists).rightPush("agent:conv-notes:m:42", ConversationJson.write(first));
-        verify(redis).expire("agent:conv-notes:m:42", Duration.ofHours(24));
+        verify(lists).leftPush("agent:conv-notes:m:42", ConversationJson.write(first)); // 되돌릴 때는 머리에
+        verify(redis, org.mockito.Mockito.times(2)).expire("agent:conv-notes:m:42", Duration.ofHours(24));
         assertThat(taken).hasSize(4).containsSequence(first).containsSequence(second);
         assertThat(again).isEmpty();
     }

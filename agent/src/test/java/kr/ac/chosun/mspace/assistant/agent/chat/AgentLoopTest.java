@@ -712,7 +712,7 @@ class AgentLoopTest {
         var briefing = org.mockito.Mockito.mock(kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing.class);
         org.mockito.Mockito.when(briefing.today(org.mockito.ArgumentMatchers.any(UserHeaders.class)))
                 .thenReturn(new kr.ac.chosun.mspace.assistant.agent.chat.application.DailyBriefing.Briefing("2026-11-03", "화",
-                        "2026-11-03T15:00:00+09:00", null, null, null, null, "11월 3일 화요일 브리핑이에요. …",
+                        "2026-11-03T15:00:00+09:00", null, null, null, null, null, "11월 3일 화요일 브리핑이에요. …",
                         List.of("OPEN_SCHEDULE"), List.of("15:30 2번 방 2시간 잡아 줘")));
         var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
                 ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), briefing);

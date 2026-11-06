@@ -64,7 +64,8 @@ class DailyBriefingTest {
             {"date":"2026-11-06","rooms":[
               {"roomId":3,"roomName":"3번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T15:30:00+09:00","endAt":"2026-11-06T16:30:00+09:00"}]},
               {"roomId":2,"roomName":"2번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T14:00:00+09:00","endAt":"2026-11-06T19:00:00+09:00"}]},
-              {"roomId":1,"roomName":"1번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T16:00:00+09:00","endAt":"2026-11-06T22:00:00+09:00"}]}],
+              {"roomId":1,"roomName":"1번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T16:00:00+09:00","endAt":"2026-11-06T22:00:00+09:00"}]},
+              {"roomId":4,"roomName":"4번 방","minPeople":3,"maxPeople":5,"free":[{"startAt":"2026-11-06T10:30:00+09:00","endAt":"2026-11-06T12:30:00+09:00"}]}],
              "note":null,"alternatives":[]}""";
 
     static DailyBriefing briefing(ToolGateway tools) {
@@ -182,13 +183,20 @@ class DailyBriefingTest {
         DailyBriefing.Briefing b = briefing(tools).today(ME);
 
         // then
-        assertThat(called).contains("find_available_rooms{date=2026-11-06, from=15:30}");
+        assertThat(called).contains("find_available_rooms{date=2026-11-06}");
+        assertThat(b.afterClass().searchFrom()).isEqualTo("15:30");
         assertThat(b.afterClass().roomName()).isEqualTo("2번 방");
         assertThat(b.afterClass().start()).isEqualTo("15:30");
         assertThat(b.afterClass().end()).isEqualTo("17:30");
         assertThat(b.afterClass().minutes()).isEqualTo(120);
-        assertThat(b.suggestions()).containsExactly("15:30 2번 방 2시간 잡아 줘");
-        assertThat(b.text()).contains("마지막 수업은 14:50에 끝나요. 수업 끝나고 15:30부터 2번 방을 2시간 쓸 수 있어요. 잡아 둔 예약은 없어요.");
+        // 공강 10:15 끝 + 30분 → 11:00 ~ 13:00 (2시간). 4번 방 10:30–12:30 → 11:00부터 1시간 30분
+        assertThat(b.freePeriod().periodStart()).isEqualTo("11:00");
+        assertThat(b.freePeriod().periodEnd()).isEqualTo("13:00");
+        assertThat(b.freePeriod().roomName()).isEqualTo("4번 방");
+        assertThat(b.freePeriod().minutes()).isEqualTo(90);
+        assertThat(b.suggestions()).containsExactly("15:30 2번 방 2시간 잡아 줘", "11:00 4번 방 1시간 30분 잡아 줘");
+        assertThat(b.text()).contains("마지막 수업은 14:50에 끝나요. 공강 11:00–13:00에는 4번 방을 11:00부터 1시간 30분 쓸 수 있어요. "
+                + "수업 끝나고 15:30부터 2번 방을 2시간 쓸 수 있어요. 잡아 둔 예약은 없어요.");
     }
 
     @Test
@@ -204,13 +212,44 @@ class DailyBriefingTest {
         DailyBriefing.Briefing b = briefing(tools, late).today(ME);
 
         // then
-        assertThat(called).contains("find_available_rooms{date=2026-11-06, from=18:30}");
+        assertThat(called).contains("find_available_rooms{date=2026-11-06}");
+        assertThat(b.afterClass().searchFrom()).isEqualTo("18:30");
         assertThat(b.afterClass().start()).isEqualTo("18:30");
+        assertThat(b.freePeriod()).as("공강은 이미 지났다").isNull();
         assertThat(b.afterClass().minutes()).isEqualTo(120);
         assertThat(b.afterClass().roomName()).isEqualTo("1번 방");
         assertThat(b.suggestions()).containsExactly("18:30 1번 방 2시간 잡아 줘");
         assertThat(DailyBriefing.lengthText(90)).isEqualTo("1시간 30분");
         assertThat(DailyBriefing.lengthText(30)).isEqualTo("30분");
+    }
+
+    @Test
+    @DisplayName("공강: 1시간보다 짧은 공강은 안 보고, 공강 중간(11:40)에 열면 지금 칸(12:00)부터 남은 만큼만")
+    void freePeriodShortOrInProgress() {
+        // given: 수업 09:00–10:15, 11:00–12:00(공강 10:45→11:00~11:00 = 0), 13:00–14:50(공강 12:30~13:00 = 30분) → 공강 없음
+        String tight = """
+                {"date":"2026-11-06","dayOfWeek":"금","code":null,
+                 "classes":[{"name":"A","startAt":"2026-11-06T09:00:00+09:00","endAt":"2026-11-06T10:15:00+09:00"},
+                            {"name":"B","startAt":"2026-11-06T11:00:00+09:00","endAt":"2026-11-06T12:00:00+09:00"},
+                            {"name":"C","startAt":"2026-11-06T13:00:00+09:00","endAt":"2026-11-06T14:50:00+09:00"}],
+                 "lastClassEndAt":"2026-11-06T14:50:00+09:00","searchFromAt":"2026-11-06T15:30:00+09:00","bufferMinutes":30,"note":null}""";
+        var none = fake(Map.of("my_schedule", tight, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", FREE), new ArrayList<>());
+        Clock midGap = Clock.fixed(Instant.parse("2026-11-06T02:40:00Z"), ZoneId.of("UTC")); // 11:40 서울
+        var inProgress = fake(Map.of("my_schedule", FRIDAY, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "find_available_rooms", FREE), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing n = briefing(none).today(ME);
+        DailyBriefing.Briefing p = briefing(inProgress, midGap).today(ME);
+
+        // then
+        assertThat(n.freePeriod()).isNull();
+        assertThat(n.afterClass().roomName()).isEqualTo("2번 방");
+        assertThat(p.freePeriod().periodStart()).isEqualTo("12:00");
+        assertThat(p.freePeriod().start()).isEqualTo("12:00");
+        assertThat(p.freePeriod().minutes()).isEqualTo(30); // 4번 방 –12:30
+        assertThat(p.suggestions()).containsExactly("15:30 2번 방 2시간 잡아 줘", "12:00 4번 방 30분 잡아 줘");
     }
 
     @Test
