@@ -52,7 +52,7 @@ public final class MemberKey {
         try {
             byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
             JsonNode sub = JSON.readTree(new String(payload, StandardCharsets.UTF_8)).get("sub");
-            return sub == null || !sub.isTextual() || sub.asString().isBlank() ? null : sub.asString();
+            return sub == null || !sub.isString() || sub.asString().isBlank() ? null : sub.asString();
         } catch (RuntimeException e) {
             return null;
         }

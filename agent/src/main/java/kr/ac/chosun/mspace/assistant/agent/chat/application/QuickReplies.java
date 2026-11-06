@@ -15,7 +15,11 @@ final class QuickReplies {
     record Seen(String tool, String json, boolean error) {
     }
 
-    static final List<String> START = List.of("내일 오후 2시 빈방 있어?", "내 예약 보여 줘", "지금 빈 방 있어?");
+    static final String MY_RESERVATIONS = "내 예약 보여 줘";
+    static final String ROOMS_NOW = "지금 빈 방 있어?";
+    static final String ACCESS_CODE = "입실 번호 보여 줘";
+
+    static final List<String> START = List.of("내일 오후 2시 빈방 있어?", MY_RESERVATIONS, ROOMS_NOW);
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -63,13 +67,18 @@ final class QuickReplies {
             case "my_reservations" -> reservations(r);
             case "week_plan" -> weekPlan(r);
             case "room_status" -> r.path("availableCount").asInt(0) > 0
-                    ? List.of("지금 바로 1시간 쓸게", "내 예약 보여 줘")
-                    : List.of("오늘 저녁 빈방 봐 줘", "내 예약 보여 줘");
-            case "my_schedule" -> "NO_SCHEDULE".equals(r.path("code").asString(null))
-                    ? List.of() // 화면이 [내 시간표 넣기] 버튼을 그린다 (hints)
-                    : r.path("classes").isEmpty() ? List.of("오후 2시부터 빈방 봐 줘") : List.of("수업 끝나고 2시간 잡아 줘");
+                    ? List.of("지금 바로 1시간 쓸게", MY_RESERVATIONS)
+                    : List.of("오늘 저녁 빈방 봐 줘", MY_RESERVATIONS);
+            case "my_schedule" -> schedule(r);
             default -> List.of();
         };
+    }
+
+    private static List<String> schedule(JsonNode r) {
+        if ("NO_SCHEDULE".equals(r.path("code").asString(null))) {
+            return List.of(); // 화면이 [내 시간표 넣기] 버튼을 그린다 (hints)
+        }
+        return r.path("classes").isEmpty() ? List.of("오후 2시부터 빈방 봐 줘") : List.of("수업 끝나고 2시간 잡아 줘");
     }
 
     /** mcp-server FindAvailableRooms.HEADCOUNT_NOTE의 앞부분. 인원 때문에 비면 날짜를 바꿔도 같은 결과라 인원을 고르게 한다 */
@@ -97,12 +106,12 @@ final class QuickReplies {
 
     private static List<String> noRooms(String date, String note, java.time.LocalDate lastAllowed) {
         if (note.contains(HEADCOUNT_MARK)) {
-            return List.of("인원 바꿔서 다시 볼게", "지금 빈 방 있어?");
+            return List.of("인원 바꿔서 다시 볼게", ROOMS_NOW);
         }
         if (lastAllowed != null && !nextDayAllowed(date, lastAllowed)) {
-            return List.of("지금 빈 방 있어?");
+            return List.of(ROOMS_NOW);
         }
-        return List.of(nextDay(date) + " 같은 시간 봐 줘", "지금 빈 방 있어?");
+        return List.of(nextDay(date) + " 같은 시간 봐 줘", ROOMS_NOW);
     }
 
     /** 다음 날이 조회 범위 안인지. 날짜를 모르면 "다음 날"이 어디인지 몰라 안 띄운다 */
@@ -134,7 +143,7 @@ final class QuickReplies {
                         + " " + start.substring(11, 16) + " " + o.path("roomName").asString("") + " 잡아 줘", "다른 날도 볼게");
             }
         }
-        return List.of("1시간으로 다시 볼게", "내 예약 보여 줘");
+        return List.of("1시간으로 다시 볼게", MY_RESERVATIONS);
     }
 
     /** 끝나지 않은 예약이 없고 최근에 끝낸 예약이 있으면 "지난번처럼" (모델이 방·시각을 그 예약에서 가져온다) */
@@ -152,11 +161,11 @@ final class QuickReplies {
             return List.of("30분 연장해 줘", "퇴실할게");
         }
         if (booked) {
-            return List.of("입실 번호 보여 줘", "이 예약 취소해 줘");
+            return List.of(ACCESS_CODE, "이 예약 취소해 줘");
         }
         if (finished) {
-            return List.of("지난번처럼 다시 잡아 줘", "지금 빈 방 있어?");
+            return List.of("지난번처럼 다시 잡아 줘", ROOMS_NOW);
         }
-        return List.of("내일 오후 2시 빈방 있어?", "지금 빈 방 있어?");
+        return List.of("내일 오후 2시 빈방 있어?", ROOMS_NOW);
     }
 }

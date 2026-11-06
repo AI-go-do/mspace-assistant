@@ -131,7 +131,8 @@ class ConversationMemoryTest {
         var loop = loop(failing, tools, memory, 20, 20_000);
 
         // when
-        assertThatThrownBy(() -> loop.run(ME, List.of(), "첫 말")).isInstanceOf(LlmException.class);
+        List<LlmMessage> noHistory = List.of();
+        assertThatThrownBy(() -> loop.run(ME, noHistory, "첫 말")).isInstanceOf(LlmException.class);
         loop.run(ME, List.of(), "첫 말");
 
         // then
@@ -179,10 +180,10 @@ class ConversationMemoryTest {
 
         // then
         assertThat(result.stoppedByLimit()).isTrue();
-        long calls = remembered.stream().filter(m -> m instanceof LlmMessage.Assistant a).mapToLong(m -> ((LlmMessage.Assistant) m).toolCalls().size()).sum();
+        long calls = remembered.stream().filter(LlmMessage.Assistant.class::isInstance).mapToLong(m -> ((LlmMessage.Assistant) m).toolCalls().size()).sum();
         long results = remembered.stream().filter(m -> m instanceof LlmMessage.ToolResult).count();
         assertThat(calls).isEqualTo(3).isEqualTo(results);
-        assertThat(remembered.stream().filter(m -> m instanceof LlmMessage.ToolResult r && r.isError()).count()).isGreaterThanOrEqualTo(1);
+        assertThat(remembered.stream().filter(m -> m instanceof LlmMessage.ToolResult r && r.isError()).count()).isPositive();
     }
 
     @Test

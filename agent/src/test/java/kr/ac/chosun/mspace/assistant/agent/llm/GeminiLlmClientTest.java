@@ -107,7 +107,10 @@ class GeminiLlmClientTest {
     void rateLimited() {
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(429)));
 
-        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+        GeminiLlmClient keyed = client("k");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+        assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_RATE_LIMITED");
     }
 
@@ -135,7 +138,10 @@ class GeminiLlmClientTest {
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(503)));
 
         // when / then
-        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+        GeminiLlmClient keyed = client("k");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+        assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
         gemini.verify(2, postRequestedFor(urlEqualTo(PATH)));
     }
@@ -161,7 +167,10 @@ class GeminiLlmClientTest {
         gemini.stubFor(post(PATH).willReturn(aResponse().withStatus(429)));
 
         // when / then
-        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+        GeminiLlmClient keyed = client("k");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+        assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_RATE_LIMITED");
         gemini.verify(1, postRequestedFor(urlEqualTo(PATH)));
     }
@@ -179,7 +188,10 @@ class GeminiLlmClientTest {
     void timeout() {
         gemini.stubFor(post(PATH).willReturn(okJson("{}").withFixedDelay(3_000)));
 
-        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+        GeminiLlmClient keyed = client("k");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+        assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
     }
 
@@ -258,7 +270,10 @@ class GeminiLlmClientTest {
             gemini.stubFor(post(PATH).willReturn(okJson(body)));
 
             // when / then
-            assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+            GeminiLlmClient keyed = client("k");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+        assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                     .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
         }
     }
@@ -271,7 +286,10 @@ class GeminiLlmClientTest {
                 .withHeader("Content-Type", "application/json").withBody("{\"candidates\": [")));
 
         // when / then
-        assertThatThrownBy(() -> client("k").chat("s", List.of(new LlmMessage.User("hi")), List.of()))
+        GeminiLlmClient keyed = client("k");
+        List<LlmMessage> hi = List.of(new LlmMessage.User("hi"));
+        List<ToolSpec> noTools = List.of();
+        assertThatThrownBy(() -> keyed.chat("s", hi, noTools))
                 .isInstanceOf(LlmException.class).extracting("code").isEqualTo("LLM_UNAVAILABLE");
     }
 

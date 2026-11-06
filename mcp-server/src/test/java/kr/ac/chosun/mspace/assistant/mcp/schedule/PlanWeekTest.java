@@ -93,8 +93,8 @@ class PlanWeekTest {
         assertThat(result.days()).hasSize(3);
         assertThat(result.days()).extracting(d -> d.option().startAt().toString())
                 .containsExactly("2026-11-05T17:00+09:00", "2026-11-06T16:30+09:00", "2026-11-07T09:00+09:00");
-        assertThat(result.days().get(0).option().endAt().toString()).isEqualTo("2026-11-05T19:00+09:00");
-        assertThat(result.days().get(0).lastClassEndAt().toString()).isEqualTo("2026-11-05T14:50+09:00");
+        assertThat(result.days().get(0).option().endAt()).hasToString("2026-11-05T19:00+09:00");
+        assertThat(result.days().get(0).lastClassEndAt()).hasToString("2026-11-05T14:50+09:00");
         assertThat(result.days().get(2).classCount()).isZero();
         assertThat(result.note()).isNull();
     }
@@ -133,7 +133,7 @@ class PlanWeekTest {
         WeekPlan tooFew = plan.plan(USER, 60, 2);
 
         // then
-        assertThat(tooFew.days()).allSatisfy(d -> assertThat(d.reason()).startsWith("2명이 쓸 수 있는 방이 없어요"));
+        assertThat(tooFew.days()).isNotEmpty().allSatisfy(d -> assertThat(d.reason()).startsWith("2명이 쓸 수 있는 방이 없어요"));
         assertThatThrownBy(() -> plan.plan(USER, 45, null)).isInstanceOf(CoreApiException.class).hasMessageContaining("30분 단위");
         assertThatThrownBy(() -> plan.plan(USER, 270, null)).isInstanceOf(CoreApiException.class);
     }

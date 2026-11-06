@@ -21,7 +21,7 @@ final class ReplyPolish {
 
     /** 답 끝에 붙은 꼬리말 (여러 개가 이어져도 전부). 앞 줄바꿈·공백, 닫는 괄호 뒤 마침표까지 함께 지운다 */
     static final Pattern FOOTER = Pattern.compile(
-            "\\s*\\(\\s*(?:예약 시스템 \\d{1,2}:\\d{2} 조회(?: 기준| · 입력한 시간표 기준)?|입력한 시간표 기준)\\s*\\)[.。]?\\s*$");
+            "\\s*\\(\\s*(?:예약 시스템 \\d{1,2}:\\d{2} 조회(?: 기준| · 입력한 시간표 기준)?|입력한 시간표 기준)\\s*\\)[.。]?\\s*$", Pattern.CANON_EQ);
 
     /** 도구 이름 → 학생용 말. 순서는 긴 이름부터 (start_now_reservation이 reservation에 먹히지 않게 단어 경계도 본다) */
     static final Map<String, String> TOOL_WORDS;
@@ -48,13 +48,13 @@ final class ReplyPolish {
     static final String UNKNOWN_WORD = "그 기능";
 
     /** 도구 이름 앞뒤의 백틱·따옴표도 같이 지운다: `room_status` → 지금 빈 방 */
-    private static final Pattern TOOL_TOKEN = Pattern.compile("[`'\"]?(?<![\\w가-힣/.@])([a-z]+(?:_[a-z]+)+)(?![\\w/@])[`'\"]?");
+    private static final Pattern TOOL_TOKEN = Pattern.compile("[`'\"]?(?<![\\w가-힣/.@])([a-z]++(?:_[a-z]++)++)(?![\\w/@])[`'\"]?");
 
     /** URL·메일 주소. 이 안의 snake_case(경로 reset_password 등)는 바꾸면 링크가 깨진다 */
-    private static final Pattern ADDRESS = Pattern.compile("(?:https?://|www\\.)\\S+|[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+");
+    private static final Pattern ADDRESS = Pattern.compile("(?:https?://|www\\.)\\S++|[\\w.+-]++@[\\w-]++(?:\\.[\\w-]++)++");
 
     /** 바꾼 말 바로 뒤에 붙은 조사. 받침에 맞게 고친다: 지금 바로 쓰기+을 → 지금 바로 쓰기를 */
-    private static final Pattern PARTICLE = Pattern.compile("^(으로|로|을|를|이|가|은|는|과|와)");
+    private static final Pattern PARTICLE = Pattern.compile("^(으로|로|을|를|이|가|은|는|과|와)", Pattern.CANON_EQ);
 
     /** 모델이 직접 쓴 꼬리말을 끝에서 모두 지운다. 없으면 그대로 */
     static String stripFooters(String text) {

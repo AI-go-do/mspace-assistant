@@ -59,10 +59,10 @@ class RoomStatusToolTest extends McpToolTestSupport {
         // then
         assertThat(result.isError()).as(text(result)).isFalse();
         String text = text(result);
-        assertThat(text).contains("\"availableCount\":2", "\"status\":\"IN_USE\"", "start_now_reservation");
         // 2번 방: 지금+2시간을 30분 칸으로 올린 시각, 3번 방: 다음 예약(1시간 뒤) 전까지
-        assertThat(text).contains("\"roomId\":3").contains(in60.toLocalTime().toString().substring(0, 5));
-        assertThat(text).doesNotContain("\"roomId\":2,\"roomName\":\"2번 방\",\"minPeople\":3,\"maxPeople\":5,\"status\":\"AVAILABLE\",\"currentEndAt\":null,\"nextStartAt\":null,\"latestEndAt\":null");
+        assertThat(text).contains("\"availableCount\":2", "\"status\":\"IN_USE\"", "start_now_reservation")
+                .contains("\"roomId\":3").contains(in60.toLocalTime().toString().substring(0, 5))
+                .doesNotContain("\"roomId\":2,\"roomName\":\"2번 방\",\"minPeople\":3,\"maxPeople\":5,\"status\":\"AVAILABLE\",\"currentEndAt\":null,\"nextStartAt\":null,\"latestEndAt\":null");
         core.verify(getRequestedFor(urlEqualTo("/api/rooms/status")).withHeader("X-User-Id", equalTo("1")));
     }
 

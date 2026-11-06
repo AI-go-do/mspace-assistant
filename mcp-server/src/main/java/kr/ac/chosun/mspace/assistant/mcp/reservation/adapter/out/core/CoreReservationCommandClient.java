@@ -20,6 +20,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
      * 웹·비서 예약 건수를 따로 센다. 통계용 표시라 권한과는 상관없다 (권한은 학생 본인 토큰으로 core가 본다)
      */
     static final String CREATED_VIA_HEADER = "X-Created-Via";
+    static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     static final String CREATED_VIA_AGENT = "AGENT";
 
     private final CoreHttp core;
@@ -73,7 +74,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         ResponseEntity<CoreCreated> response = core.callEntity("POST /api/reservations/instant", credential,
                 rest -> rest.post().uri("/api/reservations/instant")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("Idempotency-Key", idempotencyKey)
+                        .header(IDEMPOTENCY_KEY_HEADER, idempotencyKey)
                         .header(CREATED_VIA_HEADER, CREATED_VIA_AGENT)
                         .body(body),
                 CoreCreated.class);
@@ -112,7 +113,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         ResponseEntity<CoreCreated> response = core.callEntity("POST /api/reservations/{id}/continue", credential,
                 rest -> rest.post().uri("/api/reservations/{id}/continue", reservationId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("Idempotency-Key", idempotencyKey)
+                        .header(IDEMPOTENCY_KEY_HEADER, idempotencyKey)
                         .header(CREATED_VIA_HEADER, CREATED_VIA_AGENT)
                         .body(body),
                 CoreCreated.class);
@@ -188,7 +189,7 @@ class CoreReservationCommandClient implements ReservationCommandPort {
         ResponseEntity<CoreCreated> response = core.callEntity("POST /api/reservations", credential,
                 rest -> rest.post().uri("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("Idempotency-Key", idempotencyKey)
+                        .header(IDEMPOTENCY_KEY_HEADER, idempotencyKey)
                         .header(CREATED_VIA_HEADER, CREATED_VIA_AGENT)
                         .body(body),
                 CoreCreated.class);

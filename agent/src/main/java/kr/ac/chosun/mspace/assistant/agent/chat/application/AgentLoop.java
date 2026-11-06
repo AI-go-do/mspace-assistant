@@ -176,9 +176,9 @@ public class AgentLoop {
         for (int i = conversation.size() - 1; i >= 0; i--) {
             LlmMessage m = conversation.get(i);
             chars += switch (m) {
-                case LlmMessage.User u -> u.text().length();
-                case LlmMessage.Assistant a -> a.text() == null ? 0 : a.text().length();
-                case LlmMessage.ToolResult r -> r.json() == null ? 0 : r.json().length();
+                case LlmMessage.User(String text) -> text.length();
+                case LlmMessage.Assistant(String text, var ignored) -> text == null ? 0 : text.length();
+                case LlmMessage.ToolResult(var id, var name, String json, var error) -> json == null ? 0 : json.length();
             };
             if (m instanceof LlmMessage.User) {
                 turns++;
@@ -192,14 +192,7 @@ public class AgentLoop {
     }
 
     private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona) {
-        List<Confirmation> confirmations = new ArrayList<>();
-        List<AccessCodeCard> accessCodeCards = new ArrayList<>();
-        int calls = 0;
-        List<String> toolNames = new ArrayList<>(); // 부른 순서대로. 결과의 tools (측정용)
-        Instant lookedUpAt = null; // 마지막으로 예약 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
-        boolean usedSchedule = false; // my_schedule로 학생이 넣은 시간표를 봤는지. 꼬리말에 "입력한 시간표 기준"
-        List<String> hints = new ArrayList<>(); // 화면 신호 (ChatResult.HINT_*)
-        List<QuickReplies.Seen> seen = new ArrayList<>(); // 빠른 답장 규칙용 도구 결과
+        Progress progress = new Progress();
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
         // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
@@ -208,78 +201,110 @@ public class AgentLoop {
         try (ToolGateway.Session session = tools.open(headers)) {
             String system = systemPrompt(persona);
             while (true) {
-                if (calls > 0 && pastDeadline(deadline, calls)) {
-                    return result(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
+                if (progress.calls > 0 && pastDeadline(deadline, progress.calls)) {
+                    return progress.result(TIME_LIMIT_REPLY, true);
                 }
                 LlmReply reply;
                 try {
                     reply = llm.chat(system, conversation, session.tools());
                 } catch (LlmException e) {
-                    if (confirmations.isEmpty() && accessCodeCards.isEmpty()) {
+                    if (!progress.hasCards()) {
                         throw e;
                     }
                     // 카드는 이미 만들어졌다(확인 토큰 발급, 대표자 확인). 모델 답만 실패했으니 카드는 화면에 준다
                     log.warn("agent llm failed after cards code={}", e.code());
-                    return result(CARDS_ONLY_REPLY, confirmations, accessCodeCards, calls, false, toolNames, hints, seen);
+                    return progress.result(CARDS_ONLY_REPLY, false);
                 }
                 if (!reply.wantsTools()) {
-                    return result(grounded(reply.text(), lookedUpAt, usedSchedule), confirmations, accessCodeCards,
-                            calls, false, toolNames, hints, seen);
+                    return progress.result(grounded(reply.text(), progress.lookedUpAt, progress.usedSchedule), false);
                 }
-                if (calls + reply.toolCalls().size() > props.maxToolCalls()) {
-                    log.warn("agent tool limit reached calls={} max={}", calls, props.maxToolCalls());
-                    return result(LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
+                if (progress.calls + reply.toolCalls().size() > props.maxToolCalls()) {
+                    log.warn("agent tool limit reached calls={} max={}", progress.calls, props.maxToolCalls());
+                    return progress.result(LIMIT_REPLY, true);
                 }
                 // 모델 답과 도구 결과도 다음 요청에 다시 실려 외부 AI로 간다. 학생 말과 같은 규칙으로 가린다.
                 // 지금 도구는 학번·전화번호·입실 번호를 돌려주지 않지만, 도구가 늘어도 이 한 곳에서 막는다
                 conversation.add(new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), reply.toolCalls()));
-                List<ToolCall> wanted = reply.toolCalls();
-                for (int i = 0; i < wanted.size(); i++) {
-                    ToolCall call = wanted.get(i);
-                    Instant now = clock.instant(); // 기한 검사와 꼬리말의 조회 시각에 같이 쓴다 (시계는 한 번만 읽는다)
-                    if (pastDeadline(now, deadline, calls)) {
-                        // 실행하지 않은 호출에도 결과를 붙여 둔다. 짝이 안 맞는 호출이 기억에 남으면 다음 요청마다 모델이 400을 낸다
-                        for (ToolCall rest : wanted.subList(i, wanted.size())) {
-                            conversation.add(new LlmMessage.ToolResult(rest.id(), rest.name(), SKIPPED_RESULT, true));
-                        }
-                        return result(TIME_LIMIT_REPLY, confirmations, accessCodeCards, calls, true, toolNames, hints, seen);
-                    }
-                    calls++;
-                    toolNames.add(call.name());
-                    long started = System.nanoTime();
-                    ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
-                    boolean schedule = SCHEDULE_TOOL.equals(call.name()) || WEEK_PLAN_TOOL.equals(call.name());
-                    if (!outcome.isError() && schedule) {
-                        // 시간표가 없다는 답(NO_SCHEDULE)은 시간표를 본 근거가 아니다. 대신 화면에 [내 시간표] 버튼 신호를 준다
-                        boolean noSchedule = NO_SCHEDULE.matcher(outcome.json()).find();
-                        usedSchedule |= !noSchedule;
-                        if (noSchedule && !hints.contains(ChatResult.HINT_OPEN_SCHEDULE)) {
-                            hints.add(ChatResult.HINT_OPEN_SCHEDULE);
-                        }
-                    }
-                    if (!outcome.isError() && !SCHEDULE_TOOL.equals(call.name())) {
-                        lookedUpAt = now; // week_plan도 예약 시스템(빈방)을 본 결과라 조회 시각을 남긴다
-                    }
-                    log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
-                            (System.nanoTime() - started) / 1_000_000);
-                    seen.add(new QuickReplies.Seen(call.name(), outcome.json(), outcome.isError()));
-                    outcome.confirmation().ifPresent(confirmations::add);
-                    outcome.accessCodeCard().filter(c -> !accessCodeCards.contains(c)).ifPresent(accessCodeCards::add);
-                    // 도구 결과는 게이트웨이가 이미 가렸다(JSON 문자열 값만). 여기서 JSON 전체에 정규식을 걸면
-                    // 6자리 숫자 값이 바뀌어 JSON이 깨진다 (ToolGateway.Outcome 참고)
-                    conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), outcome.json(), outcome.isError()));
+                if (!runCalls(session, reply.toolCalls(), conversation, progress, deadline)) {
+                    return progress.result(TIME_LIMIT_REPLY, true);
                 }
             }
         }
     }
 
-    /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
-    private ChatResult result(String reply, List<Confirmation> confirmations, List<AccessCodeCard> cards,
-                                     int calls, boolean stopped, List<String> toolNames, List<String> hints,
-                                     List<QuickReplies.Seen> seen) {
-        List<String> suggestions = stopped ? List.of()
-                : QuickReplies.suggest(seen, !confirmations.isEmpty() || !cards.isEmpty(), lastAllowedDay());
-        return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints), suggestions);
+    /**
+     * 모델이 고른 도구를 차례로 실행하고 결과를 대화에 붙인다.
+     * 기한을 넘기면 실행하지 않은 호출에도 결과를 붙이고 false. 짝이 안 맞는 호출이 기억에 남으면 다음 요청마다 모델이 400을 낸다
+     */
+    private boolean runCalls(ToolGateway.Session session, List<ToolCall> wanted, List<LlmMessage> conversation,
+                             Progress progress, Instant deadline) {
+        for (int i = 0; i < wanted.size(); i++) {
+            ToolCall call = wanted.get(i);
+            Instant now = clock.instant(); // 기한 검사와 꼬리말의 조회 시각에 같이 쓴다 (시계는 한 번만 읽는다)
+            if (pastDeadline(now, deadline, progress.calls)) {
+                for (ToolCall rest : wanted.subList(i, wanted.size())) {
+                    conversation.add(new LlmMessage.ToolResult(rest.id(), rest.name(), SKIPPED_RESULT, true));
+                }
+                return false;
+            }
+            progress.calls++;
+            progress.toolNames.add(call.name());
+            long started = System.nanoTime();
+            ToolGateway.Outcome outcome = session.call(call.name(), call.arguments());
+            log.info("agent tool={} ok={} {}ms", loggable(call.name(), session), !outcome.isError(),
+                    (System.nanoTime() - started) / 1_000_000);
+            progress.add(call.name(), outcome, now);
+            // 도구 결과는 게이트웨이가 이미 가렸다(JSON 문자열 값만). 여기서 JSON 전체에 정규식을 걸면
+            // 6자리 숫자 값이 바뀌어 JSON이 깨진다 (ToolGateway.Outcome 참고)
+            conversation.add(new LlmMessage.ToolResult(call.id(), call.name(), outcome.json(), outcome.isError()));
+        }
+        return true;
+    }
+
+    /** 한 번의 채팅에서 모은 것: 확인·입실 번호 카드, 부른 도구, 화면 신호, 꼬리말 근거, 빠른 답장 규칙용 결과 */
+    private final class Progress {
+        final List<Confirmation> confirmations = new ArrayList<>();
+        final List<AccessCodeCard> cards = new ArrayList<>();
+        final List<String> toolNames = new ArrayList<>(); // 부른 순서대로. 결과의 tools (측정용)
+        final List<String> hints = new ArrayList<>(); // 화면 신호 (ChatResult.HINT_*)
+        final List<QuickReplies.Seen> seen = new ArrayList<>();
+        int calls;
+        Instant lookedUpAt; // 마지막으로 예약 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
+        boolean usedSchedule; // my_schedule로 학생이 넣은 시간표를 봤는지. 꼬리말에 "입력한 시간표 기준"
+
+        boolean hasCards() {
+            return !confirmations.isEmpty() || !cards.isEmpty();
+        }
+
+        void add(String tool, ToolGateway.Outcome outcome, Instant now) {
+            if (!outcome.isError()) {
+                if (SCHEDULE_TOOL.equals(tool) || WEEK_PLAN_TOOL.equals(tool)) {
+                    sawSchedule(outcome.json());
+                }
+                if (!SCHEDULE_TOOL.equals(tool)) {
+                    lookedUpAt = now; // week_plan도 예약 시스템(빈방)을 본 결과라 조회 시각을 남긴다
+                }
+            }
+            seen.add(new QuickReplies.Seen(tool, outcome.json(), outcome.isError()));
+            outcome.confirmation().ifPresent(confirmations::add);
+            outcome.accessCodeCard().filter(c -> !cards.contains(c)).ifPresent(cards::add);
+        }
+
+        /** 시간표가 없다는 답(NO_SCHEDULE)은 시간표를 본 근거가 아니다. 대신 화면에 [내 시간표] 버튼 신호를 준다 */
+        private void sawSchedule(String json) {
+            boolean noSchedule = NO_SCHEDULE.matcher(json).find();
+            usedSchedule |= !noSchedule;
+            if (noSchedule && !hints.contains(ChatResult.HINT_OPEN_SCHEDULE)) {
+                hints.add(ChatResult.HINT_OPEN_SCHEDULE);
+            }
+        }
+
+        /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
+        ChatResult result(String reply, boolean stopped) {
+            List<String> suggestions = stopped ? List.of() : QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
+            return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints),
+                    suggestions);
+        }
     }
 
     /** 조회할 수 있는 마지막 날: 오늘(서울) + 미리 예약 일수 - 1 */
