@@ -195,14 +195,16 @@
       "text": "이번 주에 수업 끝나고 2시간 쓸 수 있는 날 알려 줘",
       "expect": [
         {
-          "tools_any": [
-            "week_plan"
-          ],
+          "tools_count": {
+            "week_plan": 1
+          },
           "tools_none": [
             "find_available_rooms"
-          ]
+          ],
+          "not_stopped": true
         }
-      ]
+      ],
+      "note": "week_plan을 정확히 한 번 부르고 최대 횟수에서 멈추지 않아야 통과. 여러 번 부르거나 날짜마다 find_available_rooms로 돌면 이 기능(한 번에 보기)이 실패한 거예요"
     },
     {
       "id": "Q15",

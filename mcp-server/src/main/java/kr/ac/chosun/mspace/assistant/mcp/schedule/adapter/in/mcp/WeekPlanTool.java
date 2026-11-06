@@ -25,7 +25,9 @@ class WeekPlanTool {
                     하루가 아니라 여러 날을 묻는 말에 쓴다. 하루만 물으면 my_schedule·find_available_rooms를 쓴다.
                     시간표(my_schedule)와 빈방(find_available_rooms)을 서버가 날짜마다 이어 붙인 결과라 다시 부르지 않는다.
                     days[].option이 있으면 그날 roomName·startAt·endAt 그대로 제안하고, 없으면 reason을 전한다.
-                    code가 NO_SCHEDULE이면 note를 그대로 전한다(시간표 없이 매일 09:00부터 본 결과). 시각은 서울 시간(+09:00).""",
+                    code가 NO_SCHEDULE이면 note를 그대로 전한다(시간표 없이 매일 09:00부터 본 결과). 시각은 서울 시간(+09:00).
+                    범위는 from~to(오늘부터 7일)로 고정이라 그 밖의 날짜는 없다. 학생이 물은 범위와 겹치는 날만 답하고,
+                    범위 밖은 아직 볼 수 없다고 말한다.""",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     WeekPlan weekPlan(
             McpSyncRequestContext context,

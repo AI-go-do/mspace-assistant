@@ -100,6 +100,10 @@ def judge_one(exp, result):
         return False
     if exp.get("no_tool") and tools:
         return False
+    if "tools_count" in exp and any(tools.count(t) != n for t, n in exp["tools_count"].items()):
+        return False
+    if exp.get("not_stopped") and result.get("stoppedByLimit"):
+        return False
     if "confirm_tool" in exp and not any(c.get("tool") == exp["confirm_tool"] for c in confirms):
         return False
     if "needs_participants" in exp and not any(c.get("needsParticipants") == exp["needs_participants"] for c in confirms):
