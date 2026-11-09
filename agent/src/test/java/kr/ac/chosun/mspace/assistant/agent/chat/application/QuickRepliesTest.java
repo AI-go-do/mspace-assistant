@@ -188,4 +188,19 @@ class QuickRepliesTest {
         assertThat(b).isEmpty();
         assertThat(c).isEmpty();
     }
+
+    @Test
+    @DisplayName("인원 질문(간단히 예약하기): 물음표가 있는 \"몇 명\"·\"몇 분이서\"만 질문으로 본다. 연장 \"몇 분 늘릴까요?\"·인원 안내 문장은 아니다")
+    void asksHeadcount() {
+        // given: 인원을 묻는 말과 아닌 말(분 = 시간 단위)
+        // when·then
+        assertThat(QuickReplies.asksHeadcount("나 포함 몇 명이서 쓰실 건가요?")).isTrue();
+        assertThat(QuickReplies.asksHeadcount("나 포함 몇 분이 이용하시나요?")).isTrue();
+        assertThat(QuickReplies.asksHeadcount("몇 분이 남았나요?")).isFalse();
+        assertThat(QuickReplies.asksHeadcount("몇 분이서 하실 거예요？")).isTrue();
+        assertThat(QuickReplies.asksHeadcount("몇명 쓰세요?")).isTrue();
+        assertThat(QuickReplies.asksHeadcount("몇 분 늘릴까요?")).isFalse();
+        assertThat(QuickReplies.asksHeadcount("2명이 쓸 수 있는 방이 없어요. 몇 명인지 다시 알려 주세요.")).isFalse();
+        assertThat(QuickReplies.asksHeadcount(null)).isFalse();
+    }
 }

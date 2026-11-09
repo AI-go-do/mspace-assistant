@@ -42,6 +42,7 @@ public class AgentLoop {
     private final MemoryProperties memoryProps;
     private final DailyBriefing briefing;
     private final PersonaStore personas;
+    private final TeamStore teams;
 
     /** 성향 바꾸기 지름길의 도구 이름 (결과 tools, 측정용) */
     static final String PERSONA_TOOL = "persona";
@@ -68,11 +69,19 @@ public class AgentLoop {
         this(llm, tools, props, clock, memory, memoryProps, briefing, PersonaStore.NONE);
     }
 
-    @Autowired
+    /** 팀 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
                      ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing,
                      PersonaStore personas) {
+        this(llm, tools, props, clock, memory, memoryProps, briefing, personas, TeamStore.NONE);
+    }
+
+    @Autowired
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
+                     ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing,
+                     PersonaStore personas, TeamStore teams) {
         this.personas = personas;
+        this.teams = teams;
         this.llm = llm;
         this.tools = tools;
         this.props = props;
@@ -107,7 +116,7 @@ public class AgentLoop {
                 result = briefingShortcut(headers);
             } else {
                 Persona persona = personas.load(key);
-                result = converse(headers, conversation, persona);
+                result = converse(headers, conversation, persona, teams.load(key));
                 if (persona == Persona.QUIET && !result.suggestions().isEmpty()) {
                     // 조용히: 먼저 권하지 않는다. 답 아래 빠른 답장 버튼도 지운다 (확인 카드·입실 번호 카드는 그대로)
                     result = new ChatResult(result.reply(), result.confirmations(), result.accessCodeCards(), result.toolCalls(),
@@ -191,7 +200,7 @@ public class AgentLoop {
         return conversation.subList(start, conversation.size());
     }
 
-    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona) {
+    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona, List<Team> myTeams) {
         Progress progress = new Progress();
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
@@ -199,7 +208,7 @@ public class AgentLoop {
         Instant deadline = clock.instant().plus(props.chatTimeout());
 
         try (ToolGateway.Session session = tools.open(headers)) {
-            String system = systemPrompt(persona);
+            String system = systemPrompt(persona, myTeams);
             while (true) {
                 if (progress.calls > 0 && pastDeadline(deadline, progress.calls)) {
                     return progress.result(TIME_LIMIT_REPLY, true);
@@ -303,7 +312,17 @@ public class AgentLoop {
 
         /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
         ChatResult result(String reply, boolean stopped) {
-            List<String> suggestions = stopped ? List.of() : QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
+            List<String> suggestions;
+            if (stopped) {
+                suggestions = List.of();
+            } else if (!hasCards() && QuickReplies.asksHeadcount(reply)) {
+                suggestions = QuickReplies.HEADCOUNT; // 간단히 예약하기: 인원은 눌러서 답하게 (FR-AGT-105)
+                if (!hints.contains(ChatResult.HINT_PICK_FRIENDS)) {
+                    hints.add(ChatResult.HINT_PICK_FRIENDS); // 화면은 친구 버튼으로 "누구랑?"을 받는다. 이름은 모델로 안 감
+                }
+            } else {
+                suggestions = QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
+            }
             return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints),
                     suggestions);
         }
@@ -380,6 +399,24 @@ public class AgentLoop {
 
     /** 성향(설계 5.v)은 지시문 끝에 한 토막으로 붙는다. 안전 규칙은 성향과 상관없이 같다 */
     String systemPrompt(Persona persona) {
+        return systemPrompt(persona, List.of());
+    }
+
+    /**
+     * 학생이 저장한 팀은 이름과 인원만 지시문 끝에 붙인다(멤버 학번·이름은 넣지 않음, FR-AGT-105).
+     * 팀을 고른 뒤 누구를 넣을지는 화면이 확인 카드에 채운다
+     */
+    static String teamRule(List<Team> myTeams) {
+        if (myTeams == null || myTeams.isEmpty()) {
+            return "";
+        }
+        String list = myTeams.stream().map(t -> "%s(나 포함 %d명)".formatted(PrivacyMask.mask(t.name()), t.headcount()))
+                .collect(java.util.stream.Collectors.joining(", "));
+        return "- 학생이 저장한 팀: " + list + ". \"팀 A랑\"처럼 팀 이름을 말하면 함께할 사람과 인원은 그 팀으로 보고 다시 묻지 않는다"
+                + "(headcount = 그 인원). 팀원이 누구인지는 너도 모르고 묻지 않는다. 확인 카드에 화면이 팀원을 채운다.\n";
+    }
+
+    String systemPrompt(Persona persona, List<Team> myTeams) {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
         AgentProperties.Rules rules = props.rules();
         String today = "%s(%s) %02d:%02d".formatted(now.toLocalDate(),
@@ -425,6 +462,13 @@ public class AgentLoop {
                 - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면
                   본인 예약만 볼 수 있다고 답한다. 함께 쓸 사람의 학번은 확인 화면에서 넣는다고 안내한다.
+                - 예약하고 싶다는데 날짜·시각·길이·인원 중 모르는 것이 있으면, 도구를 부르기 전에 모르는 것만 한 번에 하나씩
+                  짧게 묻는다. 차례는 날짜·시각 → 함께할 사람("누구랑 하실 건가요? 나 포함 몇 명이서 쓰실 건가요?")이다.
+                  화면이 이 질문 아래 친구 버튼을 띄우고, 학생이 고르면 "나 포함 N명"으로 답이 온다. 길이를 말하지 않았으면
+                  2시간으로 보고 답에 "2시간으로 볼게요"라고 적는다. 한 번에 다 말했으면 묻지 않는다.
+                  "수업 끝나고"는 my_schedule로, "지금 바로"는 start_now_reservation으로 시각이 정해지니 시각을 묻지 않는다.
+                  다 모이면 빈방을 찾고, 맞는 방이 있으면 첫 번째 방으로 create_reservation을 제안한다(방을 되묻지 않는다).
+                  함께할 친구는 "확인 카드에서 친구 이름을 말하거나 눌러 고르면 돼요"라고 안내하고, 친구 이름을 묻거나 받아 적지 않는다.
                 - 인원을 말하지 않았으면 headcount를 넣지 않는다. 방마다 인원 범위가 있어(1~4번 방 3~5명, 5번 방 5~8명)
                   2명 이하는 예약할 수 없다. 인원이 안 맞으면 그 이유를 그대로 말한다.
                 - "5시"처럼 오전·오후가 없으면 지금 이후의 가장 가까운 시각으로 보고, 답에 "오후 5시"처럼 적는다.
@@ -439,6 +483,6 @@ public class AgentLoop {
                 - 답에 도구 이름(find_available_rooms 같은 영문 snake_case)을 쓰지 않는다. 학생 말로 쓴다:
                   빈방 찾기, 지금 빈 방, 내 예약, 이용 규칙, 예약, 지금 바로 쓰기, 예약 취소, 퇴실, 연장, 내 시간표, 주간 계획.
                 """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays())
-                + persona.promptRule() + "\n";
+                + teamRule(myTeams) + persona.promptRule() + "\n";
     }
 }

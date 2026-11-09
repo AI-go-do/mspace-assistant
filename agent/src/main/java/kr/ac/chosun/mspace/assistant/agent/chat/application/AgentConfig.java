@@ -5,6 +5,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryConve
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisPersonaStore;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryTeamStore;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisTeamStore;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ImageReader;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -57,5 +59,14 @@ class AgentConfig {
             return new RedisPersonaStore(redis.getObject());
         }
         return new InMemoryPersonaStore();
+    }
+
+    /** 내 팀 보관 (FR-AGT-105). 성향과 같은 저장소: redis면 Redis(TTL 없음), 아니면 메모리 */
+    @Bean
+    TeamStore teamStore(MemoryProperties props, ObjectProvider<StringRedisTemplate> redis) {
+        if (props.enabled() && "redis".equals(props.store())) {
+            return new RedisTeamStore(redis.getObject());
+        }
+        return new InMemoryTeamStore();
     }
 }
