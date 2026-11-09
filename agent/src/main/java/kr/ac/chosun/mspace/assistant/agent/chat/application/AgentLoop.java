@@ -410,7 +410,7 @@ public class AgentLoop {
         if (myTeams == null || myTeams.isEmpty()) {
             return "";
         }
-        String list = myTeams.stream().map(t -> "%s(나 포함 %d명)".formatted(t.name(), t.headcount()))
+        String list = myTeams.stream().map(t -> "%s(나 포함 %d명)".formatted(PrivacyMask.mask(t.name()), t.headcount()))
                 .collect(java.util.stream.Collectors.joining(", "));
         return "- 학생이 저장한 팀: " + list + ". \"팀 A랑\"처럼 팀 이름을 말하면 함께할 사람과 인원은 그 팀으로 보고 다시 묻지 않는다"
                 + "(headcount = 그 인원). 팀원이 누구인지는 너도 모르고 묻지 않는다. 확인 카드에 화면이 팀원을 채운다.\n";

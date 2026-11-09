@@ -39,6 +39,17 @@ public class RedisTeamStore implements TeamStore {
     }
 
     @Override
+    public List<Team> loadStrict(String memberKey) {
+        try {
+            String raw = redis.opsForValue().get(PREFIX + memberKey);
+            return raw == null ? List.of() : List.copyOf(json.readValue(raw, LIST));
+        } catch (DataAccessException | JacksonException e) {
+            log.warn("teams strict load failed type={}", e.getClass().getSimpleName());
+            throw new ConversationMemory.Unavailable();
+        }
+    }
+
+    @Override
     public void save(String memberKey, List<Team> teams) {
         try {
             redis.opsForValue().set(PREFIX + memberKey, json.writeValueAsString(teams));

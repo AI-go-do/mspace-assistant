@@ -23,7 +23,8 @@ public record Team(String name, List<Member> members) {
     }
 
     public Team {
-        members = members == null ? List.of() : List.copyOf(members);
+        // null 원소도 그대로 두어 problem()이 400으로 잡게 한다(List.copyOf는 NPE → 500)
+        members = members == null ? List.of() : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(members));
     }
 
     /** 나 포함 인원 */
@@ -35,6 +36,10 @@ public record Team(String name, List<Member> members) {
     public Optional<String> problem() {
         if (name == null || name.isBlank() || name.strip().length() > MAX_NAME) {
             return Optional.of("팀 이름은 1~%d자로 적어 주세요.".formatted(MAX_NAME));
+        }
+        // 팀 이름은 외부 AI 지시문에 들어가니 학번·전화번호 같은 긴 숫자와 줄바꿈은 받지 않는다
+        if (name.chars().anyMatch(Character::isISOControl) || name.matches(".*\\d{4,}.*")) {
+            return Optional.of("팀 이름에는 학번·전화번호 같은 숫자나 줄바꿈을 넣을 수 없어요.");
         }
         if (members.isEmpty() || members.size() > MAX_MEMBERS) {
             return Optional.of("팀에는 친구를 1~%d명 넣을 수 있어요.".formatted(MAX_MEMBERS));

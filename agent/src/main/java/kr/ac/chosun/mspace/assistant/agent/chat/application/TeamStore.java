@@ -11,6 +11,11 @@ public interface TeamStore {
     /** 만든 순서. 없거나 못 읽으면 빈 목록 */
     List<Team> load(String memberKey);
 
+    /** 바꾸기 전에 읽을 때. 못 읽으면 빈 목록 대신 {@link ConversationMemory.Unavailable} (빈 목록으로 덮어써 팀을 잃지 않게) */
+    default List<Team> loadStrict(String memberKey) {
+        return load(memberKey);
+    }
+
     /** 통째로 바꾼다 */
     void save(String memberKey, List<Team> teams);
 

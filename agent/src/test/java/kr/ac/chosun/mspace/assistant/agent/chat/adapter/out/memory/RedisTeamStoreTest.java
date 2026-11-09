@@ -54,4 +54,18 @@ class RedisTeamStoreTest {
         doThrow(new RedisConnectionFailureException("down")).when(values).set(anyString(), anyString());
         assertThatThrownBy(() -> new RedisTeamStore(redis).save("m:1", List.of())).isInstanceOf(ConversationMemory.Unavailable.class);
     }
+
+    @Test
+    @DisplayName("바꾸기 전 읽기(loadStrict)는 못 읽으면 빈 목록이 아니라 Unavailable (빈 목록으로 덮어써 팀을 잃지 않게)")
+    void strictLoadFails() {
+        // given
+        when(redis.opsForValue()).thenReturn(values);
+        when(values.get("agent:teams:m:2")).thenReturn("{broken");
+        RedisTeamStore store = new RedisTeamStore(redis);
+
+        // when·then
+        assertThatThrownBy(() -> store.loadStrict("m:2")).isInstanceOf(ConversationMemory.Unavailable.class);
+        when(values.get(anyString())).thenThrow(new RedisConnectionFailureException("down"));
+        assertThatThrownBy(() -> store.loadStrict("m:1")).isInstanceOf(ConversationMemory.Unavailable.class);
+    }
 }

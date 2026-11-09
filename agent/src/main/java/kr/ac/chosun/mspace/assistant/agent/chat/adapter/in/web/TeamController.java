@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.Team;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.TeamStore;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -67,7 +69,7 @@ class TeamController {
         }
         Team clean = team.normalized();
         String key = MemberKey.of(user);
-        List<Team> next = new ArrayList<>(teams.load(key));
+        List<Team> next = new ArrayList<>(teams.loadStrict(key));
         int at = indexOf(next, clean.name());
         if (at >= 0) {
             next.set(at, clean);
@@ -87,13 +89,19 @@ class TeamController {
             return loginRequired();
         }
         String key = MemberKey.of(user);
-        List<Team> next = new ArrayList<>(teams.load(key));
+        List<Team> next = new ArrayList<>(teams.loadStrict(key));
         int at = indexOf(next, name == null ? "" : name.strip());
         if (at >= 0) {
             next.remove(at);
             teams.save(key, next);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    /** 팀 저장소(Redis)를 못 읽거나 못 쓸 때. 대화 기록 문구가 아니라 팀 문구로 */
+    @ExceptionHandler(ConversationMemory.Unavailable.class)
+    ResponseEntity<Object> storeFailed(ConversationMemory.Unavailable e) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "MEMORY_UNAVAILABLE", "팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
     }
 
     private static int indexOf(List<Team> list, String name) {
