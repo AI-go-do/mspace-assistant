@@ -42,7 +42,7 @@ final class ReportWriter {
 
     static String markdown(String stamp, List<EvalRunner.Report> reports) {
         StringBuilder b = new StringBuilder("# 모델 평가 ").append(stamp).append(" (+09:00)\n\n");
-        b.append("가짜 도구·고정 시각(2026-11-10 화 10:00)에서 같은 발화 세트를 돌린 결과예요. 채점: 도구 50% · 인자 30% · 답 20%.\n\n");
+        b.append("가짜 도구·고정 시각(2026-11-10 화 10:25)에서 같은 발화 세트를 돌린 결과예요. 채점: 도구 50% · 인자 30% · 답 20%.\n\n");
         b.append("| 모델 | 지시문 | 종합 점수 | 완전 통과 | 도구 | 인자 | 답 | 안전 위반 | 실패율 | 응답 중앙값 | p90 | 호출/대화 | 토큰 입력/출력 | 무료 대화/일 |\n");
         b.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for (EvalRunner.Report r : reports) {
