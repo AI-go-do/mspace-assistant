@@ -21,9 +21,20 @@ final class QuickReplies {
 
     static final List<String> START = List.of("내일 오후 2시 빈방 있어?", MY_RESERVATIONS, ROOMS_NOW);
 
+    /** 비서가 인원을 물을 때(간단히 예약하기, FR-AGT-105). 방 인원 범위(1~4번 방 3~5명)에 맞춘 세 개 */
+    static final List<String> HEADCOUNT = List.of("나 포함 3명", "나 포함 4명", "나 포함 5명");
+
+    /** "몇 명이서", "몇 분이서" 같은 인원 질문. 물음표가 있어야 질문으로 본다("몇 명이 쓸 수 있는 방이 없어요"는 아님) */
+    private static final java.util.regex.Pattern ASKS_HEADCOUNT = java.util.regex.Pattern.compile("몇\\s*(?:명|분\\s*이서)[^?？\\n]{0,20}[?？]");
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private QuickReplies() {
+    }
+
+    /** 답이 인원을 묻는 질문이면 true. 이때는 도구 결과 규칙 대신 {@link #HEADCOUNT} 버튼을 띄운다 */
+    static boolean asksHeadcount(String reply) {
+        return reply != null && ASKS_HEADCOUNT.matcher(reply).find();
     }
 
     /**

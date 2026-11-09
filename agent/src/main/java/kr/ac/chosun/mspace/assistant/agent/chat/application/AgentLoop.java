@@ -303,7 +303,14 @@ public class AgentLoop {
 
         /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
         ChatResult result(String reply, boolean stopped) {
-            List<String> suggestions = stopped ? List.of() : QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
+            List<String> suggestions;
+            if (stopped) {
+                suggestions = List.of();
+            } else if (!hasCards() && QuickReplies.asksHeadcount(reply)) {
+                suggestions = QuickReplies.HEADCOUNT; // 간단히 예약하기: 인원은 눌러서 답하게 (FR-AGT-105)
+            } else {
+                suggestions = QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
+            }
             return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints),
                     suggestions);
         }
@@ -425,6 +432,11 @@ public class AgentLoop {
                 - 학생 말의 [학번]·[전화번호]·[입실 번호]는 개인정보를 가린 표시다. 원래 값은 너도 모르고 묻지도 않는다.
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면
                   본인 예약만 볼 수 있다고 답한다. 함께 쓸 사람의 학번은 확인 화면에서 넣는다고 안내한다.
+                - 예약하고 싶다는데 날짜·시각·길이·인원 중 모르는 것이 있으면, 도구를 부르기 전에 모르는 것만 한 번에 하나씩
+                  짧게 묻는다. 차례는 날짜·시각 → 인원("나 포함 몇 명이서 쓰실 건가요?")이다. 길이를 말하지 않았으면
+                  2시간으로 보고 답에 "2시간으로 볼게요"라고 적는다. 한 번에 다 말했으면 묻지 않는다.
+                  다 모이면 빈방을 찾고, 맞는 방이 있으면 첫 번째 방으로 create_reservation을 제안한다(방을 되묻지 않는다).
+                  함께할 친구는 "확인 카드에서 친구 이름을 말하거나 눌러 고르면 돼요"라고 안내하고, 친구 이름을 묻거나 받아 적지 않는다.
                 - 인원을 말하지 않았으면 headcount를 넣지 않는다. 방마다 인원 범위가 있어(1~4번 방 3~5명, 5번 방 5~8명)
                   2명 이하는 예약할 수 없다. 인원이 안 맞으면 그 이유를 그대로 말한다.
                 - "5시"처럼 오전·오후가 없으면 지금 이후의 가장 가까운 시각으로 보고, 답에 "오후 5시"처럼 적는다.

@@ -168,6 +168,22 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("간단히 예약하기(FR-AGT-105): 비서가 인원을 물으면 답 아래 [나 포함 3·4·5명] 버튼, 지시문에 하나씩 묻는 규칙")
+    void asksHeadcountWithButtons() {
+        // given
+        var llm = new ScriptedLlm().then(say("내일 오후 3시부터 2시간으로 볼게요. 나 포함 몇 명이서 쓰실 건가요?"));
+        var tools = new FakeTools(Map.of());
+
+        // when
+        ChatResult result = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK)
+                .run(ME, List.of(), "내일 3시에 방 잡아 줘");
+
+        // then
+        assertThat(result.suggestions()).containsExactly("나 포함 3명", "나 포함 4명", "나 포함 5명");
+        assertThat(llm.lastSystem).contains("나 포함 몇 명이서 쓰실 건가요?").contains("친구 이름을 묻거나 받아 적지 않는다");
+    }
+
+    @Test
     @DisplayName("성향 조용히: 빈방 결과여도 답 아래 빠른 답장 버튼을 붙이지 않는다 (먼저 권하지 않음)")
     void quietDropsSuggestions() {
         var llm = new ScriptedLlm()
