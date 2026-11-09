@@ -13,7 +13,7 @@
 - [일정](docs/일정.md)
 - [도구 명세](docs/도구-명세.md) · [설계](docs/설계.md)
 - [회의 기록](docs/meetings/README.md)
-- [시연 리허설(가짜 모델)](scripts/rehearsal/README.md) · [성공률 측정 #9(진짜 모델)](scripts/measure/README.md)
+- [시연 리허설(가짜 모델)](scripts/rehearsal/README.md) · [성공률 측정 #9(진짜 모델)](scripts/measure/README.md) · [모델·지시문 평가(점수 기준)](scripts/eval/README.md)
 
 ## 상태
 M2 구현 중이에요 (11/7–11/13, 11/13 기능 동결). Java 21 · Spring Boot 4 · Maven으로 만들어요.

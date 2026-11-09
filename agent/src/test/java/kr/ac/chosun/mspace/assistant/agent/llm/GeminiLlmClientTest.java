@@ -45,6 +45,19 @@ class GeminiLlmClientTest {
     }
 
     @Test
+    @DisplayName("토큰 수: usageMetadata의 입력, 출력+생각 토큰을 Usage로. 없으면 UNKNOWN")
+    void usage() {
+        gemini.stubFor(post(PATH).willReturn(okJson("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"안녕하세요"}]}}],
+                 "usageMetadata":{"promptTokenCount":1200,"candidatesTokenCount":30,"thoughtsTokenCount":12}}""")));
+
+        LlmReply reply = client("test-key").chat("지시문", List.of(new LlmMessage.User("안녕")), List.of());
+
+        assertThat(reply.usage()).isEqualTo(new LlmReply.Usage(1200, 42));
+        assertThat(new LlmReply("x", List.of()).usage().known()).isFalse();
+    }
+
+    @Test
     @DisplayName("요청: 키는 헤더로, 지시문·도구 스키마(parametersJsonSchema)를 함께 보낸다")
     void requestShape() {
         gemini.stubFor(post(PATH).willReturn(okJson("""
