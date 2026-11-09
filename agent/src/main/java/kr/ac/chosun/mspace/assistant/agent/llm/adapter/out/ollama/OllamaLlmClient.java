@@ -136,14 +136,17 @@ public class OllamaLlmClient implements LlmClient {
             // 빈 말풍선을 성공으로 돌려주지 않는다 (Gemini 어댑터와 같은 계약)
             throw unavailable();
         }
-        return new LlmReply(text, calls);
+        LlmReply.Usage usage = response.promptEvalCount() == null || response.evalCount() == null
+                ? LlmReply.Usage.UNKNOWN : new LlmReply.Usage(response.promptEvalCount(), response.evalCount());
+        return new LlmReply(text, calls, usage);
     }
 
     private static LlmException unavailable() {
         return new LlmException("LLM_UNAVAILABLE", "AI 비서가 지금 응답하지 않아요. 잠시 후 다시 시도해 주세요.");
     }
 
-    record ChatResponse(Message message, Boolean done) {
+    record ChatResponse(Message message, Boolean done,
+            @JsonProperty("prompt_eval_count") Integer promptEvalCount, @JsonProperty("eval_count") Integer evalCount) {
     }
 
     record Message(String role, String content,

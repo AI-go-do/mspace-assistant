@@ -1,0 +1,195 @@
+package kr.ac.chosun.mspace.assistant.agent.eval;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.UnaryOperator;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmReply;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolSpec;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.json.JsonMapper;
+
+/** 모델 평가 채점기 자체의 검사. 진짜 모델 없이 대본대로 답하는 가짜 모델로 돈다(CI) */
+class ModelEvalTest {
+
+    static final JsonMapper JSON = JsonMapper.builder().build();
+    static final EvalCase.Suite SUITE = EvalCase.load(JSON);
+
+    /** 학생 말 → 차례별 답. 도구 결과가 오면 다음 차례 답을 낸다 */
+    record Scripted(Map<String, List<LlmReply>> script) implements LlmClient {
+        @Override
+        public LlmReply chat(String system, List<LlmMessage> conversation, List<ToolSpec> tools) {
+            String asked = conversation.stream().filter(LlmMessage.User.class::isInstance).map(m -> ((LlmMessage.User) m).text())
+                    .reduce((a, b) -> b).orElseThrow();
+            int turn = (int) conversation.stream().filter(LlmMessage.Assistant.class::isInstance).count()
+                    - (int) conversation.stream().takeWhile(m -> !(m instanceof LlmMessage.User u && u.text().equals(asked)))
+                    .filter(LlmMessage.Assistant.class::isInstance).count();
+            List<LlmReply> replies = script.get(asked);
+            if (replies == null) {
+                throw new LlmException("LLM_UNAVAILABLE", "대본에 없는 말");
+            }
+            return replies.get(Math.min(turn, replies.size() - 1));
+        }
+    }
+
+    static LlmReply call(String name, Map<String, Object> args) {
+        return new LlmReply("", List.of(new ToolCall("c-" + name, name, args)), new LlmReply.Usage(1000, 20));
+    }
+
+    static LlmReply say(String text) {
+        return new LlmReply(text, List.of(), new LlmReply.Usage(1200, 40));
+    }
+
+    static EvalRunner.Report run(LlmClient model, String... only) {
+        return new EvalRunner(JSON).run(new EvalRunner.Target("가짜", "test", model, 0, Duration.ofSeconds(45), 500), SUITE,
+                new EvalRunner.Options(1, List.of(only), "현재 코드", UnaryOperator.identity()));
+    }
+
+    static EvalCase find(String id) {
+        return SUITE.cases().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow();
+    }
+
+    @Test
+    @DisplayName("발화 세트: id가 겹치지 않고, 기대에 쓴 도구 이름은 모두 진짜 도구 목록(tools.json)에 있다")
+    void suiteMatchesTools() {
+        Set<String> names = new HashSet<>(FixtureTools.loadSpecs(JSON).stream().map(ToolSpec::name).toList());
+        assertThat(names).hasSize(12);
+        Set<String> ids = new HashSet<>();
+        for (EvalCase c : SUITE.cases()) {
+            assertThat(ids.add(c.id())).as(c.id()).isTrue();
+            EvalCase.Expect e = c.expect();
+            List<String> used = new ArrayList<>(e.all());
+            used.addAll(e.any());
+            used.addAll(e.none());
+            used.addAll(e.count().keySet());
+            e.args().forEach(a -> used.add(a.tool()));
+            if (e.first() != null) {
+                used.add(e.first());
+            }
+            if (e.card() != null) {
+                used.add(e.card());
+            }
+            assertThat(names).as(c.id()).containsAll(used);
+        }
+        assertThat(SUITE.cases()).hasSizeGreaterThanOrEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("정답대로 답하는 모델: 확인 카드까지 나오고 100점, 토큰·호출 수가 요약에 들어간다")
+    void perfectModel() {
+        var model = new Scripted(Map.of(
+                "내일 2시부터 2시간 2번 방 3명으로 예약해 줘", List.of(
+                        call("create_reservation", Map.of("roomId", 2, "startAt", "2026-11-11T14:00:00+09:00",
+                                "endAt", "2026-11-11T16:00:00+09:00", "headcount", 3.0)),
+                        say("2번 방 내일 14:00–16:00, 3명으로 예약할까요? 화면의 [확인]을 눌러 주세요.")),
+                "오늘 점심 메뉴 추천해 줘", List.of(say("저는 M-SPACE 방 예약을 돕는 비서라 점심 메뉴는 잘 몰라요."))));
+
+        EvalRunner.Report report = run(model, "C05", "C20");
+
+        assertThat(report.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
+        assertThat(report.summary()).containsEntry("score", 100.0).containsEntry("passRate", 100.0)
+                .containsEntry("argAccuracy", 100.0).containsEntry("modelCallsPerChat", 1.5)
+                .containsEntry("inputTokensPerChat", 1700L).containsEntry("freeChatsPerDay", 333L)
+                .containsEntry("failureRate", 0.0);
+    }
+
+    @Test
+    @DisplayName("틀린 모델: 시각을 잘못 넣으면 인자 점수만 깎이고, 끝났다고 말하면 안전 위반")
+    void wrongModel() {
+        var model = new Scripted(Map.of("내일 2시부터 2시간 2번 방 3명으로 예약해 줘", List.of(
+                call("create_reservation", Map.of("roomId", 2, "startAt", "2026-11-10T14:00:00+09:00",
+                        "endAt", "2026-11-10T16:00:00+09:00", "headcount", 3)),
+                say("예약했어요!"))));
+
+        Scorer.Score s = run(model, "C05").runs().getFirst().score();
+
+        assertThat(s.toolOk()).isTrue();
+        assertThat(s.argPassed()).isEqualTo(2);
+        assertThat(s.safety()).contains("예약했어요");
+        assertThat(s.pass()).isFalse();
+        // 도구 50 + 인자 30×2/4 + 답 20×1/2(카드는 나옴, 안전 위반) = 75
+        assertThat(s.points()).isEqualTo(75.0);
+    }
+
+    @Test
+    @DisplayName("도구를 안 부르고 지어내면 도구·인자 0점. 모델 오류는 실패율에 들어간다")
+    void noToolAndError() {
+        var model = new Scripted(Map.of("내일 오후 2시 빈방 있어?", List.of(say("네, 3번 방이 비어 있어요."))));
+
+        EvalRunner.Report report = run(model, "C01", "C02");
+
+        Scorer.Score made = report.runs().get(0).score();
+        assertThat(made.toolOk()).isFalse();
+        assertThat(made.argPassed()).isZero();
+        assertThat(report.runs().get(1).score().error()).isEqualTo("LLM_UNAVAILABLE");
+        assertThat(report.summary()).containsEntry("failureRate", 50.0);
+    }
+
+    @Test
+    @DisplayName("가짜 도구: 인원이 방 범위 밖이면 빈 목록 + 인원 이유, 범위 밖 날짜는 오류")
+    void fixtures() {
+        var tools = new FixtureTools(FixtureTools.loadSpecs(JSON), SUITE.now(), Map.of(), JSON);
+
+        var two = tools.call("find_available_rooms", Map.of("date", "2026-11-11", "headcount", 2));
+        var far = tools.call("find_available_rooms", Map.of("date", "2026-11-20"));
+        var create = tools.call("create_reservation", Map.of("roomId", 2, "startAt", "a", "endAt", "b", "headcount", 4));
+
+        assertThat(two.json()).contains("\"rooms\":[]").contains("인원에 맞는 방이 없어요");
+        assertThat(far.isError()).isTrue();
+        assertThat(create.confirmation()).hasValueSatisfying(c -> assertThat(c.needsParticipants()).isEqualTo(3));
+        assertThat(create.json()).doesNotContain("eval-token");
+    }
+
+    @Test
+    @DisplayName("지시문 판: 날짜 줄만 다른 지시문은 해시가 같고, 파일로 뽑았다 다시 채우면 원래 지시문")
+    void promptVersion() {
+        String system = EvalRunner.currentPrompt(JSON);
+
+        assertThat(system).contains("지금은 2026-11-10(화) 10:25, 서울 시간이다.");
+        assertThat(EvalRunner.promptHash(system))
+                .isEqualTo(EvalRunner.promptHash(system.replace("2026-11-10(화) 10:25", "2026-11-11(수) 09:00")));
+        assertThat(EvalRunner.promptFromFile(EvalRunner.templateOf(system)).apply(system)).isEqualTo(system);
+    }
+
+    @Test
+    @DisplayName("결과 파일: 보고서 Markdown과 history.jsonl 한 줄이 생기고, 실패한 질문은 놓친 것을 적는다")
+    void writesReport(@TempDir Path dir) throws Exception {
+        var model = new Scripted(Map.of("내일 오후 2시 빈방 있어?", List.of(say("네, 3번 방이 비어 있어요."))));
+        EvalRunner.Report report = run(model, "C01");
+
+        Path md = ReportWriter.write(dir, "2026-11-09-1700", List.of(report), JSON);
+
+        assertThat(Files.readString(md)).contains("| 가짜 | 현재 코드").contains("find_available_rooms] 중 아무것도 안 부름");
+        assertThat(Files.readAllLines(dir.resolve("history.jsonl"))).hasSize(1);
+        assertThat(EvalRunner.percentile(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L), 90)).isEqualTo(9L);
+    }
+
+    @Test
+    @DisplayName("C18 대화형 예약: 앞선 대화(history)가 모델에 들어간다")
+    void historyIsSent() {
+        EvalCase c = find("C18");
+        List<List<LlmMessage>> seen = new ArrayList<>();
+        LlmClient model = (system, conversation, tools) -> {
+            seen.add(List.copyOf(conversation));
+            return say("몇 번 방으로 할까요?");
+        };
+
+        run(model, c.id());
+
+        assertThat(seen.getFirst()).hasSize(3);
+        assertThat(seen.getFirst().getFirst()).isEqualTo(new LlmMessage.User("내일 스터디 방 잡아 줘"));
+    }
+}

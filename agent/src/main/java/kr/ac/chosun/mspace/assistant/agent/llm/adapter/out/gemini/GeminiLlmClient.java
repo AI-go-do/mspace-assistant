@@ -236,7 +236,17 @@ public class GeminiLlmClient implements LlmClient {
         if (text.isEmpty() && calls.isEmpty()) {
             throw new Transient(); // 글도 도구 호출도 없으면 빈 말풍선 대신 한 번 더 보내고, 그래도 없으면 '응답 없음'
         }
-        return new LlmReply(text.toString(), calls);
+        return new LlmReply(text.toString(), calls, usage(response.usageMetadata()));
+    }
+
+    /** 생각 토큰(thoughtsTokenCount)도 출력 요금에 들어가서 출력 쪽에 더한다 (확인 필요: 모델마다 다를 수 있음) */
+    private static LlmReply.Usage usage(UsageMetadata u) {
+        if (u == null || u.promptTokenCount() == null) {
+            return LlmReply.Usage.UNKNOWN;
+        }
+        int out = (u.candidatesTokenCount() == null ? 0 : u.candidatesTokenCount())
+                + (u.thoughtsTokenCount() == null ? 0 : u.thoughtsTokenCount());
+        return new LlmReply.Usage(u.promptTokenCount(), out);
     }
 
     /** 첫 후보의 parts. 후보·내용이 비었으면 한 번 더 보내게 Transient */
@@ -261,7 +271,10 @@ public class GeminiLlmClient implements LlmClient {
         return new LlmException("LLM_UNAVAILABLE", "AI 비서가 지금 응답하지 않아요. 잠시 후 다시 시도해 주세요.");
     }
 
-    record GenerateResponse(List<Candidate> candidates) {
+    record GenerateResponse(List<Candidate> candidates, UsageMetadata usageMetadata) {
+    }
+
+    record UsageMetadata(Integer promptTokenCount, Integer candidatesTokenCount, Integer thoughtsTokenCount) {
     }
 
     record Candidate(Content content, String finishReason) {
