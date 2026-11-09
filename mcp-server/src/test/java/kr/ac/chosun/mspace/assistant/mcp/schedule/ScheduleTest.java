@@ -179,6 +179,27 @@ class ScheduleTest extends McpToolTestSupport {
     }
 
     @Test
+    @DisplayName("REST 응답의 수업 칸은 넣을 때와 같은 모양이다 (요일 MON, 시각 HH:mm). 화면이 받은 그대로 다시 넣는다")
+    void restResponseSameShapeAsRequest() throws Exception {
+        // given
+        Map<String, String> me = student();
+
+        // when
+        HttpResponse<String> put = send("PUT", me, FRIDAY);
+        HttpResponse<String> get = send("GET", me, null);
+
+        // then: MONDAY·10:30:00으로 나가면 화면이 요일을 못 알아봐 "수업 없음"으로 보이고, 고쳐 저장하면 "요일을 골라 주세요"
+        for (HttpResponse<String> res : java.util.List.of(put, get)) {
+            assertThat(res.body())
+                    .contains("{\"dayOfWeek\":\"MON\",\"startTime\":\"10:30\",\"endTime\":\"12:00\",\"name\":\"AI응용프로젝트\"}")
+                    .contains("\"dayOfWeek\":\"FRI\"")
+                    .doesNotContain("MONDAY", "FRIDAY", ":00:00\"");
+        }
+        // 받은 그대로 다시 넣어도 통과한다
+        assertThat(send("PUT", me, get.body()).statusCode()).isEqualTo(200);
+    }
+
+    @Test
     @DisplayName("REST: 넣기 → 보기(요일·시작 순, 캐시 안 함) → 지우기 → 404 NO_SCHEDULE")
     void restRoundTrip() throws Exception {
         // given

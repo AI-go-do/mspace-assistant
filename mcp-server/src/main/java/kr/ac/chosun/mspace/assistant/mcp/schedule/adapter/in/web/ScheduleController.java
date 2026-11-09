@@ -1,10 +1,13 @@
 package kr.ac.chosun.mspace.assistant.mcp.schedule.adapter.in.web;
 
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import kr.ac.chosun.mspace.assistant.mcp.common.adapter.in.web.ForwardedCredentials;
 import kr.ac.chosun.mspace.assistant.mcp.schedule.application.ManageSchedule;
 import kr.ac.chosun.mspace.assistant.mcp.schedule.application.ManageSchedule.ClassInput;
 import kr.ac.chosun.mspace.assistant.mcp.schedule.application.Timetable;
+import kr.ac.chosun.mspace.assistant.mcp.schedule.application.WeeklyClass;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -36,14 +39,15 @@ class ScheduleController {
     }
 
     @PutMapping("/api/schedule/me")
-    ResponseEntity<Timetable> replace(@RequestHeader HttpHeaders headers, @RequestBody(required = false) ScheduleRequest body) {
+    ResponseEntity<TimetableResponse> replace(@RequestHeader HttpHeaders headers, @RequestBody(required = false) ScheduleRequest body) {
         Timetable saved = schedule.replace(credentials.require(headers), body == null ? null : body.classes());
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(saved);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(TimetableResponse.of(saved));
     }
 
     @GetMapping("/api/schedule/me")
-    ResponseEntity<Timetable> find(@RequestHeader HttpHeaders headers) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(schedule.find(credentials.require(headers)));
+    ResponseEntity<TimetableResponse> find(@RequestHeader HttpHeaders headers) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(TimetableResponse.of(schedule.find(credentials.require(headers))));
     }
 
     @DeleteMapping("/api/schedule/me")
@@ -53,5 +57,26 @@ class ScheduleController {
     }
 
     record ScheduleRequest(List<ClassInput> classes) {
+    }
+
+    /**
+     * 응답은 PUT 본문과 같은 모양으로 낸다(요일 MON, 시각 HH:mm). 화면은 받은 시간표를 고쳐 그대로 다시 넣는다.
+     * 도메인 값(DayOfWeek·LocalTime)을 그대로 내보내면 MONDAY·10:30:00이 되어 화면이 요일을 못 알아본다 (트러블슈팅 TS-15)
+     */
+    record TimetableResponse(List<ClassResponse> classes, OffsetDateTime updatedAt) {
+
+        static TimetableResponse of(Timetable t) {
+            return new TimetableResponse(t.classes().stream().map(ClassResponse::of).toList(), t.updatedAt());
+        }
+    }
+
+    record ClassResponse(String dayOfWeek, String startTime, String endTime, String name) {
+
+        private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
+
+        static ClassResponse of(WeeklyClass c) {
+            return new ClassResponse(c.dayOfWeek().name().substring(0, 3), c.startTime().format(HHMM),
+                    c.endTime().format(HHMM), c.name());
+        }
     }
 }
