@@ -25,7 +25,7 @@ final class QuickReplies {
     static final List<String> HEADCOUNT = List.of("나 포함 3명", "나 포함 4명", "나 포함 5명");
 
     /** "몇 명이서", "몇 분이서" 같은 인원 질문. 물음표가 있어야 질문으로 본다("몇 명이 쓸 수 있는 방이 없어요"는 아님) */
-    private static final java.util.regex.Pattern ASKS_HEADCOUNT = java.util.regex.Pattern.compile("몇\\s*(?:명|분\\s*이서)[^?？\\n]{0,20}[?？]");
+    private static final java.util.regex.Pattern ASKS_HEADCOUNT = java.util.regex.Pattern.compile("몇\\s*(?:명|분\\s*(?:이서|(?:이|께서)\\s*(?:이용|쓰|사용|함께|오|가)))[^?？\\n]{0,20}[?？]");
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
