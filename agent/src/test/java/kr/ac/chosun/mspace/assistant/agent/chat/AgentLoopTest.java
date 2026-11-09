@@ -168,10 +168,10 @@ class AgentLoopTest {
     }
 
     @Test
-    @DisplayName("간단히 예약하기(FR-AGT-105): 비서가 인원을 물으면 답 아래 [나 포함 3·4·5명] 버튼, 지시문에 하나씩 묻는 규칙")
+    @DisplayName("간단히 예약하기(FR-AGT-105): 비서가 인원을 물으면 [나 포함 3·4·5명] 버튼과 친구 고르기 신호(PICK_FRIENDS), 지시문에 하나씩 묻는 규칙")
     void asksHeadcountWithButtons() {
         // given
-        var llm = new ScriptedLlm().then(say("내일 오후 3시부터 2시간으로 볼게요. 나 포함 몇 명이서 쓰실 건가요?"));
+        var llm = new ScriptedLlm().then(say("내일 오후 3시부터 2시간으로 볼게요. 누구랑 하실 건가요? 나 포함 몇 명이서 쓰실 건가요?"));
         var tools = new FakeTools(Map.of());
 
         // when
@@ -180,7 +180,8 @@ class AgentLoopTest {
 
         // then
         assertThat(result.suggestions()).containsExactly("나 포함 3명", "나 포함 4명", "나 포함 5명");
-        assertThat(llm.lastSystem).contains("나 포함 몇 명이서 쓰실 건가요?").contains("친구 이름을 묻거나 받아 적지 않는다");
+        assertThat(result.hints()).containsExactly(ChatResult.HINT_PICK_FRIENDS);
+        assertThat(llm.lastSystem).contains("누구랑 하실 건가요?").contains("친구 이름을 묻거나 받아 적지 않는다");
     }
 
     @Test

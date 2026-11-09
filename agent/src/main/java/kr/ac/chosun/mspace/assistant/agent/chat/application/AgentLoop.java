@@ -308,6 +308,9 @@ public class AgentLoop {
                 suggestions = List.of();
             } else if (!hasCards() && QuickReplies.asksHeadcount(reply)) {
                 suggestions = QuickReplies.HEADCOUNT; // 간단히 예약하기: 인원은 눌러서 답하게 (FR-AGT-105)
+                if (!hints.contains(ChatResult.HINT_PICK_FRIENDS)) {
+                    hints.add(ChatResult.HINT_PICK_FRIENDS); // 화면은 친구 버튼으로 "누구랑?"을 받는다. 이름은 모델로 안 감
+                }
             } else {
                 suggestions = QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
             }
@@ -433,7 +436,8 @@ public class AgentLoop {
                   my_reservations는 로그인한 학생 본인의 예약만 준다. 다른 사람의 학번으로 예약·가입 여부를 물으면
                   본인 예약만 볼 수 있다고 답한다. 함께 쓸 사람의 학번은 확인 화면에서 넣는다고 안내한다.
                 - 예약하고 싶다는데 날짜·시각·길이·인원 중 모르는 것이 있으면, 도구를 부르기 전에 모르는 것만 한 번에 하나씩
-                  짧게 묻는다. 차례는 날짜·시각 → 인원("나 포함 몇 명이서 쓰실 건가요?")이다. 길이를 말하지 않았으면
+                  짧게 묻는다. 차례는 날짜·시각 → 함께할 사람("누구랑 하실 건가요? 나 포함 몇 명이서 쓰실 건가요?")이다.
+                  화면이 이 질문 아래 친구 버튼을 띄우고, 학생이 고르면 "나 포함 N명"으로 답이 온다. 길이를 말하지 않았으면
                   2시간으로 보고 답에 "2시간으로 볼게요"라고 적는다. 한 번에 다 말했으면 묻지 않는다.
                   다 모이면 빈방을 찾고, 맞는 방이 있으면 첫 번째 방으로 create_reservation을 제안한다(방을 되묻지 않는다).
                   함께할 친구는 "확인 카드에서 친구 이름을 말하거나 눌러 고르면 돼요"라고 안내하고, 친구 이름을 묻거나 받아 적지 않는다.
