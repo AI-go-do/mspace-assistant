@@ -16,6 +16,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.PersonaStore;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.Team;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemoryProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.Persona;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
@@ -182,6 +184,24 @@ class AgentLoopTest {
         assertThat(result.suggestions()).containsExactly("나 포함 3명", "나 포함 4명", "나 포함 5명");
         assertThat(result.hints()).containsExactly(ChatResult.HINT_PICK_FRIENDS);
         assertThat(llm.lastSystem).contains("누구랑 하실 건가요?").contains("친구 이름을 묻거나 받아 적지 않는다");
+    }
+
+    @Test
+    @DisplayName("팀(FR-AGT-105): 저장한 팀은 지시문에 이름·인원만 들어가고 팀원 학번·이름은 안 들어간다")
+    void teamsInPromptWithoutMembers() {
+        // given
+        var llm = new ScriptedLlm().then(say("팀 A 4명으로 볼게요"));
+        var teams = new kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryTeamStore();
+        teams.save(MemberKey.of(ME), List.of(new Team("팀 A", List.of(new Team.Member("99999002", "김*영"),
+                new Team.Member("99999003", "박*웅"), new Team.Member("99999004", "이*연")))));
+
+        // when
+        new AgentLoop(llm, new FakeTools(Map.of()), new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), null, PersonaStore.NONE, teams)
+                .run(ME, List.of(), "팀 A랑 내일 3시에 잡아 줘");
+
+        // then
+        assertThat(llm.lastSystem).contains("팀 A(나 포함 4명)").doesNotContain("99999002").doesNotContain("김*영");
     }
 
     @Test

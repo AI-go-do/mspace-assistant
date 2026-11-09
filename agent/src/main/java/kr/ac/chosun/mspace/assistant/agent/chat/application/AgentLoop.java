@@ -42,6 +42,7 @@ public class AgentLoop {
     private final MemoryProperties memoryProps;
     private final DailyBriefing briefing;
     private final PersonaStore personas;
+    private final TeamStore teams;
 
     /** 성향 바꾸기 지름길의 도구 이름 (결과 tools, 측정용) */
     static final String PERSONA_TOOL = "persona";
@@ -68,11 +69,19 @@ public class AgentLoop {
         this(llm, tools, props, clock, memory, memoryProps, briefing, PersonaStore.NONE);
     }
 
-    @Autowired
+    /** 팀 없이 (테스트) */
     public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
                      ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing,
                      PersonaStore personas) {
+        this(llm, tools, props, clock, memory, memoryProps, briefing, personas, TeamStore.NONE);
+    }
+
+    @Autowired
+    public AgentLoop(LlmClient llm, ToolGateway tools, AgentProperties props, Clock clock,
+                     ConversationMemory memory, MemoryProperties memoryProps, DailyBriefing briefing,
+                     PersonaStore personas, TeamStore teams) {
         this.personas = personas;
+        this.teams = teams;
         this.llm = llm;
         this.tools = tools;
         this.props = props;
@@ -107,7 +116,7 @@ public class AgentLoop {
                 result = briefingShortcut(headers);
             } else {
                 Persona persona = personas.load(key);
-                result = converse(headers, conversation, persona);
+                result = converse(headers, conversation, persona, teams.load(key));
                 if (persona == Persona.QUIET && !result.suggestions().isEmpty()) {
                     // 조용히: 먼저 권하지 않는다. 답 아래 빠른 답장 버튼도 지운다 (확인 카드·입실 번호 카드는 그대로)
                     result = new ChatResult(result.reply(), result.confirmations(), result.accessCodeCards(), result.toolCalls(),
@@ -191,7 +200,7 @@ public class AgentLoop {
         return conversation.subList(start, conversation.size());
     }
 
-    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona) {
+    private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona, List<Team> myTeams) {
         Progress progress = new Progress();
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
@@ -199,7 +208,7 @@ public class AgentLoop {
         Instant deadline = clock.instant().plus(props.chatTimeout());
 
         try (ToolGateway.Session session = tools.open(headers)) {
-            String system = systemPrompt(persona);
+            String system = systemPrompt(persona, myTeams);
             while (true) {
                 if (progress.calls > 0 && pastDeadline(deadline, progress.calls)) {
                     return progress.result(TIME_LIMIT_REPLY, true);
@@ -390,6 +399,24 @@ public class AgentLoop {
 
     /** 성향(설계 5.v)은 지시문 끝에 한 토막으로 붙는다. 안전 규칙은 성향과 상관없이 같다 */
     String systemPrompt(Persona persona) {
+        return systemPrompt(persona, List.of());
+    }
+
+    /**
+     * 학생이 저장한 팀은 이름과 인원만 지시문 끝에 붙인다(멤버 학번·이름은 넣지 않음, FR-AGT-105).
+     * 팀을 고른 뒤 누구를 넣을지는 화면이 확인 카드에 채운다
+     */
+    static String teamRule(List<Team> myTeams) {
+        if (myTeams == null || myTeams.isEmpty()) {
+            return "";
+        }
+        String list = myTeams.stream().map(t -> "%s(나 포함 %d명)".formatted(t.name(), t.headcount()))
+                .collect(java.util.stream.Collectors.joining(", "));
+        return "- 학생이 저장한 팀: " + list + ". \"팀 A랑\"처럼 팀 이름을 말하면 함께할 사람과 인원은 그 팀으로 보고 다시 묻지 않는다"
+                + "(headcount = 그 인원). 팀원이 누구인지는 너도 모르고 묻지 않는다. 확인 카드에 화면이 팀원을 채운다.\n";
+    }
+
+    String systemPrompt(Persona persona, List<Team> myTeams) {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(SEOUL));
         AgentProperties.Rules rules = props.rules();
         String today = "%s(%s) %02d:%02d".formatted(now.toLocalDate(),
@@ -455,6 +482,6 @@ public class AgentLoop {
                 - 답에 도구 이름(find_available_rooms 같은 영문 snake_case)을 쓰지 않는다. 학생 말로 쓴다:
                   빈방 찾기, 지금 빈 방, 내 예약, 이용 규칙, 예약, 지금 바로 쓰기, 예약 취소, 퇴실, 연장, 내 시간표, 주간 계획.
                 """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays())
-                + persona.promptRule() + "\n";
+                + teamRule(myTeams) + persona.promptRule() + "\n";
     }
 }
