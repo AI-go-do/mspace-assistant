@@ -253,6 +253,15 @@ class ModelEvalTest {
     }
 
     @Test
+    @DisplayName("모든 대화가 오류면 대화당 호출 수를 모르니 무료 대화 수는 비워 두고, 요약이 터지지 않는다")
+    void allErrorsLeaveFreeChatsUnknown() {
+        EvalRunner.Report report = run(new Scripted(Map.of()), "C01", "C02");
+
+        assertThat(report.summary()).containsEntry("failureRate", 100.0).containsEntry("freeChatsPerDay", null)
+                .containsEntry("freeRequestsPerDay", 500);
+    }
+
+    @Test
     @DisplayName("가짜 도구: 인원이 방 범위 밖이면 빈 목록 + 인원 이유, 범위 밖 날짜는 오류")
     void fixtures() {
         var tools = new FixtureTools(FixtureTools.loadSpecs(JSON), SUITE.now(), Map.of(), JSON);
