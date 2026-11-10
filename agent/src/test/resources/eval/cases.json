@@ -11,7 +11,12 @@
      "find_available_rooms"
     ],
     "none": [
-     "room_status"
+     "room_status",
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
     ],
     "args": [
      {
@@ -34,7 +39,12 @@
    "expect": {
     "first": "room_status",
     "none": [
-     "find_available_rooms"
+     "find_available_rooms",
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
     ]
    }
   },
@@ -402,6 +412,13 @@
       "arg": "from",
       "equals": "15:00"
      }
+    ],
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
     ]
    }
   },
@@ -415,7 +432,12 @@
     },
     "none": [
      "my_schedule",
-     "find_available_rooms"
+     "find_available_rooms",
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
     ],
     "args": [
      {

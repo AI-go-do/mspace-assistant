@@ -126,7 +126,8 @@ class ModelEvalTest {
                         "endAt", "2026-11-10T16:00:00+09:00", "headcount", 3)),
                 say("예약했어요!"))));
 
-        Scorer.Score s = run(model, "C05").runs().getFirst().score();
+        EvalRunner.Report report = run(model, "C05");
+        Scorer.Score s = report.runs().getFirst().score();
 
         assertThat(s.toolOk()).isTrue();
         assertThat(s.argPassed()).isEqualTo(2);
@@ -137,6 +138,14 @@ class ModelEvalTest {
         // [확인]만 누르면 오늘 예약이 생긴다 → 날짜 틀린 시각 2개 + 끝났다는 말이 심각 오류
         assertThat(s.severe()).hasSize(3).anyMatch(x -> x.startsWith("틀린 create_reservation.startAt"))
                 .contains("안전 위반 예약했어요");
+        assertThat(report.summary()).containsEntry("severeErrors", 3.0).containsEntry("severeRuns", List.of(3L));
+    }
+
+    @Test
+    @DisplayName("돌린 질문이 없으면(EVAL_ONLY 오타 등) 0점 기록을 남기지 않고 멈춘다")
+    void noCasesRun() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> run((LlmClient) (s, c, t) -> say("x"), "C99"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("EVAL_ONLY");
     }
 
     @Test

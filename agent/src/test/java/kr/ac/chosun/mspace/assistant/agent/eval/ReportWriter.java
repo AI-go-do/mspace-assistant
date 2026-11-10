@@ -34,6 +34,9 @@ final class ReportWriter {
         try {
             Files.createDirectories(dir);
             Path history = dir.resolve("history.jsonl");
+            if (Files.exists(history)) {
+                readHistory(history, json); // 깨진 줄이 있으면 새 기록을 붙이기 전에 멈춘다(실패한 판이 쌓이지 않게)
+            }
             for (EvalRunner.Report r : reports) {
                 Files.writeString(history, json.writeValueAsString(r.summary()) + "\n", StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.APPEND);

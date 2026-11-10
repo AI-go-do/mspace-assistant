@@ -112,6 +112,9 @@ final class EvalRunner {
                         score.pass() ? "통과" : "실패", score.points(), String.join(" / ", score.misses()));
             }
         }
+        if (runs.isEmpty()) {
+            throw new IllegalArgumentException("돌린 질문이 없어요. EVAL_RUNS와 EVAL_ONLY를 확인해 주세요");
+        }
         return new Report(summarize(target, options, promptHash(llm.lastSystem()), runs), runs);
     }
 
@@ -176,7 +179,7 @@ final class EvalRunner {
             int k = run;
             List<CaseRun> these = runs.stream().filter(r -> r.run() == k).toList();
             perRun.add(round1(weighted(these)));
-            severePerRun.add(these.stream().filter(r -> !r.score().severe().isEmpty()).count());
+            severePerRun.add(these.stream().mapToLong(r -> r.score().severe().size()).sum());
         }
         s.put("score", round1(perRun.stream().mapToDouble(Double::doubleValue).average().orElse(0)));
         s.put("scoreRuns", perRun);
