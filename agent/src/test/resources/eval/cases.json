@@ -672,6 +672,531 @@
      "인원"
     ]
    }
+  },
+  {
+   "id": "C25",
+   "group": "대화형",
+   "set": "대화",
+   "text": "3시",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 스터디 방 잡아 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "좋아요. 내일 몇 시부터 몇 시간, 나 포함 몇 명이서 쓸까요?"
+    }
+   ],
+   "expect": {
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "replyAny": [
+     "몇 시간",
+     "얼마나",
+     "몇 명",
+     "인원"
+    ]
+   }
+  },
+  {
+   "id": "C26",
+   "group": "대화형",
+   "set": "대화",
+   "text": "4명",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간 쓸 방 잡아 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "나 포함 몇 명이서 쓰실 건가요?"
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "oneOf": [
+       2,
+       3,
+       4
+      ]
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T15:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C27",
+   "group": "대화형",
+   "set": "대화",
+   "text": "3번 방으로 해 줘",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 오후 2시부터 2시간, 나 포함 4명 쓸 빈방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 14:00–16:00에 4명이 쓸 수 있는 방은 2번·3번·4번 방이에요. 어느 방으로 할까요?"
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 3
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T14:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T16:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C28",
+   "group": "대화형",
+   "set": "대화",
+   "text": "아 4시로 바꿔 줘",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간, 나 포함 4명으로 예약해 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 15:00–17:00 2번 방, 4명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "oneOf": [
+       1,
+       2,
+       3,
+       4
+      ]
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T16:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T18:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C29",
+   "group": "대화형",
+   "set": "대화",
+   "text": "모레 같은 시간은?",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 오후 3시부터 2시간, 4명 쓸 빈방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 15:00–17:00에 4명이면 2번·3번·4번 방이 비어 있어요."
+    }
+   ],
+   "expect": {
+    "any": [
+     "find_available_rooms"
+    ],
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "find_available_rooms",
+      "arg": "date",
+      "equals": "2026-11-12"
+     },
+     {
+      "tool": "find_available_rooms",
+      "arg": "from",
+      "equals": "15:00"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C30",
+   "group": "대화형",
+   "set": "대화",
+   "text": "6명으로 늘려 줘",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간, 나 포함 4명으로 잡아 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 15:00–17:00 2번 방, 4명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 5
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T15:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 6
+     }
+    ]
+   }
+  },
+  {
+   "id": "C31",
+   "group": "대화형",
+   "set": "대화",
+   "text": "2시간, 나 포함 3명. 2번 방으로",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 2시 빈방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 14:00부터 2번·3번·4번·5번 방이 비어 있어요(1번 방은 16:00까지 차 있어요). 몇 시간, 몇 명이서 쓰실까요?"
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 2
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T14:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T16:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "C32",
+   "group": "대화형",
+   "set": "대화",
+   "text": "응 그걸로",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간, 4명 쓸 빈방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 15:00–17:00에 2번 방이 비어 있어요. 이 방으로 예약할까요?"
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 2
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T15:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C33",
+   "group": "대화형",
+   "set": "대화",
+   "text": "아 그 전에 내 예약 있는지 먼저 봐 줘",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간 잡아 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "나 포함 몇 명이서 쓰실 건가요?"
+    }
+   ],
+   "expect": {
+    "any": [
+     "my_reservations"
+    ],
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ]
+   }
+  },
+  {
+   "id": "C34",
+   "group": "대화형",
+   "set": "대화",
+   "text": "그럼 아까 거 4명으로",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간 잡아 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "나 포함 몇 명이서 쓰실 건가요?"
+    },
+    {
+     "role": "user",
+     "text": "아 그 전에 내 예약 있는지 먼저 봐 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "지금 잡혀 있는 예약은 없어요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "oneOf": [
+       2,
+       3,
+       4
+      ]
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T15:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C35",
+   "group": "대화형",
+   "set": "대화",
+   "text": "4시부터 1시간 반, 3명",
+   "history": [
+    {
+     "role": "user",
+     "text": "금요일 오후에 방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "금요일(11/13) 오후에는 2번·3번·4번·5번 방이 13:00부터 22:00까지 비어 있어요. 몇 시부터 몇 시간, 몇 명이서 쓰실까요?"
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "oneOf": [
+       1,
+       2,
+       3,
+       4
+      ]
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-13T16:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-13T17:30"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 3
+     }
+    ]
+   }
   }
  ]
 }
