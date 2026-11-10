@@ -104,6 +104,7 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 | `EVAL_ONLY` | 전체 | 질문 id 쉼표로 |
 | `EVAL_PROMPT_FILE` / `EVAL_PROMPT_LABEL` | 코드 지시문 / "현재 코드" | 지시문 실험 |
 | `EVAL_RPM` / `EVAL_RPD` | 3.5 Flash Lite 15/500, 3.8 Flash 5/20 (AI Studio 11/5 실측) | 다른 모델의 무료 한도 |
+| `EVAL_GEMINI_TIMEOUT` | 20초 (서버와 같음) | Gemini 호출 하나의 시간 제한. 3.8 Flash는 20초 안에 첫 답이 안 와서(11/10 7문항 모두 시간 초과) 늘려서 재요. 대화 제한은 이 값의 3배(최소 45초) |
 | `EVAL_OLLAMA_TIMEOUT` / `EVAL_CHAT_TIMEOUT` | 120초 / 180초 | 젯슨은 첫 호출에 모델을 올리느라 느려요. 서버 설정(45초)과 다르니 표에 적혀요 |
 | `EVAL_OUT` | `scripts/eval/results` | 결과 폴더 |
 
