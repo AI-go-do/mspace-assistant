@@ -182,7 +182,7 @@ final class ReportWriter {
         if (free == null) {
             return "확인 필요";
         }
-        return ((Number) free).longValue() < 0 ? "0원<br><sub>로컬(젯슨 B)</sub>" : "0원<br><sub>무료 " + free + "대화/일</sub>";
+        return ((Number) free).longValue() < 0 ? "0원<br><sub>로컬(젯슨 보드 A)</sub>" : "0원<br><sub>무료 " + free + "대화/일</sub>";
     }
 
     private static List<Map<String, Object>> details(List<EvalRunner.Report> reports) {
