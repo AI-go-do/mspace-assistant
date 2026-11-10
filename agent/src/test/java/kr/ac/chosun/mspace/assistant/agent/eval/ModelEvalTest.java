@@ -195,14 +195,15 @@ class ModelEvalTest {
                         "note", "지금 운영 중인 판."),
                 row("model", "m", "prompt", "v2", "promptHash", "bbbb", "chats", 48, "runs", 2, "score", 95.5,
                         "scoreRuns", List.of(95.0, 96.0), "severeErrors", 0.0, "severeRuns", List.of(0, 0), "verdict", "채택",
-                        "note", "v1에서 날짜 규칙 한 줄만 더했어요."));
+                        "note", "v1에서 날짜 규칙 한 줄만 더했어요.", "at", "2026-11-10T09:31:36+09:00"));
 
         String md = ReportWriter.scoreboard(rows);
 
         assertThat(md).contains("| 순위 | 방식 | 판단 | 점수 | 심각 오류 | 시간 | 자원 | 비용 |");
         assertThat(md.indexOf("| 1 | m · 지시문 v2")).isPositive().isLessThan(md.indexOf("| 2 | m · 지시문 v1"));
         assertThat(md).contains("| – | 옛 기록 · 지시문 v0").contains("**95.5**<br><sub>95.0 / 96.0</sub>")
-                .contains("**m · 지시문 v2**: v1에서 날짜 규칙 한 줄만 더했어요.");
+                .contains("**m · 지시문 v2** (2회, 11-10 09:31): v1에서 날짜 규칙 한 줄만 더했어요.")
+                .contains("**m · 지시문 v1** (2회): 지금 운영 중인 판.");
     }
 
     @Test
@@ -254,7 +255,7 @@ class ModelEvalTest {
         Path md = ReportWriter.write(dir, "2026-11-09-1700", List.of(report), JSON);
 
         assertThat(Files.readString(md)).contains("가짜 · 지시문 현재 코드").contains("| 기준 |")
-                .contains("find_available_rooms] 중 아무것도 안 부름").contains("**가짜 · 지시문 현재 코드**: 지금 운영 중인 판.");
+                .contains("find_available_rooms] 중 아무것도 안 부름").contains("**가짜 · 지시문 현재 코드** (").contains("): 지금 운영 중인 판.");
         assertThat(Files.readAllLines(dir.resolve("history.jsonl"))).hasSize(1);
         assertThat(Files.readString(dir.resolve("scoreboard.md"))).contains("| 1 | 가짜 · 지시문 현재 코드");
         assertThat(EvalRunner.percentile(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L), 90)).isEqualTo(9L);
