@@ -476,10 +476,7 @@
      {
       "tool": "find_available_rooms",
       "arg": "date",
-      "oneOf": [
-       "2026-11-10",
-       "2026-11-17"
-      ]
+      "equals": "2026-11-10"
      },
      {
       "tool": "find_available_rooms",
