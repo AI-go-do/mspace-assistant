@@ -22,6 +22,8 @@ public final class PrivacyMask {
     /** 입실 번호 6자리. 학생이 "482913 맞아?"처럼 채팅에 적어도 외부 AI로 보내지 않는다 */
     private static final Pattern ACCESS_CODE = Pattern.compile("(?<!\\d)\\d{6}(?!\\d)");
 
+    private static final String PHONE_MASK = "[전화번호]";
+
     private PrivacyMask() {
     }
 
@@ -29,9 +31,9 @@ public final class PrivacyMask {
         if (text == null) {
             return null;
         }
-        String masked = PHONE.matcher(text).replaceAll("[전화번호]");
-        masked = LANDLINE_INTL.matcher(masked).replaceAll("[전화번호]");
-        masked = LANDLINE.matcher(masked).replaceAll("[전화번호]");
+        String masked = PHONE.matcher(text).replaceAll(PHONE_MASK);
+        masked = LANDLINE_INTL.matcher(masked).replaceAll(PHONE_MASK);
+        masked = LANDLINE.matcher(masked).replaceAll(PHONE_MASK);
         masked = STUDENT_ID.matcher(masked).replaceAll("[학번]");
         return ACCESS_CODE.matcher(masked).replaceAll("[입실 번호]");
     }

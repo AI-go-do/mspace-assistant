@@ -15,7 +15,7 @@
 |---|---|
 | `agent/src/test/resources/eval/cases.json` | 고정 발화 35개. C01–C24 기본 세트(조회·예약·취소·퇴실·연장·즉시 시작·시간표·지난번처럼·대화형·범위 밖·안전), **C25–C35 대화 세트**(`"set": "대화"`, 11/10): 앞선 대화를 이어 받아 예약까지 가는지(빠진 것만 묻기·방 고르기·시각/인원 고치기·"모레 같은 시간"·딴 질문 뒤 돌아오기·"응 그걸로"). 시각은 **2026-11-10(화) 10:25** 고정 |
 | `agent/src/test/resources/eval/tools.json` | 진짜 mcp-server `tools/list` 스냅숏(도구 12개). 도구 설명을 고치면 `./dump-tools.sh`로 다시 떠요 |
-| `agent/src/test/java/.../eval/` | `FixtureTools`(가짜 도구), `RecordingLlm`(호출마다 시간·토큰·인자 기록, 분당 한도 지키기), `Scorer`(채점), `EvalRunner`, `ReportWriter`, `ModelEvalRun`(입구), `ModelEvalTest`(CI에서 채점기 검사) |
+| `agent/src/test/java/.../eval/` | `FixtureTools`(가짜 도구), `RecordingLlm`(호출마다 시간·토큰·인자 기록, 분당 한도 지키기), `Scorer`(채점), `EvalRunner`, `ReportWriter`, `ModelEvalRunTest`(입구), `ModelEvalTest`(CI에서 채점기 검사) |
 | `prompts/v1.txt` | 지금 코드의 지시문(해시 `ce5cf5cf`). 날짜 자리는 `{{NOW}}` |
 | `results/` | 실행마다 `<날짜>.md`(표), `<날짜>-detail.json`(질문별 도구·인자·놓친 것), `history.jsonl`(판마다 한 줄, 지우지 않고 쌓음) |
 
@@ -74,25 +74,25 @@ JDK 21이 있는 내 컴퓨터에서 돌려요. 키는 명령줄에 쓰지 말�
 cd ~/mspace-assistant && git switch develop && git pull
 read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY
 EVAL_MODELS=gemini:gemini-3.5-flash-lite \
-  ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 unset GEMINI_API_KEY
 
 # 2) 젯슨 보드 B의 Ollama (Tailscale). 젯슨에서 먼저: OLLAMA_HOST=0.0.0.0 ollama serve, ollama pull qwen2.5:3b
 EVAL_MODELS=ollama:qwen2.5:3b,ollama:llama3.2:3b OLLAMA_BASE_URL=http://<젯슨 Tailscale IP>:11434 \
-  ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 3) 지시문 실험: 지금 지시문을 뽑아 고친 뒤 같은 모델로 잰다 (코드는 안 바꿈)
-EVAL_DUMP_PROMPT=$PWD/scripts/eval/prompts/v2.txt ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_DUMP_PROMPT=$PWD/scripts/eval/prompts/v2.txt ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 #   → prompts/v2.txt를 고치고
 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prompts/v2.txt EVAL_PROMPT_LABEL=v2 EVAL_NOTE="v1에서 ○○ 규칙 한 줄만 더함" \
-  ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 #   → 점수가 오르면 AgentLoop.systemPrompt에 옮기고 PR. 다음 실행부터 "현재 코드" 해시가 바뀌어요
 
 # 대화 세트만 (여러 차례 주고받는 예약, 11/10)
-EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 몇 개만
-EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 | 환경 변수 | 기본 | 뜻 |
@@ -114,7 +114,7 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 - 무료 등급 입력은 구글 제품 개선에 쓰일 수 있어요. 그래서 발화 세트·가짜 데이터에도 실제 학생 정보를 넣지 않아요
 
 ## 지켜야 할 것
-- 진짜 모델 실행(`ModelEvalRun`)은 `EVAL_MODELS`가 있을 때만 돌아요. CI는 `ModelEvalTest`가 같은 채점기를 가짜 모델로 검사해요(테스트를 끈 것이 아니라 측정 도구라 키가 필요해서예요)
+- 진짜 모델 실행(`ModelEvalRunTest`)은 `EVAL_MODELS`가 있을 때만 돌아요. CI는 `ModelEvalTest`가 같은 채점기를 가짜 모델로 검사해요(테스트를 끈 것이 아니라 측정 도구라 키가 필요해서예요)
 - 결과 파일에는 가짜 질문·가짜 데이터·답 앞 120자(6자리 숫자 등은 가림)만 있어요. 키·토큰은 남지 않아요
 - 가짜 도구라 core 규칙 위반(정지 계정, 친구 아님, 겹침)은 여기서 안 나와요. 그건 `scripts/measure`와 리허설로 봐요
 - 발화를 바꾸면 이전 점수와 비교가 안 돼요. 새 발화는 **끝에 추가**하고, 바꿨으면 `history.jsonl`에 세트가 바뀐 날짜를 적어요

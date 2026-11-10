@@ -2,6 +2,8 @@ package kr.ac.chosun.mspace.assistant.agent.eval;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.UnaryOperator;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmClient;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmException;
@@ -64,14 +66,10 @@ final class RecordingLlm implements LlmClient {
     }
 
     private void pace() {
-        long now = System.currentTimeMillis();
-        long wait = lastStartedAt + minIntervalMillis - now;
-        if (wait > 0) {
-            try {
-                Thread.sleep(wait);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        // 분당 한도 지키기. parkNanos는 일찍 깰 수 있어 정한 시각까지 다시 기다린다
+        long until = lastStartedAt + minIntervalMillis;
+        while (System.currentTimeMillis() < until && !Thread.currentThread().isInterrupted()) {
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(until - System.currentTimeMillis()));
         }
         lastStartedAt = System.currentTimeMillis();
     }

@@ -1,9 +1,12 @@
 package kr.ac.chosun.mspace.assistant.agent.eval;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -19,18 +22,19 @@ import kr.ac.chosun.mspace.assistant.agent.llm.adapter.out.ollama.OllamaProperti
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 진짜 모델로 평가를 돌리는 입구. 모델 키·젯슨이 있어야 해서 EVAL_MODELS를 넣었을 때만 돈다(CI의 빌드 검사가 아니라 측정 도구).
+ * 진짜 모델로 평가를 돌리는 입구. 모델 키·젯슨이 있어야 해서 EVAL_MODELS와 -Deval=true를 다 넣었을 때만 돈다(환경 변수만 남아 있을 때 일반 빌드에서 돌지 않게)(CI의 빌드 검사가 아니라 측정 도구).
  * CI에서는 ModelEvalTest가 같은 채점기를 가짜 모델로 검사한다. 쓰는 법은 scripts/eval/README.md.
  *
  * <pre>
  * read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY   (zsh. bash는 read -rs -p "Gemini 키: " GEMINI_API_KEY)
- * EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+ * EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
  * </pre>
  */
-class ModelEvalRun {
+class ModelEvalRunTest {
 
     /** AI Studio 한도 화면 실측(11/5, 무료 등급, 영준 계정). 다른 모델은 EVAL_RPM·EVAL_RPD로 넣는다 */
     static final Map<String, int[]> GEMINI_FREE = Map.of(
@@ -39,6 +43,7 @@ class ModelEvalRun {
 
     @Test
     @EnabledIfEnvironmentVariable(named = "EVAL_MODELS", matches = ".+")
+    @EnabledIfSystemProperty(named = "eval", matches = "true")
     @DisplayName("진짜 모델 평가 (EVAL_MODELS가 있을 때만)")
     void run() throws IOException {
         JsonMapper json = JsonMapper.builder().build();
@@ -62,18 +67,23 @@ class ModelEvalRun {
         Path out = Path.of(env("EVAL_OUT", "../scripts/eval/results"));
         String stamp = OffsetDateTime.now(EvalRunner.SEOUL).format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"));
         Path md = ReportWriter.write(out, stamp, reports, json);
+        assertThat(md).exists();
+        assertThat(reports).allSatisfy(r -> assertThat(r.runs()).isNotEmpty());
         System.out.println("\n결과: " + md.toAbsolutePath());
         reports.forEach(r -> System.out.println(r.summary()));
     }
 
     @Test
     @EnabledIfEnvironmentVariable(named = "EVAL_DUMP_PROMPT", matches = ".+")
+    @EnabledIfSystemProperty(named = "eval", matches = "true")
     @DisplayName("지금 코드의 지시문을 파일로 뽑기 (EVAL_DUMP_PROMPT=경로). 고친 판을 EVAL_PROMPT_FILE로 잰다")
     void dumpPrompt() throws IOException {
         JsonMapper json = JsonMapper.builder().build();
         String system = EvalRunner.currentPrompt(json);
         Path out = Path.of(System.getenv("EVAL_DUMP_PROMPT"));
-        Files.writeString(out, EvalRunner.templateOf(system), StandardCharsets.UTF_8);
+        // 고치던 지시문을 덮어쓰지 않는다 (CREATE_NEW: 이미 있으면 실패)
+        Files.writeString(out, EvalRunner.templateOf(system), StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);
+        assertThat(Files.readString(out, StandardCharsets.UTF_8)).contains("{{NOW}}");
         System.out.println("지시문 " + EvalRunner.promptHash(system) + " → " + out.toAbsolutePath());
     }
 

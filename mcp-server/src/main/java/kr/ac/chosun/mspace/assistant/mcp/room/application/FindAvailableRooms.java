@@ -63,33 +63,39 @@ public class FindAvailableRooms {
 
         List<FreeRoom> rooms = new ArrayList<>();
         List<Alternative> candidates = new ArrayList<>();
-        boolean anyRoomFitsHeadcount = false;
-        for (RoomSlots room : day.rooms()) {
-            if (fits(room, headcount)) {
-                anyRoomFitsHeadcount = true;
-                List<FreeRange> merged = merge(room.slots());
-                List<FreeRange> free = freeInWindow(merged, windowStart, windowEnd);
-                if (free == null) { // 원하는 시간 전체가 비어 있지 않음 → 가까운 대안 후보 (자정 넘김은 대안을 안 찾는다)
-                    if (!crossesMidnight) {
-                        candidates.addAll(nearest(room, merged, windowStart, Duration.between(windowStart, windowEnd)));
-                    }
-                } else if (!free.isEmpty()) {
-                    rooms.add(new FreeRoom(room.roomId(), room.roomName(), room.minPeople(), room.maxPeople(), free));
+        // 대안은 시작·끝이 다 있고 자정을 넘지 않을 때만 찾는다
+        Duration wanted = windowStart != null && windowEnd != null && !crossesMidnight
+                ? Duration.between(windowStart, windowEnd) : null;
+        for (RoomSlots room : day.rooms().stream().filter(r -> fits(r, headcount)).toList()) {
+            List<FreeRange> merged = merge(room.slots());
+            List<FreeRange> free = freeInWindow(merged, windowStart, windowEnd);
+            if (free == null) {
+                // 원하는 시간 전체가 비어 있지 않음 → 가까운 대안 후보
+                if (wanted != null && windowStart != null) {
+                    candidates.addAll(nearest(room, merged, windowStart, wanted));
                 }
+            } else if (!free.isEmpty()) {
+                rooms.add(new FreeRoom(room.roomId(), room.roomName(), room.minPeople(), room.maxPeople(), free));
             }
         }
         List<Alternative> alternatives = rooms.isEmpty() ? pick(candidates, windowStart) : List.of();
-        String note;
-        if (!rooms.isEmpty()) {
-            note = crossesMidnight ? MIDNIGHT_NOTE : null;
-        } else if (!alternatives.isEmpty()) {
-            note = ALTERNATIVES_NOTE;
-        } else if (headcount != null && !anyRoomFitsHeadcount && !day.rooms().isEmpty()) {
-            note = headcountNote(headcount, day.rooms());
-        } else {
-            note = NONE_NOTE;
-        }
+        String note = note(day, rooms, alternatives, headcount, crossesMidnight);
         return new AvailableRooms(day.date(), rooms, note, alternatives);
+    }
+
+    private static String note(RoomDay day, List<FreeRoom> rooms, List<Alternative> alternatives, Integer headcount,
+                               boolean crossesMidnight) {
+        if (!rooms.isEmpty()) {
+            return crossesMidnight ? MIDNIGHT_NOTE : null;
+        }
+        if (!alternatives.isEmpty()) {
+            return ALTERNATIVES_NOTE;
+        }
+        boolean anyRoomFitsHeadcount = day.rooms().stream().anyMatch(r -> fits(r, headcount));
+        if (headcount != null && !anyRoomFitsHeadcount && !day.rooms().isEmpty()) {
+            return headcountNote(headcount, day.rooms());
+        }
+        return NONE_NOTE;
     }
 
     private static boolean fits(RoomSlots room, Integer headcount) {
