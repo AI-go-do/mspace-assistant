@@ -142,10 +142,16 @@ final class ReportWriter {
         }
         b.append("\n");
         for (Map<String, Object> s : withNote) {
-            b.append("**").append(method(s)).append("**: ").append(s.get("note")).append(" 점수 ").append(s.get("score"))
+            b.append("**").append(method(s)).append("** (").append(s.get("runs")).append("회").append(when(s)).append("): ").append(s.get("note")).append(" 점수 ").append(s.get("score"))
                     .append(", 심각 오류 ").append(s.get("severeErrors")).append(", 예약 흐름 완주 ")
                     .append(s.getOrDefault("flowCompletion", "–")).append("%.\n\n");
         }
+    }
+
+    /** 같은 방식이 여러 판일 때 구분하려고 실행 시각(MM-DD HH:mm)을 붙인다 */
+    private static String when(Map<String, Object> s) {
+        String at = String.valueOf(s.getOrDefault("at", ""));
+        return at.length() >= 16 ? ", " + at.substring(5, 16).replace('T', ' ') : "";
     }
 
     static String method(Map<String, Object> s) {
