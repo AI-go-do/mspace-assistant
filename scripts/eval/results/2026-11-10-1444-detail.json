@@ -1,0 +1,1833 @@
+[ {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C01",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "date" : "2026-11-11",
+        "from" : "14:00",
+        "to" : "16:00"
+      }
+    } ],
+    "ms" : 5244
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 4992
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 오후 2시부터 4시까지는 2번, 3번, 4번, 5번 방 모두 비어 있어요.   이대로 예약을 잡아 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C02",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "room_status" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "room_status",
+      "args" : { }
+    } ],
+    "ms" : 5530
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 6732
+  } ],
+  "misses" : [ ],
+  "reply" : "지금 바로 쓸 수 있는 방은 2번 방과 3번 방이 있어요. 두 방 모두 낮 12시까지 이용할 수 있습니다.   어떤 방으로 바로 잡을까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C03",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 4873
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 5768
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 오후 2시부터 4시까지 2번 방 예약이 1건 있습니다.  입실 번호가 필요하시면 알려 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C04",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "usage_rules" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "usage_rules",
+      "args" : { }
+    } ],
+    "ms" : 4420
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 4647
+  } ],
+  "misses" : [ ],
+  "reply" : "방은 한 번에 최대 2시간까지 쓸 수 있어요. 빈방을 찾아 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "16:00",
+        "date" : "2026-11-11",
+        "from" : "14:00",
+        "headcount" : 3
+      }
+    } ],
+    "ms" : 5141
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "startAt" : "2026-11-11T14:00:00+09:00",
+        "endAt" : "2026-11-11T16:00:00+09:00",
+        "roomId" : 2,
+        "headcount" : 3
+      }
+    } ],
+    "ms" : 4651
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 7191
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11T14:00:00+09:00–2026-11-11T16:00:00+09:00, 3명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓰는 사람의 학번을 넣으면 예약이 완료돼요.  (…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C06",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "16:00",
+        "to" : "17:30",
+        "headcount" : 6,
+        "date" : "2026-11-13"
+      }
+    } ],
+    "ms" : 4858
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "endAt" : "2026-11-13T17:30:00+09:00",
+        "roomId" : 5,
+        "startAt" : "2026-11-13T16:00:00+09:00",
+        "headcount" : 6
+      }
+    } ],
+    "ms" : 4579
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3702
+  } ],
+  "misses" : [ ],
+  "reply" : "5번 방, 2026-11-13 16:00–17:30, 6명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓸 친구 학번도 입력해 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C07",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "18:00",
+        "headcount" : 4,
+        "from" : "17:00",
+        "date" : "2026-11-10"
+      }
+    } ],
+    "ms" : 4497
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "roomId" : 3,
+        "startAt" : "2026-11-10T17:00:00+09:00",
+        "headcount" : 4,
+        "endAt" : "2026-11-10T18:00:00+09:00"
+      }
+    } ],
+    "ms" : 4612
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3805
+  } ],
+  "misses" : [ ],
+  "reply" : "3번 방, 2026-11-10 17:00–18:00, 4명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓸 친구 학번은 확인 카드에서 입력하시면 돼요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "cancel_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 3828
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "cancel_reservation",
+      "args" : {
+        "reservationId" : 101
+      }
+    } ],
+    "ms" : 5029
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3547
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방 예약(11월 11일 14:00~16:00) 취소를 제안합니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C09",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "checkout_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 4912
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "checkout_reservation",
+      "args" : {
+        "reservationId" : 102
+      }
+    } ],
+    "ms" : 4151
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 4186
+  } ],
+  "misses" : [ ],
+  "reply" : "예약 102 사용을 끝내고 퇴실할까요?  화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "continue_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 3451
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "continue_reservation",
+      "args" : {
+        "reservationId" : 102,
+        "minutes" : 30
+      }
+    } ],
+    "ms" : 3495
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3506
+  } ],
+  "misses" : [ ],
+  "reply" : "예약 102 사용을 30분 연장할까요?  화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C11",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 3786
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3382
+  } ],
+  "misses" : [ ],
+  "reply" : "사용 중인 2번 방 예약을 연장하려고 하시는군요. 몇 분 늘릴까요? (30분 단위, 최대 2시간)  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "room_status", "start_now_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "room_status",
+      "args" : { }
+    } ],
+    "ms" : 3539
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "start_now_reservation",
+      "args" : {
+        "headcount" : 3,
+        "roomId" : 2,
+        "endAt" : "2026-11-10T11:30:00+09:00"
+      }
+    } ],
+    "ms" : 3944
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3631
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방을 지금부터 2026-11-10T11:30:00+09:00까지 3명으로 바로 쓸까요?  화면의 [확인]을 눌러 주세요. 바로 잡을까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C13",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_schedule" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_schedule",
+      "args" : { }
+    } ],
+    "ms" : 4297
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 5090
+  } ],
+  "misses" : [ ],
+  "reply" : "오늘 수업은 오전 09:00부터 10:15까지 자료구조, 오후 1:30부터 2:45까지 운영체제가 있습니다.   수업이 끝나는 오후 3시 이후에 스터디룸을 찾아드릴까요?  (입력한 시간표 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C14",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_schedule", "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_schedule",
+      "args" : { }
+    } ],
+    "ms" : 4419
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "15:00",
+        "date" : "2026-11-10"
+      }
+    } ],
+    "ms" : 4019
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 4555
+  } ],
+  "misses" : [ ],
+  "reply" : "오늘 수업이 끝나는 시각(14:45)에 여유 시간을 더해 오후 3시부터 2번 방을 2시간(15:00~17:00) 이용하실 수 있습니다.   이대로 잡아 드릴까요?  (예약 시스템 10:25 조회 · 입력한 시간표 기…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C15",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "week_plan" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "week_plan",
+      "args" : {
+        "headcount" : null,
+        "minutes" : 120
+      }
+    } ],
+    "ms" : 4916
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 8153
+  } ],
+  "misses" : [ ],
+  "reply" : "이번 주에 수업 끝나고 2시간 쓸 수 있는 날은 다음과 같아요.  - 11월 10일(화) 15:00~17:00 (2번 방) - 11월 11일(수) 15:00~17:00 (2번 방) - 11월 12일(목) 15:00~…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 3343
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "16:00",
+        "date" : "2026-11-10",
+        "from" : "14:00"
+      }
+    } ],
+    "ms" : 3447
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "headcount" : 3,
+        "endAt" : "2026-11-10T16:00:00+09:00",
+        "roomId" : 3,
+        "startAt" : "2026-11-10T14:00:00+09:00"
+      }
+    } ],
+    "ms" : 8462
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 2565
+  } ],
+  "misses" : [ ],
+  "reply" : "3번 방, 2026-11-10 14:00–16:00, 3명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 말하거나 눌러 고르면 돼요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C17",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3747
+  } ],
+  "misses" : [ ],
+  "reply" : "스터디 방을 잡으려면 날짜와 이용하실 시각, 그리고 함께 쓰는 분을 포함한 인원이 필요해요.  어떤 날짜 몇 시부터 몇 시까지 이용하실 예정인가요?"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C18",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "headcount" : "4",
+        "date" : "2026-11-11",
+        "to" : "17:00",
+        "from" : "15:00"
+      }
+    } ],
+    "ms" : 6179
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "headcount" : "4",
+        "roomId" : 2,
+        "endAt" : "2026-11-11T17:00:00+09:00"
+      }
+    } ],
+    "ms" : 3436
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 2560
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 15:00 ~ 17:00, 4명 예약 확인안입니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "headcount" : 3,
+        "date" : "2026-11-11",
+        "from" : "19:00",
+        "to" : "20:30"
+      }
+    } ],
+    "ms" : 1579
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1368
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 저녁 7시부터 8시 반까지 3명이서 쓸 수 있는 방은 1번 방, 2번 방, 3번 방, 4번 방이 있습니다.   1번 방으로 예약해 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C20",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1721
+  } ],
+  "misses" : [ ],
+  "reply" : "조선대 IT융합대학 M-SPACE 예약 비서입니다. 점심 메뉴 추천은 도와드리기 어렵지만, M-SPACE 방 예약이나 이용 규칙 등은 안내해 드릴 수 있어요.   오늘 M-SPACE 방을 예약해 드릴까요?"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C21",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 2288
+  } ],
+  "misses" : [ ],
+  "reply" : "안녕하세요! M-SPACE 예약 비서예요.   회의실이나 스터디 방 빈방을 찾고, 바로 쓰거나 예약할 수 있어요. 제 예약 확인, 취소, 퇴실, 연장, 그리고 이용 규칙 안내까지 도와드릴 수 있답니다.   오늘 M-…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C22",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1644
+  } ],
+  "misses" : [ ],
+  "reply" : "다른 사람의 학번으로는 예약 내역을 볼 수 없어요. 로그인하신 본인의 예약만 확인할 수 있답니다.   내 예약 목록을 보여 드릴까요?"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C23",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "show_access_code" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "show_access_code",
+      "args" : { }
+    } ],
+    "ms" : 1266
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 932
+  } ],
+  "misses" : [ ],
+  "reply" : "입실 번호는 화면 카드에서 확인해 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C24",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "headcount" : "25",
+        "from" : "14:00",
+        "to" : "16:00",
+        "date" : "2026-11-11"
+      }
+    } ],
+    "ms" : 1800
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1232
+  } ],
+  "misses" : [ ],
+  "reply" : "인원에 맞는 방이 없어요. 1~4번 방은 3~5명, 5번 방은 5~8명이 쓸 수 있어요.  인원을 3명 이상으로 바꿔서 다시 찾아드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C25",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "15:00",
+        "to" : "17:00",
+        "date" : "2026-11-11"
+      }
+    } ],
+    "ms" : 1410
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1577
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 오후 3시부터 2시간 동안 2번 방으로 2시간(기본) 볼게요. 몇 명이서 쓰시나요? (나 포함 인원을 알려주세요)  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C26",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "date" : "2026-11-11",
+        "headcount" : 4,
+        "from" : "15:00",
+        "to" : "17:00"
+      }
+    } ],
+    "ms" : 2014
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "headcount" : 4,
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "roomId" : 2
+      }
+    } ],
+    "ms" : 1982
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1249
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 15:00–17:00, 4명 예약 확인안입니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C27",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "endAt" : "2026-11-11T16:00:00+09:00",
+        "startAt" : "2026-11-11T14:00:00+09:00",
+        "roomId" : 3,
+        "headcount" : 4
+      }
+    } ],
+    "ms" : 1380
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1895
+  } ],
+  "misses" : [ ],
+  "reply" : "내일 14:00부터 16:00까지 3번 방 예약 확인안이에요. 화면의 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 고를 수 있어요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C28",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "date" : "2026-11-11",
+        "to" : "18:00",
+        "headcount" : 4,
+        "from" : "16:00"
+      }
+    } ],
+    "ms" : 4615
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "roomId" : 1,
+        "headcount" : 4,
+        "startAt" : "2026-11-11T16:00:00+09:00",
+        "endAt" : "2026-11-11T18:00:00+09:00"
+      }
+    } ],
+    "ms" : 2267
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1628
+  } ],
+  "misses" : [ ],
+  "reply" : "내일 16:00–18:00 1번 방, 4명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 고를 수 있어요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C29",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "date" : "2026-11-12",
+        "from" : "15:00",
+        "to" : "17:00",
+        "headcount" : "4"
+      }
+    } ],
+    "ms" : 1833
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3694
+  } ],
+  "misses" : [ ],
+  "reply" : "모레 15:00–17:00에 4명이면 2번·3번·4번 방이 비어 있어요. 2번 방으로 예약해 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C30",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "15:00",
+        "headcount" : "6",
+        "date" : "2026-11-11",
+        "to" : "17:00"
+      }
+    } ],
+    "ms" : 4692
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "headcount" : "6",
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "roomId" : 5
+      }
+    } ],
+    "ms" : 3374
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 2344
+  } ],
+  "misses" : [ ],
+  "reply" : "내일 15:00–17:00 5번 방, 6명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "16:00",
+        "from" : "14:00",
+        "date" : "2026-11-11",
+        "headcount" : 3
+      }
+    } ],
+    "ms" : 1563
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "headcount" : 3,
+        "roomId" : 2,
+        "startAt" : "2026-11-11T14:00:00+09:00",
+        "endAt" : "2026-11-11T16:00:00+09:00"
+      }
+    } ],
+    "ms" : 1450
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1722
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 14:00–16:00, 3명으로 예약할까요? 화면의 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 친구 이름을 말하거나 눌러 고르면 돼요.  (예약 시스템 10:25 조회 기준…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C32",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "roomId" : 2,
+        "headcount" : 4
+      }
+    } ],
+    "ms" : 3333
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 2558
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 15:00–17:00, 4명으로 예약할까요?  화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C33",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 1355
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1928
+  } ],
+  "misses" : [ ],
+  "reply" : "끝나지 않은 예약이 없습니다. 내일(11월 11일) 오후 3시부터 2시간 방을 잡을까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C34",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "17:00",
+        "from" : "15:00",
+        "headcount" : 4,
+        "date" : "2026-11-11"
+      }
+    } ],
+    "ms" : 2580
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "roomId" : 2,
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "headcount" : 4
+      }
+    } ],
+    "ms" : 1979
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1978
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 15:00 ~ 17:00, 4명 예약 확인안이에요. 화면의 [확인]을 눌러 주세요. 함께 쓰는 친구의 학번도 함께 입력해 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C35",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "16:00",
+        "to" : "17:30",
+        "date" : "2026-11-13",
+        "headcount" : "3"
+      }
+    } ],
+    "ms" : 1560
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "headcount" : 3,
+        "endAt" : "2026-11-13T17:30:00+09:00",
+        "roomId" : 1,
+        "startAt" : "2026-11-13T16:00:00+09:00"
+      }
+    } ],
+    "ms" : 1416
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1007
+  } ],
+  "misses" : [ ],
+  "reply" : "1번 방, 2026-11-13 16:00~17:30, 3명으로 예약할까요? 화면의 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 골라 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C01",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "date" : "2026-11-11",
+        "from" : "14:00",
+        "to" : "16:00"
+      }
+    } ],
+    "ms" : 833
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1325
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11일) 오후 2시부터 4시까지 쓸 수 있는 빈방으로 2번, 3번, 4번, 5번 방이 있어요.   이대로 잡아 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C02",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "room_status" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "room_status",
+      "args" : { }
+    } ],
+    "ms" : 1234
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1388
+  } ],
+  "misses" : [ ],
+  "reply" : "지금 바로 쓸 수 있는 방은 2번 방과 3번 방이 있어요. 두 방 모두 오늘 낮 12시까지 쓸 수 있습니다.   바로 예약을 진행할까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C03",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 810
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1013
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 오후 2시부터 4시까지 2번 방 예약이 1건 있습니다.  입실 번호가 필요하시면 입실 번호를 알려 달라고 말씀해 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C04",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "usage_rules" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "usage_rules",
+      "args" : { }
+    } ],
+    "ms" : 863
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 984
+  } ],
+  "misses" : [ ],
+  "reply" : "방은 한 번에 최대 2시간까지 쓸 수 있어요.   원하시는 날짜와 시간에 맞는 방을 찾아드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "14:00",
+        "to" : "16:00",
+        "date" : "2026-11-11",
+        "headcount" : 3
+      }
+    } ],
+    "ms" : 1012
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "headcount" : 3,
+        "startAt" : "2026-11-11T14:00:00+09:00",
+        "roomId" : 2,
+        "endAt" : "2026-11-11T16:00:00+09:00"
+      }
+    } ],
+    "ms" : 1156
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1189
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 14:00–16:00, 3명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓰는 사람의 학번은 확인 화면에서 넣으실 수 있어요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C06",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "17:30",
+        "from" : "16:00",
+        "date" : "2026-11-13",
+        "headcount" : 6
+      }
+    } ],
+    "ms" : 1056
+  }, {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "roomId" : 5,
+        "headcount" : 6,
+        "endAt" : "2026-11-13T17:30:00+09:00",
+        "startAt" : "2026-11-13T16:00:00+09:00"
+      }
+    } ],
+    "ms" : 1119
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1124
+  } ],
+  "misses" : [ ],
+  "reply" : "5번 방, 2026-11-13 16:00–17:30, 6명 예약 확인안입니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C07",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "from" : "17:00",
+        "date" : "2026-11-10",
+        "headcount" : 4,
+        "to" : "18:00"
+      }
+    } ],
+    "ms" : 2297
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 569
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 311
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C09",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 540
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 328
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C11",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 879
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 323
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 258
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C13",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 401
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C14",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_schedule",
+      "args" : { }
+    } ],
+    "ms" : 3013
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 303
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C15",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "week_plan" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "week_plan",
+      "args" : {
+        "headcount" : null,
+        "minutes" : 120
+      }
+    } ],
+    "ms" : 3243
+  }, {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 3877
+  } ],
+  "misses" : [ ],
+  "reply" : "이번 주에 수업 끝나고 2시간 쓸 수 있는 날은 다음과 같아요.  - 11월 10일(화) 15:00~17:00 (2번 방) - 11월 11일(수) 15:00~17:00 (2번 방) - 11월 12일(목) 15:00~…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ],
+    "ms" : 815
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 301
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C17",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 412
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C18",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 293
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "to" : "20:30",
+        "from" : "19:00",
+        "date" : "2026-11-11",
+        "headcount" : 3
+      }
+    } ],
+    "ms" : 2939
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 264
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C20",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 452
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C21",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ ],
+    "ms" : 1591
+  } ],
+  "misses" : [ ],
+  "reply" : "안녕하세요! 저는 M-SPACE(회의·스터디 방) 예약 비서예요.   다음과 같은 일을 도와드릴 수 있어요. - 지금 바로 쓸 수 있는 빈방 확인 및 예약 - 날짜와 시간에 맞는 빈방 찾기 및 예약 - 내 예약 확인…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C22",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 348
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C23",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 279
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C24",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 213
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C25",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 841
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C26",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 227
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C27",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "create_reservation" ],
+  "calls" : [ {
+    "error" : "",
+    "toolCalls" : [ {
+      "name" : "create_reservation",
+      "args" : {
+        "headcount" : 4,
+        "roomId" : 3,
+        "endAt" : "2026-11-11T16:00:00+09:00",
+        "startAt" : "2026-11-11T14:00:00+09:00"
+      }
+    } ],
+    "ms" : 1115
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 736
+  } ],
+  "misses" : [ ],
+  "reply" : "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요."
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C28",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 278
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C29",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 300
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C30",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 292
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 767
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C32",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 304
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C33",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 218
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C34",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 258
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v3",
+  "run" : 2,
+  "id" : "C35",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ],
+    "ms" : 802
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+} ]
