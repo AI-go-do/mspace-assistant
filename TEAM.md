@@ -6,19 +6,22 @@
 
 ## 1. 무엇을 만드나
 
+> **서비스 이름: 오디** (11/9 9차 회의 2차 논의). 화면·발표·제출 서류 제목에 쓰고, 아이콘은 오디 열매. 색감·그라데이션은 지금 쓰는 그대로 둡니다. 저장소 이름은 그대로. M-space는 첫 적용 공간입니다.
+> **방향:** 말만 하면 비서(오디) 하나로 예약·연장·시간표·방 안내가 다 되게. 홈은 [AI로 예약하기]가 먼저, [수동으로 예약하기]는 그 아래. 새 기능보다 다듬기와 수치 기록(개선 이력)이 먼저입니다.
+
 조선대 IT융합대학 M-space(회의·스터디 방 5개)를 **사람(교학팀) 없이도** 예약하고, **예약만으로 문을 여는** 예약·출입 시스템입니다.
 
 - 지금 방식: 교학팀 명부 작성 → 학생증 맡김 → 열쇠 → 사용 → 반납. 18시 이후·시험 기간에는 관리가 끊깁니다
 - 설문에서 가장 큰 불편은 "비었는지 직접 가 봐야 안다". 열쇠 없이 예약만으로 이용하는 데 다수가 찬성 (설문은 11/9까지 수집 중)
 - 출품: IT Festival SW중심대학 캡스톤디자인 경진대회 (작년 기준: 서류·5분 영상 11/21 16:00 마감, 본 행사 11/28). 11/20 수업 발표
-- 학교 시범운영은 답이 없어 기다리지 않습니다. **키패드(키 없는 입실)가 기본**이고, 학교가 원하면 시범운영을 선택지로 둡니다
+- 학교 시범운영은 답이 없어 기다리지 않습니다. **키 없는 입실이 기본**입니다. 입실은 **QR로만** 합니다(11/10 재웅 결정, 키패드·NFC 뺌), 학교가 원하면 시범운영을 선택지로 둡니다
 
 ## 2. 팀과 저장소
 
 | 사람 | 맡는 것 | 저장소 |
 |---|---|---|
 | 지영 | 예약 코어: 예약 규칙, 동시 예약 처리, 신고·노쇼 | `core` |
-| 수연 | 키패드·센서(ESP32·아두이노), 재실·환기 | IoT 저장소 (이름 정하면 기록) |
+| 수연 | 문 앞 QR 입실·센서(ESP32·아두이노·젯슨), 재실·환기 | IoT 저장소 (이름 정하면 기록) |
 | 재웅 | 인프라·CI/CD, 학교 서버 배포, 팀 문서 | `infra`, `docs`, `Scrum` |
 | 영준 | AI 비서 + MCP 서버 | [`mspace-assistant`](https://github.com/AI-go-do/mspace-assistant) |
 | (정해야 함) | 화면 | `front` |
@@ -31,9 +34,9 @@
 
 | 기간 | 버전 | 한 줄 |
 |---|---|---|
-| 11/2–11/5 | v0.1 | 예약 한 바퀴: 메일 로그인 → 예약 → 6자리 번호 → 키패드 체크인 → 퇴실 |
-| 11/6–11/10 | v0.2 | 사람 없이 돌아감: 자동 퇴실, 노쇼, 즉시 시작, 연장, 알림, 방 현황, 재실·환기 센서 |
-| 11/11–11/13 | v0.3 | 운영·AI: 신고, 사진 체크인·아웃, 관리자 판정, AI 비서(MCP) |
+| 11/2–11/5 | v0.1 | 예약 한 바퀴: 메일 로그인 → 예약 → 입실 QR → 체크인 → 퇴실 (11/10부터 QR만) |
+| 11/6–11/10 | v0.2 | 사람 없이 돌아감: 자동 퇴실, 노쇼, 즉시 시작, 연장하기(1회), 알림, 방 현황, 재실·환기 센서 |
+| 11/11–11/13 | v0.3 | 운영·AI: 신고, 사진 체크인·아웃, AI 판정(10차: 관리자는 보기만), AI 비서(MCP) |
 | **11/13** | — | **기능 동결.** 이후 `main` 고정 |
 | 11/14–11/19 | — | 발표 준비 |
 | 11/20 | — | 발표 |
@@ -57,28 +60,28 @@
 
 - 겹침·대표자 1건은 **DB 제약**으로 막습니다 (`no_room_overlap`, `one_active_per_owner`). 동시 요청 100건에서 중복 0건
 - 숫자(7일·2시간 등)는 코드에 박지 않고 설정값으로 둡니다
-- 상태: `BOOKED` → `IN_USE` → `CHECKED_OUT` / `AUTO_CHECKED_OUT`, 그 밖에 `CANCELED`, `NO_SHOW`
+- 상태: `BOOKED` → `IN_USE` → `CHECKED_OUT` / `AUTO_CHECKED_OUT` / `AWAY_RELEASED`(자리 비움, v0.2), 그 밖에 `CANCELED`, `NO_SHOW`
 
 ## 5. 구조
 
 ```
 학생 폰(React PWA) ─▶ nginx ─▶ front
                              └▶ core(Spring Boot) ─▶ PostgreSQL
-문 앞 키패드(ESP32·아두이노) ─▶ core   (POST /api/access/verify)
+문 앞 QR 카메라 ─▶ core   (POST /api/access/verify)
 방 안 센서(v0.2) ─▶ core
 AI 비서·MCP(v0.3) ─▶ core API만 호출
 ```
 
-- **기능은 core API로만 엽니다.** 키패드·센서·비서는 DB에 직접 붙지 않습니다
+- **기능은 core API로만 엽니다.** QR 장치·센서·비서는 DB에 직접 붙지 않습니다
 - 바깥 장치·서비스는 인터페이스(포트) 뒤에 둡니다
 
 | 인터페이스 | 지금 (시연) | 나중 (도입) |
 |---|---|---|
 | `IdentityVerifier` | 학교 메일 인증 | 학교 학사 DB |
-| `AccessDevice` | 키패드 모형 | 실제 도어락·QR |
+| `AccessDevice` | 문 앞 카메라 QR (11/10부터 QR만) | 실제 도어락 |
 | `NotificationChannel` | 메일 | 텔레그램·푸시 |
-| `PresenceDetector` | 레이더·조도·CO2 규칙 | 다른 센서 |
-| `LlmClient` | Gemini | Ollama (Jetson 보드 B) |
+| `PresenceDetector` | PIR·조도·CO2 규칙 (레이더는 8차 회의에서 환불) | 카메라 인원 세기(Q-17), 다른 센서 |
+| `LlmClient` | Gemini | Ollama (Jetson 보드 A, 11/10 변경) |
 
 - 장치가 같은 신호를 두 번 보내도 `eventId`로 한 번만 처리합니다
 - 기록에 `created_via`(WEB / AGENT / DEVICE)를 남기고, 상태 변경은 도메인 이벤트로 냅니다
@@ -94,7 +97,7 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 | 장치 | ESP32·아두이노 (부품 오기 전에는 우노 + 노트북 USB) |
 | Jetson | Python |
 | AI 비서 | Java 21 · Spring Boot 4 · Maven (core와 같은 스택, 11/2 결정) |
-| CI | GitHub Actions · Testcontainers(PostgreSQL, H2 안 씀) · SonarQube Cloud · CodeRabbit(참고용) |
+| CI | GitHub Actions · Testcontainers(PostgreSQL, H2 안 씀) · SonarQube(학교 Community 서버) · CodeRabbit(`develop` 머지 조건) |
 | 배포 | Docker · docker compose · GHCR · nginx · 학교 실습 서버 |
 
 ## 7. 작업 방식
@@ -110,7 +113,9 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 - `main`, `develop` 직접 push 금지
 - 커밋: `feat: 예약 생성 API 추가` (feat, fix, refactor, test, docs, chore) + `Refs #12`
 - PR: 제목은 커밋 형식, 본문에 요구사항 ID(`FR-RSV-001`)와 `Closes #12`. 400줄 안. **매일 15시까지**
-- 합치기: 빌드·테스트 통과 + 팀원 1명 승인 → Squash merge. `main`은 새 코드 커버리지 80% 이상
+- 합치기([컨벤션](https://github.com/AI-go-do/docs/blob/main/conventions.md))
+  - `develop`: 빌드·테스트 통과 + 마지막 커밋의 CodeRabbit 리뷰가 끝나고 해결 안 된 지적 없음 + 팀원 1명 승인 → Squash merge
+  - `main`(develop → main 릴리스): CodeRabbit이 건너뛰므로 CI만 봄. 빌드·테스트 + SonarQube 팀 게이트(새 코드 커버리지 80% 이상 · 중복 3% 이하 · 새 버그·취약점 0) 통과 → Merge commit
 - 리뷰 댓글 머리말: `[필수]` `[제안]` `[질문]`
 - 이슈 제목: `[FR-RSV-001] 예약 생성`, 라벨은 종류 + 버전(`v0.1`)
 
@@ -135,7 +140,7 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 | 시간 | ISO-8601 `+09:00`. 날짜 계산은 `Asia/Seoul`, DB는 `timestamptz` |
 | 오류 | `{ "code": "...", "message": "..." }`. 코드는 `RESERVATION_OVERLAP`처럼 |
 | 상태 코드 | 400 입력 오류 · 401 로그인 안 함 · 403 권한 없음 · 404 없음 · 409 충돌 |
-| API 문서 | springdoc OpenAPI 자동 생성. 프론트 타입과 MCP 도구가 이것을 근거로 한다 |
+| API 문서 | springdoc OpenAPI 자동 생성(아직 core에 없음, 그 전까지는 [API 명세](https://github.com/AI-go-do/docs/blob/main/api/README.md)가 기준). 프론트 타입과 MCP 도구가 이것을 근거로 한다 |
 | DB | snake_case, `…_at`, `is_…`, 상태는 대문자 문자열 + CHECK. 테이블은 `schema-v2.sql` 기준 |
 | 테스트 | `@DisplayName` 한국어, given/when/then, 수용 기준 1개 = 테스트 1개 이상 |
 
@@ -148,7 +153,7 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 | 시연 서버 | 학교 실습 서버 (재웅 계정) | `main`에 합치면 (버전 완료) |
 
 - 흐름: PR → 빌드·테스트 → `develop` 합침 → 이미지 → GHCR → 학교 서버 `docker compose pull && up -d` → `/actuator/health`
-- 재웅 포트 8410–8419 (8410 시연 입구, 8411 개발 입구, DB는 외부 노출 안 함). 다른 팀원은 각자 포트 범위에서 개인 테스트
+- 재웅 포트 8410–8419 중 **8414 시연 입구(`mspace.java21.net`, `main`), 8413 개발 입구(`dev-mspace.java21.net`, `develop`)**. 8410·8411은 다른 프로젝트가 써서 11/5에 옮김. DB는 외부 노출 안 함. 다른 팀원은 각자 포트 범위에서 개인 테스트
 - 되돌리기: 이미지 태그를 이전 버전으로 바꾸고 `docker compose up -d`
 - 시연 대비: 학교 서버·와이파이가 죽어도 노트북에서 전체를 띄울 수 있게 연습
 
@@ -161,7 +166,7 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 - 테스트를 끄거나 건너뛰어 빌드 통과시키기
 - 실제 학생 개인정보를 테스트·로그·시연 데이터에 넣기
 - 돈 쓰기: **사비 0원 원칙.** 유료 클라우드(AWS 등)는 쓰지 않는다
-- **Jetson 보드 A** 사용 (보드 B만)
+- Jetson 보드를 정해진 용도 밖으로 쓰기. **보드 B는 IoT(카메라·센서)**, **보드 A는 시계열 수집기 + 비서 Ollama 측정**(11/10 팀 합의로 보드 A 사용 금지를 풂. 수집기를 멈추지 않게 측정 전 메모리 확인)
 - 교학팀 허락 없이 학교 방에 장치 설치
 
 ## 11. 아직 정할 것
@@ -171,6 +176,6 @@ AI 비서·MCP(v0.3) ─▶ core API만 호출
 | `front` 저장소 담당, 화면 공통 틀 | 정해지지 않음 |
 | IoT 저장소 이름 | 수연 |
 | 학교 서버 사용 조건 (11/20까지 가능? HTTPS? Actions SSH 배포 허용?) | 재웅 확인 |
-| Jetson 보드 B에 맡길 것 (CO2 예측 / 비서용 Ollama / 규칙 답변) | 팀 결정 대기 |
+| Jetson 보드 B에 맡길 것 (CO2 예측 / 규칙 답변) | 팀 결정 대기. 비서용 Ollama는 보드 A로 정함(11/10) |
 | 설문 추첨 개수·금액·비용 분담 | 11/9 마감 전 |
 | 수연 부품비 분담 | 금액 기록 후 |

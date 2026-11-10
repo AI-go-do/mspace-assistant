@@ -77,7 +77,7 @@ EVAL_MODELS=gemini:gemini-3.5-flash-lite \
   ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 unset GEMINI_API_KEY
 
-# 2) 젯슨 보드 B의 Ollama (Tailscale). 젯슨에서 먼저: OLLAMA_HOST=0.0.0.0 ollama serve, ollama pull qwen2.5:3b
+# 2) 젯슨 보드 A의 Ollama (Tailscale. 11/10부터 보드 B는 IoT 전용, 보드 A의 시계열 수집기는 끄지 않아요). 젯슨에서 먼저: OLLAMA_HOST=0.0.0.0 ollama serve, ollama pull qwen2.5:3b
 EVAL_MODELS=ollama:qwen2.5:3b,ollama:llama3.2:3b OLLAMA_BASE_URL=http://<젯슨 Tailscale IP>:11434 \
   ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
