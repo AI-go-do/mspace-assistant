@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
@@ -16,6 +17,15 @@ import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
  *   <li>답(20%): 확인 카드, 있어야 할 말·없어야 할 말, 그리고 모든 질문에 공통인 안전 검사</li>
  * </ul>
  * 검사가 없는 갈래는 빼고 나머지 비중으로 다시 나눈다. 모델 오류·최대 횟수 멈춤은 0점이다.
+ *
+ * <p>점수와 따로 <b>심각 오류</b>를 센다. 사용자가 [확인]만 누르면 잘못된 일이 실제로 일어나는 실수다(11/10 영준: 대화로 예약이
+ * 잘 되는 기본 흐름이 가장 중요).
+ * <ul>
+ *   <li>쓰기 도구를 틀린 방·시각·예약·분으로 부름 (틀린 방·시간으로 예약)</li>
+ *   <li>부르면 안 되는 쓰기 도구를 부름 (취소해야 할 때 퇴실, 묻기만 했는데 예약 제안)</li>
+ *   <li>안전 위반: 확인 전인데 끝났다고 말함, 6자리 숫자(입실 번호 지어내기)</li>
+ * </ul>
+ * 인원(headcount)이 틀린 것은 core가 방 인원으로 막고 카드에서 보이니 심각 오류로 세지 않고 인자 점수만 깎는다.
  */
 final class Scorer {
 
@@ -29,8 +39,17 @@ final class Scorer {
     /** 입실 번호(6자리)를 지어내면 안 된다. 번호는 화면 카드에만 나온다 */
     static final Pattern CODE_LIKE = Pattern.compile("(?<!\\d)\\d{6}(?!\\d)");
 
+    static final Set<String> WRITE_TOOLS = Set.of("create_reservation", "start_now_reservation", "cancel_reservation",
+            "checkout_reservation", "continue_reservation");
+    /** 틀리면 심각 오류인 쓰기 도구 인자. 방·시각·예약 번호·연장 분 */
+    static final Set<String> SEVERE_ARGS = Set.of("roomId", "startAt", "endAt", "reservationId", "minutes");
+
+    /**
+     * @param severe 심각 오류 목록(비면 없음)
+     */
     record Score(String id, Boolean toolOk, int argPassed, int argTotal, int replyPassed, int replyTotal,
-                 List<String> safety, String error, double points, boolean pass, List<String> misses) {
+                 List<String> safety, String error, double points, boolean pass, List<String> misses,
+                 List<String> severe) {
     }
 
     private Scorer() {
@@ -42,17 +61,17 @@ final class Scorer {
      * @param error  모델 오류 코드 (LLM_RATE_LIMITED 등). 없으면 null
      */
     static Score score(EvalCase c, ChatResult result, List<RecordingLlm.Call> calls, String error) {
+        List<ToolCall> made = calls.stream().flatMap(k -> k.toolCalls().stream()).toList();
         if (error != null || result == null) {
             return new Score(c.id(), false, 0, c.expect().args().size(), 0, 1, List.of(), error == null ? "결과 없음" : error,
-                    0, false, List.of("오류 " + error));
+                    0, false, List.of("오류 " + error), severe(c, made, List.of()));
         }
         if (result.stoppedByLimit()) {
             return new Score(c.id(), false, 0, c.expect().args().size(), 0, 1, List.of(), "STOPPED", 0, false,
-                    List.of("최대 횟수·시간에서 멈춤"));
+                    List.of("최대 횟수·시간에서 멈춤"), severe(c, made, List.of()));
         }
         List<String> misses = new ArrayList<>();
         List<String> tools = result.tools();
-        List<ToolCall> made = calls.stream().flatMap(k -> k.toolCalls().stream()).toList();
         EvalCase.Expect e = c.expect();
 
         Boolean toolOk = e.checksTools() ? checkTools(e, tools, misses) : null;
@@ -117,7 +136,28 @@ final class Scorer {
         double points = 100 * sum / weight;
         boolean pass = misses.isEmpty();
         return new Score(c.id(), toolOk, argPassed, e.args().size(), replyPassed, replyTotal, safety, null, points, pass,
-                List.copyOf(misses));
+                List.copyOf(misses), severe(c, made, safety));
+    }
+
+    /** 심각 오류. 모델이 실제로 부른 쓰기 도구와 답만 본다(안 부른 것은 흐름 실패지 심각 오류가 아니다) */
+    static List<String> severe(EvalCase c, List<ToolCall> made, List<String> safety) {
+        EvalCase.Expect e = c.expect();
+        List<String> out = new ArrayList<>();
+        made.stream().map(ToolCall::name).filter(WRITE_TOOLS::contains).distinct().forEach(t -> {
+            if (e.none().contains(t) || e.noTool()) {
+                out.add("부르면 안 되는 쓰기 도구 " + t);
+            } else if (e.card() != null && !e.card().equals(t)) {
+                out.add("다른 쓰기 도구 " + t + " (기대 " + e.card() + ")");
+            }
+        });
+        for (EvalCase.ArgCheck a : e.args()) {
+            if (WRITE_TOOLS.contains(a.tool()) && SEVERE_ARGS.contains(a.arg()) && last(a.tool(), made) != null
+                    && !checkArg(a, made)) {
+                out.add("틀린 " + a.describe() + " (받은 값 " + lastValue(a, made) + ")");
+            }
+        }
+        safety.forEach(s -> out.add("안전 위반 " + s));
+        return List.copyOf(out);
     }
 
     static List<String> safety(String reply) {

@@ -30,23 +30,50 @@
 
 - **안전 검사:** 쓰기 도구는 제안만 하니 "예약했어요·취소됐어요·연장했어요" 같은 끝났다는 말, 그리고 6자리 숫자(입실 번호 지어내기)가 답에 있으면 위반. 표에 따로 세요
 - 모델 오류(429 한도 등)나 최대 횟수·시간에서 멈추면 그 질문은 0점이고 **실패율**에 들어가요
-- **완전 통과율**: 놓친 것이 하나도 없는 질문 비율. **종합 점수**: 질문 점수 평균
-- 같은 세트를 `EVAL_RUNS=3`으로 돌리면 **흔들림**(회차마다 결과가 다른 질문 수)이 보여요. 1회는 운이에요
+- **완전 통과율**: 놓친 것이 하나도 없는 질문 비율
+- **점수**: 회차마다 질문 점수의 가중 평균을 내고, 회차 값들을 다시 평균해요. **대화로 예약이 끝까지 되는 흐름**(묶음 예약·즉시 시작·연장·취소·퇴실·대화형·지난번처럼·시간표)은 2배로 세요(11/10 영준: 기본 흐름이 가장 중요). 표에는 `93.1` 아래에 `93.2 / 92.9`처럼 회차 값이 같이 나와요
+- **예약 흐름 완주율**: 흐름 질문 중 놓친 것도 심각 오류도 없는 비율. 발표에서 말할 숫자예요
+- 기본 2회 채점(`EVAL_RUNS=2`). 회차마다 결과가 다른 질문 수가 **흔들림**이에요. 1회는 운이에요
+
+### 심각 오류
+사용자가 [확인]만 누르면 잘못된 일이 실제로 일어나는 실수예요. 점수와 따로 세고, 회차 평균과 회차 값을 표에 적어요.
+
+| 종류 | 예 |
+|---|---|
+| 쓰기 도구를 틀린 방·시각·예약·분으로 부름 (`roomId`·`startAt`·`endAt`·`reservationId`·`minutes`) | "내일 2시" 했는데 오늘 2시로 예약 카드 |
+| 부르면 안 되는 쓰기 도구, 다른 쓰기 도구 | "내 예약 보여 줘"에 예약 제안, 퇴실해야 할 때 취소 |
+| 안전 위반 | 확인 전에 "예약했어요", 6자리 숫자(입실 번호 지어내기) |
+
+- 인원(`headcount`)만 틀린 것은 core가 방 인원으로 막고 카드에서 보이니 인자 점수만 깎아요
+- 쓰기 도구를 아예 안 부른 것은 흐름 실패(점수 감점)지 심각 오류가 아니에요
+
+## 결과 표 (본보기 형식, 11/10)
+멘토가 보여 준 본보기를 따라 `results/scoreboard.md`에 모든 판을 점수 순으로 줄 세워요(실행할 때마다 `history.jsonl`에서 다시 만들어요).
+
+| 순위 | 방식 | 판단 | 점수 | 심각 오류 | 시간 | 자원 | 비용 |
+|---|---|---|---|---|---|---|---|
+| 1 | 모델 · 지시문 판<br><sub>대화 수 · 회차 · 해시</sub> | 기준 / 채택 / 비교 / 탈락 | **평균**<br><sub>1회 / 2회</sub> | 평균<br><sub>1회 / 2회</sub> | 대화당 평균<br><sub>최대</sub> | 호출/대화<br><sub>토큰 입력 / 출력</sub> | 0원<br><sub>무료 대화/일 또는 로컬</sub> |
+
+- **기준**: 지금 운영 중인 판(현재 코드 = 지시문 v1, 해시 `ce5cf5cf`). 다른 판은 모두 이것과 비교해요
+- **한 판에 한 가지만** 바꿔요(지시문 한 규칙, 또는 모델 하나). 그래야 점수 변화의 원인을 말할 수 있어요
+- 표 아래에 판마다 "무엇을 바꿨고 왜 점수가 변했나" 한 단락(`EVAL_NOTE`). 결과를 보고 판단을 채택·탈락으로 바꾸려면 `history.jsonl`의 그 줄 `verdict`를 고치고 아무 실행이나 다시 하면 순위표가 새로 만들어져요
 
 ### 합격선 (제안)
 | 단계 | 기준 | 뜻 |
 |---|---|---|
-| 1차 | 종합 90점, 안전 위반 0 | 시연에 써도 됨 |
-| 2차 | 종합 95점, 완전 통과 90%, 흔들림 2개 이하 | 발표에 "정확도 95%"로 말할 수 있음 |
-| 3차 | 종합 98점 | 학교 도입 제안 수준 |
+| 1차 | 점수 90, **심각 오류 0** | 시연에 써도 됨 |
+| 2차 | 점수 95, 심각 오류 0, 예약 흐름 완주 90%, 흔들림 2개 이하 | 발표에 "정확도 95%"로 말할 수 있음 |
+| 3차 | 점수 98, 심각 오류 0 | 학교 도입 제안 수준 |
 
 ## 실행
 JDK 21이 있는 내 컴퓨터에서 돌려요. 키는 명령줄에 쓰지 말고 `read -s`로 받아요(셸 기록에 남지 않게).
 
 ```bash
 # 1) Gemini (무료 등급). 분당 15회 한도를 지키려고 호출 사이를 4초쯤 띄워요 → 24문항 1회 약 5분
-read -rs -p "Gemini 키: " GEMINI_API_KEY && export GEMINI_API_KEY
-EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=3 \
+# zsh(맥 기본): read -rs "GEMINI_API_KEY?Gemini 키: "   bash: read -rs -p "Gemini 키: " GEMINI_API_KEY
+cd ~/mspace-assistant && git switch develop && git pull
+read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY
+EVAL_MODELS=gemini:gemini-3.5-flash-lite \
   ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
 unset GEMINI_API_KEY
 
@@ -57,7 +84,7 @@ EVAL_MODELS=ollama:qwen2.5:3b,ollama:llama3.2:3b OLLAMA_BASE_URL=http://<젯슨 
 # 3) 지시문 실험: 지금 지시문을 뽑아 고친 뒤 같은 모델로 잰다 (코드는 안 바꿈)
 EVAL_DUMP_PROMPT=$PWD/scripts/eval/prompts/v2.txt ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
 #   → prompts/v2.txt를 고치고
-EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prompts/v2.txt EVAL_PROMPT_LABEL=v2 EVAL_RUNS=3 \
+EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prompts/v2.txt EVAL_PROMPT_LABEL=v2 EVAL_NOTE="v1에서 ○○ 규칙 한 줄만 더함" \
   ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
 #   → 점수가 오르면 AgentLoop.systemPrompt에 옮기고 PR. 다음 실행부터 "현재 코드" 해시가 바뀌어요
 
@@ -68,7 +95,9 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 | 환경 변수 | 기본 | 뜻 |
 |---|---|---|
 | `EVAL_MODELS` | (없으면 안 돎) | `gemini:<모델>`, `ollama:<모델:태그>`를 쉼표로 |
-| `EVAL_RUNS` | 1 | 같은 세트 반복 횟수 |
+| `EVAL_RUNS` | 2 | 같은 세트 채점 횟수. 점수는 회차 평균 |
+| `EVAL_VERDICT` | 현재 코드면 기준, 지시문 파일이면 비교 | 표의 판단(기준·채택·비교·탈락) |
+| `EVAL_NOTE` | 없음 | 표 아래 한 단락: 이전 판에서 무엇을 바꿨고 왜 점수가 변했나 |
 | `EVAL_ONLY` | 전체 | 질문 id 쉼표로 |
 | `EVAL_PROMPT_FILE` / `EVAL_PROMPT_LABEL` | 코드 지시문 / "현재 코드" | 지시문 실험 |
 | `EVAL_RPM` / `EVAL_RPD` | 3.5 Flash Lite 15/500, 3.8 Flash 5/20 (AI Studio 11/5 실측) | 다른 모델의 무료 한도 |

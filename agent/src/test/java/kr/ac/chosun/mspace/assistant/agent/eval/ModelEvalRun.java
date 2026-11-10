@@ -26,8 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
  * CI에서는 ModelEvalTest가 같은 채점기를 가짜 모델로 검사한다. 쓰는 법은 scripts/eval/README.md.
  *
  * <pre>
- * read -rs -p "Gemini 키: " GEMINI_API_KEY && export GEMINI_API_KEY
- * EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=3 ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+ * read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY   (zsh. bash는 read -rs -p "Gemini 키: " GEMINI_API_KEY)
+ * EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
  * </pre>
  */
 class ModelEvalRun {
@@ -44,13 +44,16 @@ class ModelEvalRun {
         JsonMapper json = JsonMapper.builder().build();
         EvalCase.Suite suite = EvalCase.load(json);
         EvalRunner runner = new EvalRunner(json);
-        int runs = Integer.parseInt(env("EVAL_RUNS", "1"));
+        // 두 번 채점해 평균(회차 값도 표에 보임). 한 번은 운이다
+        int runs = Integer.parseInt(env("EVAL_RUNS", "2"));
         List<String> only = env("EVAL_ONLY", "").isBlank() ? List.of() : Arrays.asList(env("EVAL_ONLY", "").split(","));
         String promptFile = env("EVAL_PROMPT_FILE", "");
         UnaryOperator<String> prompt = promptFile.isBlank() ? UnaryOperator.identity()
                 : EvalRunner.promptFromFile(Files.readString(Path.of(promptFile), StandardCharsets.UTF_8));
         String promptLabel = env("EVAL_PROMPT_LABEL", promptFile.isBlank() ? "현재 코드" : Path.of(promptFile).getFileName().toString());
-        EvalRunner.Options options = new EvalRunner.Options(runs, only, promptLabel, prompt);
+        // 판단: 지금 운영 중인 판(현재 코드 = 지시문 v1)이 기준, 나머지는 비교로 시작해 결과를 보고 채택·탈락으로 고친다
+        String verdict = env("EVAL_VERDICT", promptFile.isBlank() ? "기준" : "비교");
+        EvalRunner.Options options = new EvalRunner.Options(runs, only, promptLabel, prompt, verdict, env("EVAL_NOTE", ""));
 
         List<EvalRunner.Report> reports = new ArrayList<>();
         for (String spec : env("EVAL_MODELS", "").split(",")) {
