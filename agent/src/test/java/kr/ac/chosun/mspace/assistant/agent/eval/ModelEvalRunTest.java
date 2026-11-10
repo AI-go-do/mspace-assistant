@@ -100,10 +100,11 @@ class ModelEvalRunTest {
                 int[] free = GEMINI_FREE.getOrDefault(model, new int[]{10, -2});
                 int rpm = Integer.parseInt(env("EVAL_RPM", String.valueOf(free[0])));
                 Integer rpd = env("EVAL_RPD", "").isBlank() ? (free[1] == -2 ? null : free[1]) : Integer.valueOf(env("EVAL_RPD", ""));
-                // 기본은 서버와 같은 20초. 생각이 긴 모델(3.8 Flash)은 20초 안에 첫 답이 안 와서 EVAL_GEMINI_TIMEOUT으로 늘려 잰다(11/10)
+                // 기본은 서버와 같은 호출 20초·대화 45초. 3.8 Flash가 과부하로 20초 안에 답이 안 와서(11/10)
+                // 다시 잴 때만 EVAL_GEMINI_TIMEOUT으로 늘리고, 그때만 대화 상한도 호출 상한의 3배로 늘린다
                 Duration timeout = Duration.ofSeconds(Long.parseLong(env("EVAL_GEMINI_TIMEOUT", "20")));
                 var client = new GeminiLlmClient(new GeminiProperties(null, model, env("GEMINI_API_KEY", ""), timeout), json);
-                Duration chatTimeout = Duration.ofSeconds(Math.max(45, timeout.toSeconds() * 3));
+                Duration chatTimeout = Duration.ofSeconds(timeout.toSeconds() <= 20 ? 45 : timeout.toSeconds() * 3);
                 yield new EvalRunner.Target(model, provider, client, 60_000L / rpm + 200, chatTimeout, rpd);
             }
             case "ollama" -> {
