@@ -13,7 +13,7 @@
 ## 구성
 | 파일 | 하는 일 |
 |---|---|
-| `agent/src/test/resources/eval/cases.json` | 고정 발화 24개(조회·예약·취소·퇴실·연장·즉시 시작·시간표·지난번처럼·대화형·범위 밖·안전). 시각은 **2026-11-10(화) 10:25** 고정 |
+| `agent/src/test/resources/eval/cases.json` | 고정 발화 35개. C01–C24 기본 세트(조회·예약·취소·퇴실·연장·즉시 시작·시간표·지난번처럼·대화형·범위 밖·안전), **C25–C35 대화 세트**(`"set": "대화"`, 11/10): 앞선 대화를 이어 받아 예약까지 가는지(빠진 것만 묻기·방 고르기·시각/인원 고치기·"모레 같은 시간"·딴 질문 뒤 돌아오기·"응 그걸로"). 시각은 **2026-11-10(화) 10:25** 고정 |
 | `agent/src/test/resources/eval/tools.json` | 진짜 mcp-server `tools/list` 스냅숏(도구 12개). 도구 설명을 고치면 `./dump-tools.sh`로 다시 떠요 |
 | `agent/src/test/java/.../eval/` | `FixtureTools`(가짜 도구), `RecordingLlm`(호출마다 시간·토큰·인자 기록, 분당 한도 지키기), `Scorer`(채점), `EvalRunner`, `ReportWriter`, `ModelEvalRun`(입구), `ModelEvalTest`(CI에서 채점기 검사) |
 | `prompts/v1.txt` | 지금 코드의 지시문(해시 `ce5cf5cf`). 날짜 자리는 `{{NOW}}` |
@@ -87,6 +87,9 @@ EVAL_DUMP_PROMPT=$PWD/scripts/eval/prompts/v2.txt ./mvnw -q -pl agent test -Dtes
 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prompts/v2.txt EVAL_PROMPT_LABEL=v2 EVAL_NOTE="v1에서 ○○ 규칙 한 줄만 더함" \
   ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
 #   → 점수가 오르면 AgentLoop.systemPrompt에 옮기고 PR. 다음 실행부터 "현재 코드" 해시가 바뀌어요
+
+# 대화 세트만 (여러 차례 주고받는 예약, 11/10)
+EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
 
 # 몇 개만
 EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
