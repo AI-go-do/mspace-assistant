@@ -1,0 +1,120 @@
+[ {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 20061,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 20008,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 20009,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 20008,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 20006,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 20010,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.8-flash",
+  "prompt" : "v3",
+  "run" : 1,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "toolCalls" : [ ],
+    "ms" : 26246,
+    "error" : "LLM_UNAVAILABLE"
+  } ],
+  "misses" : [ "오류 LLM_UNAVAILABLE" ],
+  "reply" : ""
+} ]

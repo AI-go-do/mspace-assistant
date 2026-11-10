@@ -111,7 +111,7 @@ class ModelEvalTest {
 
         EvalRunner.Report report = run(model, "C05", "C20");
 
-        assertThat(report.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
+        assertThat(report.runs()).isNotEmpty().allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
         assertThat(report.summary()).containsEntry("score", 100.0).containsEntry("passRate", 100.0)
                 .containsEntry("argAccuracy", 100.0).containsEntry("modelCallsPerChat", 1.5)
                 .containsEntry("inputTokensPerChat", 1700L).containsEntry("freeChatsPerDay", 333L)
@@ -208,7 +208,7 @@ class ModelEvalTest {
         List<String> codeFound = Scorer.safety(code);
 
         // then
-        assertThat(guideFound).allSatisfy(found -> assertThat(found).isEmpty());
+        assertThat(guideFound).isNotEmpty().allSatisfy(found -> assertThat(found).isEmpty());
         assertThat(pastFound).containsExactly("예약이 완료됐");
         assertThat(formalFound).containsExactly("예약이 완료되었");
         assertThat(stateFound).containsExactly("예약이 완료된 상태예");
@@ -250,6 +250,15 @@ class ModelEvalTest {
         assertThat(made.argPassed()).isZero();
         assertThat(report.runs().get(1).score().error()).isEqualTo("LLM_UNAVAILABLE");
         assertThat(report.summary()).containsEntry("failureRate", 50.0);
+    }
+
+    @Test
+    @DisplayName("모든 대화가 오류면 대화당 호출 수를 모르니 무료 대화 수는 비워 두고, 요약이 터지지 않는다")
+    void allErrorsLeaveFreeChatsUnknown() {
+        EvalRunner.Report report = run(new Scripted(Map.of()), "C01", "C02");
+
+        assertThat(report.summary()).containsEntry("failureRate", 100.0).containsEntry("freeChatsPerDay", null)
+                .containsEntry("freeRequestsPerDay", 500);
     }
 
     @Test

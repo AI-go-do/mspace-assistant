@@ -210,8 +210,16 @@ final class EvalRunner {
         s.put("inputTokensPerChat", tokensKnown ? Math.round(known.stream().mapToInt(k -> k.usage().inputTokens()).sum() / (double) n) : null);
         s.put("outputTokensPerChat", tokensKnown ? Math.round(known.stream().mapToInt(k -> k.usage().outputTokens()).sum() / (double) n) : null);
         s.put("freeRequestsPerDay", target.freeRpd());
-        s.put("freeChatsPerDay", target.freeRpd() == null ? null
-                : target.freeRpd() < 0 ? -1 : (long) Math.floor(target.freeRpd() / Math.max(1.0, callsPerChat)));
+        // 끝까지 간 대화가 하나도 없으면 대화당 호출 수를 모르니 무료 대화 수도 모른다(3.8 Flash 전부 시간 초과, 11/10)
+        boolean anyFinished = runs.stream().anyMatch(r -> r.score().error() == null);
+        // 삼항 연산자로 쓰면 null이 long으로 풀리며 NPE가 나서(11/10) 나눠 쓴다
+        Long freeChats = null;
+        if (target.freeRpd() != null && target.freeRpd() < 0) {
+            freeChats = -1L;
+        } else if (target.freeRpd() != null && anyFinished) {
+            freeChats = (long) Math.floor(target.freeRpd() / Math.max(1.0, callsPerChat));
+        }
+        s.put("freeChatsPerDay", freeChats);
         s.put("chatTimeoutSec", target.chatTimeout().toSeconds());
         Map<String, String> perCase = new LinkedHashMap<>();
         Map<String, double[]> byGroup = new LinkedHashMap<>();

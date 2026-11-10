@@ -180,7 +180,8 @@ final class ReportWriter {
     private static String cost(Map<String, Object> s) {
         Object free = s.get("freeChatsPerDay");
         if (free == null) {
-            return "확인 필요";
+            Object rpd = s.get("freeRequestsPerDay");
+            return rpd == null ? "확인 필요" : "0원<br><sub>무료 " + rpd + "회/일, 대화 수 확인 필요</sub>";
         }
         return ((Number) free).longValue() < 0 ? "0원<br><sub>로컬(젯슨 보드 A)</sub>" : "0원<br><sub>무료 " + free + "대화/일</sub>";
     }
