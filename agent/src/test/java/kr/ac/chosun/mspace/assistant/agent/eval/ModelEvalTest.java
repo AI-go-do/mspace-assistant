@@ -54,8 +54,20 @@ class ModelEvalTest {
     }
 
     static EvalRunner.Report run(LlmClient model, String... only) {
+        return run(1, model, only);
+    }
+
+    static EvalRunner.Report run(int runs, LlmClient model, String... only) {
         return new EvalRunner(JSON).run(new EvalRunner.Target("가짜", "test", model, 0, Duration.ofSeconds(45), 500), SUITE,
-                new EvalRunner.Options(1, List.of(only), "현재 코드", UnaryOperator.identity()));
+                new EvalRunner.Options(runs, List.of(only), "현재 코드", UnaryOperator.identity(), "기준", "지금 운영 중인 판."));
+    }
+
+    static Map<String, Object> row(Object... kv) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) {
+            m.put((String) kv[i], kv[i + 1]);
+        }
+        return m;
     }
 
     static EvalCase find(String id) {
@@ -114,7 +126,8 @@ class ModelEvalTest {
                         "endAt", "2026-11-10T16:00:00+09:00", "headcount", 3)),
                 say("예약했어요!"))));
 
-        Scorer.Score s = run(model, "C05").runs().getFirst().score();
+        EvalRunner.Report report = run(model, "C05");
+        Scorer.Score s = report.runs().getFirst().score();
 
         assertThat(s.toolOk()).isTrue();
         assertThat(s.argPassed()).isEqualTo(2);
@@ -122,6 +135,74 @@ class ModelEvalTest {
         assertThat(s.pass()).isFalse();
         // 도구 50 + 인자 30×2/4 + 답 20×1/2(카드는 나옴, 안전 위반) = 75
         assertThat(s.points()).isEqualTo(75.0);
+        // [확인]만 누르면 오늘 예약이 생긴다 → 날짜 틀린 시각 2개 + 끝났다는 말이 심각 오류
+        assertThat(s.severe()).hasSize(3).anyMatch(x -> x.startsWith("틀린 create_reservation.startAt"))
+                .contains("안전 위반 예약했어요");
+        assertThat(report.summary()).containsEntry("severeErrors", 3.0).containsEntry("severeRuns", List.of(3L));
+    }
+
+    @Test
+    @DisplayName("돌린 질문이 없으면(EVAL_ONLY 오타 등) 0점 기록을 남기지 않고 멈춘다")
+    void noCasesRun() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> run((LlmClient) (s, c, t) -> say("x"), "C99"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("EVAL_ONLY");
+    }
+
+    @Test
+    @DisplayName("심각 오류: 묻기만 했는데 예약을 제안하면 심각 오류, 인원만 틀리면 점수만 깎이고 심각 오류는 아니다")
+    void severeErrors() {
+        var model = new Scripted(Map.of(
+                "내 예약 보여 줘", List.of(call("create_reservation", Map.of("roomId", 1, "startAt", "x", "endAt", "y",
+                        "headcount", 3)), say("예약 카드를 띄웠어요.")),
+                "내일 2시부터 2시간 2번 방 3명으로 예약해 줘", List.of(
+                        call("create_reservation", Map.of("roomId", 2, "startAt", "2026-11-11T14:00:00+09:00",
+                                "endAt", "2026-11-11T16:00:00+09:00", "headcount", 4)),
+                        say("2번 방 내일 14:00–16:00, 4명으로 예약할까요?"))));
+
+        EvalRunner.Report report = run(model, "C03", "C05");
+
+        assertThat(report.runs().get(0).score().severe()).containsExactly("부르면 안 되는 쓰기 도구 create_reservation");
+        assertThat(report.runs().get(1).score().severe()).isEmpty();
+        assertThat(report.runs().get(1).score().pass()).isFalse();
+        assertThat(report.summary()).containsEntry("severeErrors", 1.0).containsEntry("severeRuns", List.of(1L))
+                .containsEntry("flowCompletion", 0.0);
+    }
+
+    @Test
+    @DisplayName("점수: 예약 흐름 질문은 2배로 세고, 두 번 돌리면 회차별 점수와 평균이 남는다")
+    void weightedAndRuns() {
+        var model = new Scripted(Map.of(
+                "내일 2시부터 2시간 2번 방 3명으로 예약해 줘", List.of(
+                        call("create_reservation", Map.of("roomId", 2, "startAt", "2026-11-11T14:00:00+09:00",
+                                "endAt", "2026-11-11T16:00:00+09:00", "headcount", 3)),
+                        say("2번 방 내일 14:00–16:00, 3명으로 예약할까요?"))));
+
+        // C05(예약, 100점 ×2) + C02(조회, 대본 없음 → 오류 0점 ×1) = 200/3
+        EvalRunner.Report report = run(2, model, "C05", "C02");
+
+        assertThat(report.summary()).containsEntry("score", 66.7).containsEntry("plainScore", 50.0)
+                .containsEntry("scoreRuns", List.of(66.7, 66.7)).containsEntry("flowCompletion", 100.0)
+                .containsEntry("verdict", "기준").containsEntry("bySet", Map.of("기본", 66.7));
+    }
+
+    @Test
+    @DisplayName("순위표: 점수 순으로 줄 세우고, 점수가 없는 옛 기록은 순위 대신 –, 판마다 설명 단락이 붙는다")
+    void scoreboard() {
+        List<Map<String, Object>> rows = List.of(
+                row("model", "옛 기록", "prompt", "v0", "promptHash", "aaaa", "chats", 24, "runs", 1, "score", 99.0),
+                row("model", "m", "prompt", "v1", "promptHash", "ce5cf5cf", "chats", 48, "runs", 2, "score", 90.0,
+                        "scoreRuns", List.of(89.0, 91.0), "severeErrors", 1.0, "severeRuns", List.of(1, 1), "verdict", "기준",
+                        "note", "지금 운영 중인 판."),
+                row("model", "m", "prompt", "v2", "promptHash", "bbbb", "chats", 48, "runs", 2, "score", 95.5,
+                        "scoreRuns", List.of(95.0, 96.0), "severeErrors", 0.0, "severeRuns", List.of(0, 0), "verdict", "채택",
+                        "note", "v1에서 날짜 규칙 한 줄만 더했어요."));
+
+        String md = ReportWriter.scoreboard(rows);
+
+        assertThat(md).contains("| 순위 | 방식 | 판단 | 점수 | 심각 오류 | 시간 | 자원 | 비용 |");
+        assertThat(md.indexOf("| 1 | m · 지시문 v2")).isPositive().isLessThan(md.indexOf("| 2 | m · 지시문 v1"));
+        assertThat(md).contains("| – | 옛 기록 · 지시문 v0").contains("**95.5**<br><sub>95.0 / 96.0</sub>")
+                .contains("**m · 지시문 v2**: v1에서 날짜 규칙 한 줄만 더했어요.");
     }
 
     @Test
@@ -172,8 +253,10 @@ class ModelEvalTest {
 
         Path md = ReportWriter.write(dir, "2026-11-09-1700", List.of(report), JSON);
 
-        assertThat(Files.readString(md)).contains("| 가짜 | 현재 코드").contains("find_available_rooms] 중 아무것도 안 부름");
+        assertThat(Files.readString(md)).contains("가짜 · 지시문 현재 코드").contains("| 기준 |")
+                .contains("find_available_rooms] 중 아무것도 안 부름").contains("**가짜 · 지시문 현재 코드**: 지금 운영 중인 판.");
         assertThat(Files.readAllLines(dir.resolve("history.jsonl"))).hasSize(1);
+        assertThat(Files.readString(dir.resolve("scoreboard.md"))).contains("| 1 | 가짜 · 지시문 현재 코드");
         assertThat(EvalRunner.percentile(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L), 90)).isEqualTo(9L);
     }
 

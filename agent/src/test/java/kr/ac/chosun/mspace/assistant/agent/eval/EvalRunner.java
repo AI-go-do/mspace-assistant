@@ -48,8 +48,17 @@ final class EvalRunner {
                   Integer freeRpd) {
     }
 
-    /** @param prompt 지시문 바꾸기. 그대로면 identity */
-    record Options(int runs, List<String> only, String promptLabel, UnaryOperator<String> prompt) {
+    /**
+     * @param prompt  지시문 바꾸기. 그대로면 identity
+     * @param verdict 표의 판단: 기준·채택·비교·탈락. 지금 운영 중인 판이 기준
+     * @param note    표 아래 한 단락: 이전 판에서 무엇을 바꿨고 왜 점수가 변했나 (판마다 한 가지만 바꾼다)
+     */
+    record Options(int runs, List<String> only, String promptLabel, UnaryOperator<String> prompt, String verdict,
+                   String note) {
+
+        Options(int runs, List<String> only, String promptLabel, UnaryOperator<String> prompt) {
+            this(runs, only, promptLabel, prompt, "비교", "");
+        }
     }
 
     record CaseRun(int run, EvalCase evalCase, Scorer.Score score, List<RecordingLlm.Call> calls, List<String> tools,
@@ -102,6 +111,9 @@ final class EvalRunner {
                 System.out.printf("[%s %d/%d] %s %s %.0f점 %s%n", target.label(), run, options.runs(), c.id(),
                         score.pass() ? "통과" : "실패", score.points(), String.join(" / ", score.misses()));
             }
+        }
+        if (runs.isEmpty()) {
+            throw new IllegalArgumentException("돌린 질문이 없어요. EVAL_RUNS와 EVAL_ONLY를 확인해 주세요");
         }
         return new Report(summarize(target, options, promptHash(llm.lastSystem()), runs), runs);
     }
@@ -158,7 +170,25 @@ final class EvalRunner {
         s.put("promptHash", promptHash);
         s.put("runs", options.runs());
         s.put("chats", n);
-        s.put("score", round1(runs.stream().mapToDouble(r -> r.score().points()).average().orElse(0)));
+        s.put("verdict", options.verdict());
+        s.put("note", options.note());
+        // 점수 = 회차별 점수(예약 흐름 질문은 2배)의 평균. 회차 값도 남겨 "93.1 (93.2 / 92.9)"처럼 흔들림을 보인다
+        List<Double> perRun = new ArrayList<>();
+        List<Long> severePerRun = new ArrayList<>();
+        for (int run = 1; run <= options.runs(); run++) {
+            int k = run;
+            List<CaseRun> these = runs.stream().filter(r -> r.run() == k).toList();
+            perRun.add(round1(weighted(these)));
+            severePerRun.add(these.stream().mapToLong(r -> r.score().severe().size()).sum());
+        }
+        s.put("score", round1(perRun.stream().mapToDouble(Double::doubleValue).average().orElse(0)));
+        s.put("scoreRuns", perRun);
+        s.put("severeErrors", round1(severePerRun.stream().mapToLong(Long::longValue).average().orElse(0)));
+        s.put("severeRuns", severePerRun);
+        List<CaseRun> flow = runs.stream().filter(r -> r.evalCase().flow()).toList();
+        s.put("flowCompletion", pct(flow.stream().filter(r -> r.score().pass() && r.score().severe().isEmpty()).count(),
+                flow.size()));
+        s.put("plainScore", round1(runs.stream().mapToDouble(r -> r.score().points()).average().orElse(0)));
         s.put("passRate", pct(runs.stream().filter(r -> r.score().pass()).count(), n));
         long toolChecked = runs.stream().filter(r -> r.score().toolOk() != null).count();
         s.put("toolAccuracy", pct(runs.stream().filter(r -> Boolean.TRUE.equals(r.score().toolOk())).count(), toolChecked));
@@ -169,6 +199,8 @@ final class EvalRunner {
         s.put("safetyViolations", runs.stream().filter(r -> !r.score().safety().isEmpty()).count());
         s.put("failureRate", pct(runs.stream().filter(r -> r.score().error() != null).count(), n));
         List<Long> millis = runs.stream().filter(r -> r.score().error() == null).map(CaseRun::modelMillis).sorted().toList();
+        s.put("latencyAvgMs", millis.isEmpty() ? null : Math.round(millis.stream().mapToLong(Long::longValue).average().orElse(0)));
+        s.put("latencyMaxMs", millis.isEmpty() ? null : millis.getLast());
         s.put("latencyMedianMs", percentile(millis, 50));
         s.put("latencyP90Ms", percentile(millis, 90));
         double callsPerChat = n == 0 ? 0 : runs.stream().mapToInt(r -> r.calls().size()).sum() / (double) n;
@@ -195,10 +227,20 @@ final class EvalRunner {
         Map<String, Double> groups = new LinkedHashMap<>();
         byGroup.forEach((k, v) -> groups.put(k, round1(v[0] / v[1])));
         s.put("byGroup", groups);
+        Map<String, Double> bySet = new LinkedHashMap<>();
+        runs.stream().map(r -> r.evalCase().set()).distinct()
+                .forEach(set -> bySet.put(set, round1(weighted(runs.stream().filter(r -> r.evalCase().set().equals(set)).toList()))));
+        s.put("bySet", bySet);
         s.put("perCase", perCase);
         s.put("unstableCases", perCase.values().stream()
                 .filter(v -> !v.startsWith("0/") && !v.split("/")[0].equals(v.split("/")[1])).count());
         return s;
+    }
+
+    /** 예약 흐름 질문은 2배로 센 평균 */
+    static double weighted(List<CaseRun> runs) {
+        double weight = runs.stream().mapToInt(r -> r.evalCase().weight()).sum();
+        return weight == 0 ? 0 : runs.stream().mapToDouble(r -> r.score().points() * r.evalCase().weight()).sum() / weight;
     }
 
     static Long percentile(List<Long> sorted, int p) {

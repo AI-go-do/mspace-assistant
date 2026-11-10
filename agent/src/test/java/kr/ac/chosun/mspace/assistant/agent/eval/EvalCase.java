@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.LlmMessage;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -15,9 +16,25 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * @param history  앞선 대화(대화형 예약처럼 여러 차례에 걸친 것). 학생·비서 글만
  * @param fixtures 이 질문에서만 바꿀 도구 결과 (예: my_reservations에 사용 중 예약 하나)
+ * @param set      발화 세트. 없으면 "기본"(C01–C24). 새 세트(예: 여러 차례 대화 "대화")는 점수를 따로 내서 이전 판과 비교가 깨지지 않게 한다
  */
 record EvalCase(String id, String group, String text, List<LlmMessage> history, Map<String, Object> fixtures,
-                Expect expect) {
+                Expect expect, String set) {
+
+    static final String DEFAULT_SET = "기본";
+
+    /** 대화로 예약이 끝까지 되는 기본 흐름(11/10 영준: 가장 중요). 점수에서 2배로 센다 */
+    static final Set<String> FLOW_GROUPS = Set.of("예약", "즉시 시작", "연장", "취소·퇴실", "대화형",
+            "지난번처럼", "시간표");
+    static final int FLOW_WEIGHT = 2;
+
+    boolean flow() {
+        return FLOW_GROUPS.contains(group);
+    }
+
+    int weight() {
+        return flow() ? FLOW_WEIGHT : 1;
+    }
 
     /**
      * 기대. 비어 있는 항목은 보지 않는다.
@@ -90,7 +107,8 @@ record EvalCase(String id, String group, String text, List<LlmMessage> history, 
                 (Map<String, Integer>) e.getOrDefault("count", Map.of()), List.copyOf(args), (String) e.get("card"),
                 strings(e.get("replyAny")), strings(e.get("replyNone")));
         return new EvalCase((String) c.get("id"), (String) c.get("group"), (String) c.get("text"), List.copyOf(history),
-                (Map<String, Object>) c.getOrDefault("fixtures", Map.of()), expect);
+                (Map<String, Object>) c.getOrDefault("fixtures", Map.of()), expect,
+                (String) c.getOrDefault("set", DEFAULT_SET));
     }
 
     @SuppressWarnings("unchecked")
