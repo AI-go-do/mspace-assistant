@@ -269,20 +269,18 @@ final class ReplyPolish {
         int labels = 0;
         int end = from;
         int i = from;
-        while (true) {
+        boolean more = true;
+        while (more) {
             int j = i;
             while (j < text.length() && isLabelChar(text.charAt(j))) {
                 j++;
             }
-            if (j == i) {
-                break;
-            }
-            labels++;
-            end = j;
-            if (j < text.length() && text.charAt(j) == '.') {
+            more = j > i;
+            if (more) {
+                labels++;
+                end = j;
+                more = j < text.length() && text.charAt(j) == '.';
                 i = j + 1;
-            } else {
-                break;
             }
         }
         return labels >= 2 ? end : -1;

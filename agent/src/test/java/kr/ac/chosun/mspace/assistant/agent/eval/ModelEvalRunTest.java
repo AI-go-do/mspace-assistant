@@ -1,5 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.eval;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,10 +29,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <pre>
  * read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY   (zsh. bash는 read -rs -p "Gemini 키: " GEMINI_API_KEY)
- * EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRun -Dsurefire.failIfNoSpecifiedTests=false
+ * EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
  * </pre>
  */
-class ModelEvalRun {
+class ModelEvalRunTest {
 
     /** AI Studio 한도 화면 실측(11/5, 무료 등급, 영준 계정). 다른 모델은 EVAL_RPM·EVAL_RPD로 넣는다 */
     static final Map<String, int[]> GEMINI_FREE = Map.of(
@@ -62,6 +64,8 @@ class ModelEvalRun {
         Path out = Path.of(env("EVAL_OUT", "../scripts/eval/results"));
         String stamp = OffsetDateTime.now(EvalRunner.SEOUL).format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"));
         Path md = ReportWriter.write(out, stamp, reports, json);
+        assertThat(md).exists();
+        assertThat(reports).allSatisfy(r -> assertThat(r.runs()).isNotEmpty());
         System.out.println("\n결과: " + md.toAbsolutePath());
         reports.forEach(r -> System.out.println(r.summary()));
     }
@@ -74,6 +78,7 @@ class ModelEvalRun {
         String system = EvalRunner.currentPrompt(json);
         Path out = Path.of(System.getenv("EVAL_DUMP_PROMPT"));
         Files.writeString(out, EvalRunner.templateOf(system), StandardCharsets.UTF_8);
+        assertThat(Files.readString(out, StandardCharsets.UTF_8)).contains("{{NOW}}");
         System.out.println("지시문 " + EvalRunner.promptHash(system) + " → " + out.toAbsolutePath());
     }
 

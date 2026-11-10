@@ -123,22 +123,33 @@ public class OllamaLlmClient implements LlmClient {
         if (response == null || response.message() == null) {
             throw unavailable();
         }
+        List<ToolCall> calls = toolCalls(response.message());
+        String text = orEmpty(response.message().content());
+        if (calls.isEmpty() && text.isBlank()) {
+            // 빈 말풍선을 성공으로 돌려주지 않는다 (Gemini 어댑터와 같은 계약)
+            throw unavailable();
+        }
+        return new LlmReply(text, calls, usage(response));
+    }
+
+    private static List<ToolCall> toolCalls(Message message) {
         List<ToolCall> calls = new ArrayList<>();
-        for (OllamaToolCall c : response.message().toolCalls() == null ? List.<OllamaToolCall>of() : response.message().toolCalls()) {
+        if (message.toolCalls() == null) {
+            return calls;
+        }
+        for (OllamaToolCall c : message.toolCalls()) {
             if (c != null && c.function() != null && c.function().name() != null) {
                 Map<String, Object> args = c.function().arguments() == null ? Map.of() : c.function().arguments();
                 // Ollama는 호출 id를 주지 않아서 만든다. 결과는 tool_name으로 짝을 맞춘다
                 calls.add(new ToolCall("call_" + UUID.randomUUID(), c.function().name(), args, null));
             }
         }
-        String text = response.message().content() == null ? "" : response.message().content();
-        if (calls.isEmpty() && text.isBlank()) {
-            // 빈 말풍선을 성공으로 돌려주지 않는다 (Gemini 어댑터와 같은 계약)
-            throw unavailable();
-        }
-        LlmReply.Usage usage = response.promptEvalCount() == null || response.evalCount() == null
+        return calls;
+    }
+
+    private static LlmReply.Usage usage(ChatResponse response) {
+        return response.promptEvalCount() == null || response.evalCount() == null
                 ? LlmReply.Usage.UNKNOWN : new LlmReply.Usage(response.promptEvalCount(), response.evalCount());
-        return new LlmReply(text, calls, usage);
     }
 
     private static LlmException unavailable() {
