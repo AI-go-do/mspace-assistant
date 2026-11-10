@@ -74,25 +74,25 @@ JDK 21이 있는 내 컴퓨터에서 돌려요. 키는 명령줄에 쓰지 말�
 cd ~/mspace-assistant && git switch develop && git pull
 read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY
 EVAL_MODELS=gemini:gemini-3.5-flash-lite \
-  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
+  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 unset GEMINI_API_KEY
 
 # 2) 젯슨 보드 B의 Ollama (Tailscale). 젯슨에서 먼저: OLLAMA_HOST=0.0.0.0 ollama serve, ollama pull qwen2.5:3b
 EVAL_MODELS=ollama:qwen2.5:3b,ollama:llama3.2:3b OLLAMA_BASE_URL=http://<젯슨 Tailscale IP>:11434 \
-  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
+  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 3) 지시문 실험: 지금 지시문을 뽑아 고친 뒤 같은 모델로 잰다 (코드는 안 바꿈)
-EVAL_DUMP_PROMPT=$PWD/scripts/eval/prompts/v2.txt ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_DUMP_PROMPT=$PWD/scripts/eval/prompts/v2.txt ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 #   → prompts/v2.txt를 고치고
 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prompts/v2.txt EVAL_PROMPT_LABEL=v2 EVAL_NOTE="v1에서 ○○ 규칙 한 줄만 더함" \
-  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
+  ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 #   → 점수가 오르면 AgentLoop.systemPrompt에 옮기고 PR. 다음 실행부터 "현재 코드" 해시가 바뀌어요
 
 # 대화 세트만 (여러 차례 주고받는 예약, 11/10)
-EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 몇 개만
-EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 | 환경 변수 | 기본 | 뜻 |
