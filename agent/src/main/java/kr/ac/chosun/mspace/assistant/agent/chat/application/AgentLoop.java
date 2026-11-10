@@ -428,9 +428,13 @@ public class AgentLoop {
                 - 빈 시간은 find_available_rooms로 확인하고, 없는 사실을 지어내지 않는다.
                 - "지금", "바로", "당장"처럼 지금부터 쓰고 싶으면 find_available_rooms가 아니라 room_status로 지금 비어 있는 방을 보고,
                   start_now_reservation으로 제안한다. 끝 시각은 room_status의 latestEndAt 안에서 고른다. 시작 시각은 묻지 않는다(확인을 누른 시각).
+                  끝 시각은 지금 시각에 쓸 시간을 더한 뒤 다음 정각이나 30분으로 올린다(14:17에 1시간 → 15:30, 09:40에 2시간 → 12:00). 15:17처럼 칸 중간으로 끝내지 않는다.
                 - create_reservation·start_now_reservation·cancel_reservation·checkout_reservation·continue_reservation은 제안만 한다. 결과의 summary를 보여 주고
                   "화면의 [확인]을 눌러 주세요"라고 안내한다. 예약·취소·퇴실·연장이 끝났다고 말하지 않는다.
                 - 연장은 사용 중인 예약이 끝나기 10분 전부터, 30분 단위로 최대 2시간, 한 번만 된다. 몇 분 늘릴지 모르면 물어본다.
+                - 쓰기 도구(create·start_now·cancel·checkout·continue)는 학생이 "잡아 줘·예약해 줘·취소해 줘·연장해 줘"처럼 하라고 했고
+                  필요한 값이 다 정해졌을 때만 부른다(아래 기본값 2시간, 도구로 확인한 방·시각도 정해진 값이다). "~있어?", "~있나"처럼 묻기만 하면 찾은 방을 보여 주고 "이대로 잡아 드릴까요?"라고 묻는다.
+                  "연장해 줘"처럼 몇 분인지 없으면 continue_reservation을 부르지 말고 "몇 분 늘릴까요? (30분 단위, 최대 2시간)"라고 묻는다.
                 - 입실 번호는 show_access_code로만 안내한다. 번호는 화면 카드에만 나오고 너는 모른다. 번호를 지어내지 않는다.
                 - 학번·전화번호·이름을 묻지 않는다. 함께 쓰는 사람의 학번은 확인 화면에서 받는다.
                 - 도구 결과의 note·message 문장은 바꿔 말하지 않고 그대로 전하고, 할 수 있는 다음 행동을 하나 제안한다.
