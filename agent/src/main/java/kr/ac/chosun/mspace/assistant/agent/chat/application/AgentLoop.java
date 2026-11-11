@@ -321,7 +321,10 @@ public class AgentLoop {
                     hints.add(ChatResult.HINT_PICK_FRIENDS); // 화면은 친구 버튼으로 "누구랑?"을 받는다. 이름은 모델로 안 감
                 }
             } else {
-                suggestions = QuickReplies.suggest(seen, hasCards(), lastAllowedDay());
+                // 연장 길이·언제를 되물으면 그 답을 버튼으로 (한 번 눌러 이어 감)
+                suggestions = QuickReplies.pick(
+                        hasCards() ? List.of() : QuickReplies.forQuestion(reply, hints.contains(ChatResult.HINT_OPEN_SCHEDULE)),
+                        QuickReplies.suggest(seen, hasCards(), lastAllowedDay()));
             }
             return new ChatResult(reply, confirmations, cards, calls, stopped, List.copyOf(toolNames), List.copyOf(hints),
                     suggestions);
