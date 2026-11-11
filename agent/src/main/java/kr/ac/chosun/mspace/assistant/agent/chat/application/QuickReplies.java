@@ -77,13 +77,14 @@ final class QuickReplies {
 
     /**
      * 질문 버튼(asked)과 도구 결과 버튼(fromTools) 중 하나. 연장 길이 질문은 늘 질문 버튼.
-     * "언제" 질문은 도구 결과 버튼이 없거나 시작 버튼뿐일 때만 (빈방 대안 "15:00 2번 방 잡아 줘"가 더 구체적이라 앞선다)
+     * "언제" 질문은 도구 결과 버튼에 "~잡아 줘"(빈방 대안 "15:00 2번 방 잡아 줘"처럼 시각까지 정해진 예약 말)가 있으면
+     * 그쪽이 더 구체적이라 도구 결과 버튼. 없으면(내 예약 조회 뒤 등) 질문 버튼
      */
     static List<String> pick(List<String> asked, List<String> fromTools) {
         if (asked.isEmpty()) {
             return fromTools;
         }
-        if (EXTEND.equals(asked) || fromTools.isEmpty() || START.equals(fromTools)) {
+        if (EXTEND.equals(asked) || fromTools.stream().noneMatch(t -> t.endsWith("잡아 줘"))) {
             return asked;
         }
         return fromTools;

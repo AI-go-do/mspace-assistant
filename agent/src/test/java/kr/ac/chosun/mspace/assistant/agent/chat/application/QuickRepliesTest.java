@@ -235,12 +235,19 @@ class QuickRepliesTest {
     @Test
     @DisplayName("질문이 아니거나 다른 질문이면 질문 버튼 없음 (몇 시간=길이, 이대로 잡을까요, 물음표 없음)")
     void notAQuestionWeKnow() {
-        // given·when·then
-        assertThat(QuickReplies.forQuestion("2번 방이 비어 있어요. 이대로 잡아 드릴까요?", false)).isEmpty();
-        assertThat(QuickReplies.forQuestion("몇 시간 쓰실 건가요?", false)).isEmpty();
-        assertThat(QuickReplies.forQuestion("언제든 다시 물어봐 주세요.", false)).isEmpty();
-        assertThat(QuickReplies.forQuestion("예약을 연장했어요. 몇 분 남았는지는 내 예약에서 볼 수 있어요.", false)).isEmpty();
-        assertThat(QuickReplies.forQuestion(null, false)).isEmpty();
+        // given
+        String offer = "2번 방이 비어 있어요. 이대로 잡아 드릴까요?";
+        String length = "몇 시간 쓰실 건가요?";
+        String noMark = "언제든 다시 물어봐 주세요.";
+        String extendedNoMark = "예약을 연장했어요. 몇 분 남았는지는 내 예약에서 볼 수 있어요.";
+
+        // when
+        List<List<String>> got = List.of(QuickReplies.forQuestion(offer, false), QuickReplies.forQuestion(length, false),
+                QuickReplies.forQuestion(noMark, false), QuickReplies.forQuestion(extendedNoMark, false),
+                QuickReplies.forQuestion(null, false));
+
+        // then
+        assertThat(got).isNotEmpty().allSatisfy(g -> assertThat(g).isEmpty());
     }
 
     @Test
@@ -249,22 +256,36 @@ class QuickRepliesTest {
         // given
         String reply = "언제든 바꿀 수 있어요. 이대로 잡아 드릴까요?";
 
-        // when·then
-        assertThat(QuickReplies.lastQuestion(reply)).isEqualTo(" 이대로 잡아 드릴까요?");
-        assertThat(QuickReplies.forQuestion(reply, false)).isEmpty();
+        // when
+        String last = QuickReplies.lastQuestion(reply);
+        List<String> got = QuickReplies.forQuestion(reply, false);
+
+        // then
+        assertThat(last).isEqualTo(" 이대로 잡아 드릴까요?");
+        assertThat(got).isEmpty();
     }
 
     @Test
-    @DisplayName("고르기: 연장 질문은 늘 질문 버튼, 언제 질문은 빈방 대안 버튼이 있으면 대안이 앞선다")
+    @DisplayName("고르기: 연장 질문은 늘 질문 버튼, 언제 질문은 '~잡아 줘' 대안 버튼이 있을 때만 대안이 앞선다(내 예약 조회 뒤면 질문 버튼)")
     void pick() {
         // given
         List<String> alternatives = List.of("15:00 2번 방 잡아 줘", "다른 시간도 볼게");
+        List<String> afterMyReservations = List.of("입실 번호 보여 줘", "이 예약 취소해 줘");
 
-        // when·then
-        assertThat(QuickReplies.pick(QuickReplies.EXTEND, alternatives)).isEqualTo(QuickReplies.EXTEND);
-        assertThat(QuickReplies.pick(QuickReplies.WHEN, alternatives)).isEqualTo(alternatives);
-        assertThat(QuickReplies.pick(QuickReplies.WHEN, QuickReplies.START)).isEqualTo(QuickReplies.WHEN);
-        assertThat(QuickReplies.pick(QuickReplies.WHEN, List.of())).isEqualTo(QuickReplies.WHEN);
-        assertThat(QuickReplies.pick(List.of(), alternatives)).isEqualTo(alternatives);
+        // when
+        List<String> extend = QuickReplies.pick(QuickReplies.EXTEND, alternatives);
+        List<String> whenWithAlternatives = QuickReplies.pick(QuickReplies.WHEN, alternatives);
+        List<String> whenAfterReservations = QuickReplies.pick(QuickReplies.WHEN, afterMyReservations);
+        List<String> whenAfterStart = QuickReplies.pick(QuickReplies.WHEN, QuickReplies.START);
+        List<String> whenNoTools = QuickReplies.pick(QuickReplies.WHEN, List.of());
+        List<String> noQuestion = QuickReplies.pick(List.of(), alternatives);
+
+        // then
+        assertThat(extend).isEqualTo(QuickReplies.EXTEND);
+        assertThat(whenWithAlternatives).isEqualTo(alternatives);
+        assertThat(whenAfterReservations).isEqualTo(QuickReplies.WHEN);
+        assertThat(whenAfterStart).isEqualTo(QuickReplies.WHEN);
+        assertThat(whenNoTools).isEqualTo(QuickReplies.WHEN);
+        assertThat(noQuestion).isEqualTo(alternatives);
     }
 }
