@@ -233,7 +233,7 @@ public class AgentLoop {
                         return progress.result(grounded(ReplyPolish.dropCardClaims(reply.text()), progress.lookedUpAt,
                                 progress.usedSchedule), false);
                     }
-                    if (progress.confirmations.isEmpty() && ReplyPolish.claimsCard(reply.text())) {
+                    if (progress.confirmations.isEmpty() && claimsConfirmCard(reply.text(), progress.hasCards())) {
                         // 쓰기 도구를 안 불렀는데 "카드를 띄웠어요"라고 하면 화면에는 카드가 없다 (평가 C30·C36).
                         // 한 번만 바로잡아 다시 묻는다. 이 두 줄은 기억에 남기지 않는다(다음 채팅이 따라 하지 않게)
                         progress.nudged = true;
@@ -428,6 +428,17 @@ public class AgentLoop {
     static final String GROUNDING_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 기준)";
     static final String SCHEDULE_SUFFIX = "\n\n(입력한 시간표 기준)";
     static final String BOTH_SUFFIX = "\n\n(예약 시스템 %02d:%02d 조회 · 입력한 시간표 기준)";
+
+    /**
+     * 확인 카드를 만들었다는 주장인지. 입실 번호 카드가 이미 화면에 있으면 "카드를 띄웠어요"는 그 카드를 말하는 것일 수 있으니,
+     * "확인 카드"나 "[확인]"을 말할 때만 주장으로 본다
+     */
+    static boolean claimsConfirmCard(String text, boolean otherCardShown) {
+        if (!ReplyPolish.claimsCard(text)) {
+            return false;
+        }
+        return !otherCardShown || text.contains("확인 카드") || text.contains("[확인]");
+    }
 
     String systemPrompt() {
         return systemPrompt(Persona.DEFAULT);

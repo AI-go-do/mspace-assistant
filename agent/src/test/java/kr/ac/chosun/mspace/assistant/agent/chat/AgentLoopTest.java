@@ -245,6 +245,45 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("입실 번호 카드가 있으면 '화면에 카드를 띄웠어요'는 그 카드 이야기라 다시 묻지 않는다")
+    void bareCardClaimWithAccessCodeIsKept() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(tool("show_access_code", Map.of("reservationId", 7)))
+                .then(say("화면에 카드를 띄웠어요."));
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(ACCESS_CODE, false)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        // then
+        assertThat(llm.seen).hasSize(2);
+        assertThat(result.reply()).startsWith("화면에 카드를 띄웠어요.");
+    }
+
+    @Test
+    @DisplayName("'확인 카드가 생성됐어요'(주격·피동)도 카드 주장으로 보고, 처음엔 다시 묻고 두 번째엔 지운다")
+    void passiveCardClaimIsCaught() {
+        // given
+        var once = new ScriptedLlm()
+                .then(say("확인 카드가 생성됐어요. 화면의 [확인]을 눌러 주세요."))
+                .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+        var twice = new ScriptedLlm()
+                .then(say("확인 카드가 생성됐어요."))
+                .then(say("확인 카드가 다시 생성됐어요. 내일 3시 1번 방이에요."));
+
+        // when
+        ChatResult asked = loop(once, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+        ChatResult dropped = loop(twice, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(once.seen).hasSize(2);
+        assertThat(asked.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
+        assertThat(twice.seen).hasSize(2);
+        assertThat(dropped.reply()).isEqualTo("내일 3시 1번 방이에요.");
+    }
+
+    @Test
     @DisplayName("카드 안내 문장('확인 카드에서 친구를 고르면 돼요')은 거짓 주장이 아니라 그대로 둔다")
     void cardGuidanceIsNotAClaim() {
         // given
