@@ -392,6 +392,26 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("조건은 [확인] 안내와 같은 마디에 있을 때만 인정한다('카드가 다시 보이면 [확인]'은 두고, '카드가 뜨면 알려 드릴게요, 지금 [확인]'은 다시 묻는다)")
+    void conditionMustCoverConfirmClause() {
+        // given
+        var modified = new ScriptedLlm().then(say("확인 카드가 다시 보이면 [확인]을 눌러 주세요."));
+        var detached = new ScriptedLlm()
+                .then(say("확인 카드가 뜨면 알려 드릴게요, 지금 [확인]을 눌러 주세요."))
+                .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+
+        // when
+        ChatResult kept = loop(modified, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+        ChatResult fixed = loop(detached, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(modified.seen).hasSize(1);
+        assertThat(kept.reply()).isEqualTo("확인 카드가 다시 보이면 [확인]을 눌러 주세요.");
+        assertThat(detached.seen).hasSize(2);
+        assertThat(fixed.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
+    }
+
+    @Test
     @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
     void footerOnlyAfterNudgeBecomesNoCardReply() {
         // given

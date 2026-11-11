@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -322,7 +323,25 @@ final class ReplyPolish {
      * 조건의 주어가 카드나 [확인]이어야 한다. "빈방이 보이면 [확인]을 눌러"는 지금 버튼이 있다는 말이라 해당하지 않는다
      */
     private static final Pattern WHEN_CARD_SHOWS = Pattern.compile(
-            "(?:카드|\\[확인\\]|버튼) ?(?:이|가|도)? ?(?:화면에 )?(?:나오|뜨|보이|생기|올라오)면");
+            "(?:카드|\\[확인\\]|버튼) ?(?:이|가|도)? ?(?:[가-힣]+ )?(?:화면에 )?(?:나오|뜨|보이|생기|올라오)면");
+
+    /**
+     * [확인] 안내가 "카드가 나오면" 조건 아래에 있는지. 조건은 [확인] 바로 앞, 같은 마디(쉼표로 끊김) 안에 있어야 한다.
+     * "카드가 뜨면 알려 드릴게요, 지금 [확인]을 눌러 주세요"는 조건이 알림에만 걸려 있어 해당하지 않는다
+     */
+    static boolean isConditionalConfirm(String sentence) {
+        Matcher press = PRESS_CONFIRM.matcher(sentence);
+        boolean any = false;
+        while (press.find()) {
+            any = true;
+            String before = sentence.substring(0, press.start());
+            String clause = before.substring(Math.max(before.lastIndexOf(','), before.lastIndexOf('，')) + 1);
+            if (!WHEN_CARD_SHOWS.matcher(clause).find()) {
+                return false;
+            }
+        }
+        return any || WHEN_CARD_SHOWS.matcher(sentence).find();
+    }
 
     /** 확인 카드를 가리키는 말. "확인카드"처럼 붙여 써도 된다 */
     private static final Pattern CONFIRM_CARD_WORD = Pattern.compile("확인 ?카드|\\[확인\\]");
@@ -333,7 +352,7 @@ final class ReplyPolish {
      * 같은 문장에 "확인 카드"나 "[확인]"이 있을 때만 확인 카드 주장으로 본다
      */
     static boolean isConfirmClaim(String sentence, boolean otherCardShown) {
-        if (PRESS_CONFIRM.matcher(sentence).find() && !WHEN_CARD_SHOWS.matcher(sentence).find()) {
+        if (PRESS_CONFIRM.matcher(sentence).find() && !isConditionalConfirm(sentence)) {
             return true;
         }
         if (!CARD_CLAIM.matcher(sentence).find()) {
@@ -372,7 +391,7 @@ final class ReplyPolish {
             StringBuilder kept = new StringBuilder();
             for (String sentence : sentences(line)) {
                 if (isConfirmClaim(sentence, otherCardShown)
-                        || (sentence.contains("[확인]") && !WHEN_CARD_SHOWS.matcher(sentence).find())) {
+                        || (sentence.contains("[확인]") && !isConditionalConfirm(sentence))) {
                     continue;
                 }
                 kept.append(kept.isEmpty() ? "" : " ").append(sentence);
