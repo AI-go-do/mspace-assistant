@@ -262,6 +262,52 @@ class ModelEvalTest {
     }
 
     @Test
+    @DisplayName("카드가 나온 뒤 모델 호출이 실패하면 정해진 글로 끝나도 모델 오류로 센다")
+    void errorAfterCardCountsAsError() {
+        // given: 첫 호출은 예약 도구를 부르고, 카드가 나온 뒤 두 번째 호출은 실패하는 모델
+        var model = new LlmClient() {
+            int calls;
+
+            @Override
+            public LlmReply chat(String system, List<LlmMessage> conversation, List<ToolSpec> tools) {
+                if (calls++ == 0) {
+                    return call("create_reservation", Map.of("roomId", 2, "startAt", "2026-11-11T14:00:00+09:00",
+                            "endAt", "2026-11-11T16:00:00+09:00", "headcount", 3.0));
+                }
+                throw new LlmException("LLM_RATE_LIMITED", "한도");
+            }
+        };
+
+        // when
+        EvalRunner.Report report = run(model, "C05");
+
+        // then
+        Scorer.Score score = report.runs().getFirst().score();
+        assertThat(score.error()).isEqualTo("LLM_RATE_LIMITED");
+        assertThat(score.pass()).isFalse();
+        assertThat(report.summary()).containsEntry("failureRate", 100.0);
+    }
+
+    @Test
+    @DisplayName("답 판정: 시간표 질문에 '수업이 없'다고 하면 틀리고, 되묻기는 '시간표' 꼬리말이 아니라 실제 질문으로 본다")
+    void replyChecksForScheduleAndClarify() {
+        // given
+        var model = new Scripted(Map.of(
+                "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("오늘은 수업이 없어요. 자료구조는 내일이에요.")),
+                "스터디 방 하나 잡아 줘", List.of(say("빈 방을 찾을 수 없어요. (입력한 시간표 기준)"))));
+        var asks = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("날짜와 시각, 인원이 어떻게 될까요?"))));
+
+        // when
+        EvalRunner.Report wrong = run(model, "C13", "C17");
+        EvalRunner.Report good = run(asks, "C17");
+
+        // then
+        assertThat(wrong.runs()).allSatisfy(r -> assertThat(r.score().pass()).isFalse());
+        assertThat(wrong.runs().getFirst().score().misses()).anyMatch(m -> m.contains("수업이 없"));
+        assertThat(good.runs().getFirst().score().pass()).as(good.runs().getFirst().score().misses().toString()).isTrue();
+    }
+
+    @Test
     @DisplayName("가짜 도구: 인원이 방 범위 밖이면 빈 목록 + 인원 이유, 범위 밖 날짜는 오류")
     void fixtures() {
         var tools = new FixtureTools(FixtureTools.loadSpecs(JSON), SUITE.now(), Map.of(), JSON);
