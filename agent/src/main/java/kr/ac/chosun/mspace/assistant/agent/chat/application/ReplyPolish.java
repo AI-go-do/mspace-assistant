@@ -316,7 +316,7 @@ final class ReplyPolish {
                     + "|생성됐|생성되었|만들어졌|준비됐|준비되었|바뀌었|바꼈|수정됐|수정되었|변경됐|변경되었|떴|올라갔)");
 
     /** "[확인]을 눌러 주세요"처럼 지금 확인 버튼을 누르라는 말. "[확인]을 누르면 ~돼요" 같은 설명은 아니다 */
-    static final Pattern PRESS_CONFIRM = Pattern.compile("\\[확인\\] ?(?:을|를)? ?(?:바로 |지금 )?눌러");
+    static final Pattern PRESS_CONFIRM = Pattern.compile("\\[확인\\] ?(?:버튼 ?)?(?:을|를)? ?(?:바로 |지금 )?눌러");
 
     /**
      * "카드가 나오면 [확인]을 눌러 주세요"처럼 확인 카드가 뜬 뒤를 말하는 조건 안내. 지금 카드가 있다는 말이 아니다.
@@ -334,7 +334,8 @@ final class ReplyPolish {
         boolean any = false;
         while (press.find()) {
             any = true;
-            String before = sentence.substring(0, press.start());
+            // "카드가 뜨면, [확인]을…"처럼 조건 바로 뒤 쉼표는 마디를 끊지 않는다
+            String before = sentence.substring(0, press.start()).replaceAll("면\\s*[,，]", "면 ");
             String clause = before.substring(Math.max(before.lastIndexOf(','), before.lastIndexOf('，')) + 1);
             if (!WHEN_CARD_SHOWS.matcher(clause).find()) {
                 return false;
@@ -380,7 +381,7 @@ final class ReplyPolish {
         return line.split("(?<=[.!?。])\\s+");
     }
 
-    /** 확인 카드가 있다고 말하는 문장과 "[확인]" 문장을 지운다. "카드가 나오면 [확인]을…" 같은 조건 안내는 둔다. 다 지워지면 안내 한 줄 */
+    /** 확인 카드가 있다고 말하거나 지금 [확인]을 누르라는 문장만 지운다. 조건 안내·일반 설명은 둔다. 다 지워지면 안내 한 줄 */
     static String dropCardClaims(String text, boolean otherCardShown) {
         if (text == null) {
             return null;
@@ -390,8 +391,7 @@ final class ReplyPolish {
         for (String line : text.split("\\R")) {
             StringBuilder kept = new StringBuilder();
             for (String sentence : sentences(line)) {
-                if (isConfirmClaim(sentence, otherCardShown)
-                        || (sentence.contains("[확인]") && !isConditionalConfirm(sentence))) {
+                if (isConfirmClaim(sentence, otherCardShown)) {
                     continue;
                 }
                 kept.append(kept.isEmpty() ? "" : " ").append(sentence);

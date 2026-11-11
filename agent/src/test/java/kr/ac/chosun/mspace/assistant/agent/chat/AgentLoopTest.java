@@ -412,6 +412,26 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("조건 뒤 쉼표('카드가 뜨면, [확인]을')는 조건 안내로 두고, 다시 물은 답의 일반 [확인] 설명은 지우지 않는다")
+    void commaAfterConditionAndPlainConfirmExplanationAreKept() {
+        // given
+        var comma = new ScriptedLlm().then(say("확인 카드가 뜨면, 화면의 [확인]을 눌러 주세요."));
+        var plain = new ScriptedLlm()
+                .then(say("확인 카드를 띄웠어요."))
+                .then(say("날짜를 알려 주세요. 예약은 [확인]을 누르기 전에는 끝나지 않아요."));
+
+        // when
+        ChatResult kept = loop(comma, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+        ChatResult explained = loop(plain, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(comma.seen).hasSize(1);
+        assertThat(kept.reply()).isEqualTo("확인 카드가 뜨면, 화면의 [확인]을 눌러 주세요.");
+        assertThat(plain.seen).hasSize(2);
+        assertThat(explained.reply()).isEqualTo("날짜를 알려 주세요. 예약은 [확인]을 누르기 전에는 끝나지 않아요.");
+    }
+
+    @Test
     @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
     void footerOnlyAfterNudgeBecomesNoCardReply() {
         // given
