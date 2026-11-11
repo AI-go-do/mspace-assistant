@@ -289,22 +289,27 @@ class ModelEvalTest {
     }
 
     @Test
-    @DisplayName("답 판정: 시간표 질문에 '수업이 없'다고 하면 틀리고, 되묻기는 '시간표' 꼬리말이 아니라 실제 질문으로 본다")
+    @DisplayName("답 판정: 시간표 질문에 '수업이 없어요'라고 단정하면 틀리고('수업이 없는 시간'은 괜찮음), 되묻기는 '시간표' 꼬리말이 아니라 실제 질문으로 본다")
     void replyChecksForScheduleAndClarify() {
         // given
         var model = new Scripted(Map.of(
                 "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("오늘은 수업이 없어요. 자료구조는 내일이에요.")),
                 "스터디 방 하나 잡아 줘", List.of(say("빈 방을 찾을 수 없어요. (입력한 시간표 기준)"))));
-        var asks = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("날짜와 시각, 인원이 어떻게 될까요?"))));
+        var asks = new Scripted(Map.of(
+                "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("자료구조와 운영체제 수업이 있어요. 수업이 없는 시간도 알려 드릴까요?")),
+                "스터디 방 하나 잡아 줘", List.of(say("날짜와 시각, 인원이 어떻게 될까요?"))));
+        var asksTime = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간과 인원을 알려 주세요."))));
 
         // when
         EvalRunner.Report wrong = run(model, "C13", "C17");
-        EvalRunner.Report good = run(asks, "C17");
+        EvalRunner.Report good = run(asks, "C13", "C17");
+        EvalRunner.Report goodTime = run(asksTime, "C17");
 
         // then
         assertThat(wrong.runs()).allSatisfy(r -> assertThat(r.score().pass()).isFalse());
         assertThat(wrong.runs().getFirst().score().misses()).anyMatch(m -> m.contains("수업이 없"));
-        assertThat(good.runs().getFirst().score().pass()).as(good.runs().getFirst().score().misses().toString()).isTrue();
+        assertThat(good.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
+        assertThat(goodTime.runs().getFirst().score().pass()).as(goodTime.runs().getFirst().score().misses().toString()).isTrue();
     }
 
     @Test
