@@ -304,6 +304,34 @@ final class ReplyPolish {
         };
     }
 
+    /**
+     * "확인 카드를 띄웠어요", "카드를 바꿨어요"처럼 이번 답에서 카드를 만들었다고 말하는 문장.
+     * "확인 카드에서 친구를 고르면 돼요" 같은 안내는 아니다. 카드는 쓰기 도구를 불러야만 생긴다
+     */
+    static final Pattern CARD_CLAIM = Pattern.compile(
+            "카드를 ?(?:다시 |새로 )?(?:띄웠|띄워 ?드렸|바꿨|바꾸었|고쳤|만들었|보여 ?드렸|올렸|준비했)");
+
+    static boolean claimsCard(String text) {
+        return text != null && CARD_CLAIM.matcher(text).find();
+    }
+
+    /** 카드를 띄웠다는 문장과 "[확인]을 눌러" 문장을 지운다. 다 지워지면 안내 한 줄 */
+    static String dropCardClaims(String text) {
+        if (text == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String sentence : text.split("(?<=[.!?。])\\s+")) {
+            if (CARD_CLAIM.matcher(sentence).find() || sentence.contains("[확인]")) {
+                continue;
+            }
+            sb.append(sb.isEmpty() ? "" : " ").append(sentence);
+        }
+        return sb.isEmpty() ? NO_CARD_REPLY : sb.toString();
+    }
+
+    static final String NO_CARD_REPLY = "확인 카드를 만들지 못했어요. 날짜·시각·인원을 한 번 더 말해 주시면 다시 잡아 볼게요.";
+
     /** 둘 다: 꼬리말 지우고 도구 이름 바꾸기 */
     static String polish(String text) {
         return hideToolNames(stripFooters(text));

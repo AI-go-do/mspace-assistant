@@ -201,7 +201,7 @@ public class AgentLoop {
     }
 
     private ChatResult converse(UserHeaders headers, List<LlmMessage> conversation, Persona persona, List<Team> myTeams) {
-        Progress progress = new Progress();
+        Progress progress = new Progress(conversation);
         // 모델 9번×20초 + 도구 8번×10초면 nginx(60초)가 먼저 끊어 504가 나고, 발급된 확인 카드가 화면에 안 간다.
         // 그래서 모델·도구를 새로 부르기 전마다 남은 시간을 보고, 넘었으면 지금까지의 카드와 함께 멈춘다.
         // 이미 시작한 호출 하나는 끊지 않으므로 최악은 기한 + 호출 하나의 제한(Gemini 20초, 도구 10초)이다
@@ -225,6 +225,23 @@ public class AgentLoop {
                     return progress.result(CARDS_ONLY_REPLY, false);
                 }
                 if (!reply.wantsTools()) {
+                    if (!progress.hasCards() && ReplyPolish.claimsCard(reply.text())) {
+                        if (!progress.nudged) {
+                            // 쓰기 도구를 안 불렀는데 "카드를 띄웠어요"라고 하면 화면에는 카드가 없다 (평가 C30·C36).
+                            // 한 번만 바로잡아 다시 묻는다. 이 두 줄은 기억에 남기지 않는다(다음 채팅이 따라 하지 않게)
+                            progress.nudged = true;
+                            LlmMessage said = new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), List.of());
+                            LlmMessage nudge = new LlmMessage.User(NO_CARD_NUDGE);
+                            conversation.add(said);
+                            conversation.add(nudge);
+                            progress.scratch.add(said);
+                            progress.scratch.add(nudge);
+                            continue;
+                        }
+                        log.warn("agent card claim without card");
+                        return progress.result(grounded(ReplyPolish.dropCardClaims(reply.text()), progress.lookedUpAt,
+                                progress.usedSchedule), false);
+                    }
                     return progress.result(grounded(reply.text(), progress.lookedUpAt, progress.usedSchedule), false);
                 }
                 if (progress.calls + reply.toolCalls().size() > props.maxToolCalls()) {
@@ -274,14 +291,21 @@ public class AgentLoop {
 
     /** 한 번의 채팅에서 모은 것: 확인·입실 번호 카드, 부른 도구, 화면 신호, 꼬리말 근거, 빠른 답장 규칙용 결과 */
     private final class Progress {
+        final List<LlmMessage> conversationOf;
         final List<Confirmation> confirmations = new ArrayList<>();
         final List<AccessCodeCard> cards = new ArrayList<>();
         final List<String> toolNames = new ArrayList<>(); // 부른 순서대로. 결과의 tools (측정용)
         final List<String> hints = new ArrayList<>(); // 화면 신호 (ChatResult.HINT_*)
         final List<QuickReplies.Seen> seen = new ArrayList<>();
         int calls;
+        boolean nudged; // "카드 띄웠다"는 거짓 답을 한 번 바로잡았는지
+        final List<LlmMessage> scratch = new ArrayList<>(); // 바로잡을 때 넣은 글. 끝나면 대화에서 뺀다
         Instant lookedUpAt; // 마지막으로 예약 도구가 성공한 시각. 꼬리말의 근거 시각 (실패만 있으면 꼬리말 없음)
         boolean usedSchedule; // my_schedule로 학생이 넣은 시간표를 봤는지. 꼬리말에 "입력한 시간표 기준"
+
+        Progress(List<LlmMessage> conversation) {
+            this.conversationOf = conversation;
+        }
 
         boolean hasCards() {
             return !confirmations.isEmpty() || !cards.isEmpty();
@@ -312,6 +336,9 @@ public class AgentLoop {
 
         /** 멈춘 대화(한도·시간 초과)에는 빠른 답장을 안 띄운다. 이어 가라고 부추기면 또 멈춘다 */
         ChatResult result(String reply, boolean stopped) {
+            if (!scratch.isEmpty()) {
+                conversationOf.removeIf(m -> scratch.stream().anyMatch(x -> x == m));
+            }
             List<String> suggestions;
             if (stopped) {
                 suggestions = List.of();
@@ -358,6 +385,9 @@ public class AgentLoop {
 
     /** 시간 상한으로 실행하지 않은 도구 호출의 결과 자리 (기억의 호출·결과 짝을 지킨다) */
     static final String SKIPPED_RESULT = "{\"message\":\"시간이 오래 걸려 실행하지 않았어요\"}";
+    /** 쓰기 도구 없이 "카드를 띄웠다"고 답했을 때 한 번 다시 묻는 말. 학생 말이 아니라 코드가 넣는 안내다 */
+    static final String NO_CARD_NUDGE = "[안내] 이번 답에서 쓰기 도구를 부르지 않아 화면에 확인 카드가 없어요. "
+            + "카드가 필요하면 지금 해당 쓰기 도구를 부르고, 아니면 카드를 띄웠다고 말하지 말고 다시 답해 주세요.";
     static final String CARDS_ONLY_REPLY = "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요.";
 
     /**

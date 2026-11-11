@@ -154,6 +154,52 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("쓰기 도구 없이 '카드를 띄웠어요'라고 하면 한 번 바로잡아 다시 묻고, 그때 부른 카드가 화면에 간다 (평가 C30)")
+    void fakeCardClaimIsNudgedOnce() {
+        var llm = new ScriptedLlm()
+                .then(say("5번 방으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."))
+                .then(tool("create_reservation", Map.of("roomId", 5)))
+                .then(say("5번 방으로 확인 카드를 띄웠어요."));
+        var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(PROPOSAL, false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "6명으로 늘려 줘");
+
+        assertThat(tools.called).containsExactly("create_reservation");
+        assertThat(result.confirmations()).hasSize(1);
+        assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.User.class,
+                u -> assertThat(u.text()).startsWith("[안내]"));
+        assertThat(llm.seen.get(2)).as("바로잡는 글은 다음 요청까지만, 결과에는 안 남는다")
+                .anyMatch(m -> m instanceof LlmMessage.User u && u.text().startsWith("[안내]"));
+    }
+
+    @Test
+    @DisplayName("바로잡아도 또 카드 없이 '띄웠어요'라고 하면 그 문장을 지우고 끝낸다 (없는 카드를 찾게 하지 않음)")
+    void fakeCardClaimTwiceIsDropped() {
+        var llm = new ScriptedLlm()
+                .then(say("확인 카드를 바꿨어요. 맞으면 화면의 [확인]을 눌러 주세요."))
+                .then(say("모레 15:00–17:00로 확인 카드를 다시 띄웠어요."));
+        var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(PROPOSAL, false)));
+
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "아 내일 말고 모레로");
+
+        assertThat(result.confirmations()).isEmpty();
+        assertThat(result.reply()).doesNotContain("띄웠").doesNotContain("[확인]")
+                .contains("확인 카드를 만들지 못했어요");
+        assertThat(llm.seen).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("카드 안내 문장('확인 카드에서 친구를 고르면 돼요')은 거짓 주장이 아니라 그대로 둔다")
+    void cardGuidanceIsNotAClaim() {
+        var llm = new ScriptedLlm().then(say("함께할 친구는 확인 카드에서 고르면 돼요."));
+
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "친구는 어떻게 넣어?");
+
+        assertThat(result.reply()).isEqualTo("함께할 친구는 확인 카드에서 고르면 돼요.");
+        assertThat(llm.seen).hasSize(1);
+    }
+
+    @Test
     @DisplayName("도구를 부른 답에만 조회 시각 꼬리말이 붙는다. 도구 없는 답(인사)에는 안 붙는다 (TS-09)")
     void groundsOnlyToolBackedReplies() {
         var withTool = new ScriptedLlm()
