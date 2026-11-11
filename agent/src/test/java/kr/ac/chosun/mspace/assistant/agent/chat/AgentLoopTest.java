@@ -457,6 +457,26 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("대괄호 없는 '확인 버튼을 클릭해 주세요'도 지시로 보고, '[확인]을 클릭해야 완료돼요'(설명)는 그대로 둔다")
+    void bareButtonIsPressAndExplanationIsKept() {
+        // given
+        var bare = new ScriptedLlm()
+                .then(say("확인 버튼을 클릭해 주세요."))
+                .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+        var explain = new ScriptedLlm().then(say("예약은 [확인]을 클릭해야 완료돼요."));
+
+        // when
+        ChatResult fixed = loop(bare, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+        ChatResult kept = loop(explain, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+
+        // then
+        assertThat(bare.seen).hasSize(2);
+        assertThat(fixed.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
+        assertThat(explain.seen).hasSize(1);
+        assertThat(kept.reply()).isEqualTo("예약은 [확인]을 클릭해야 완료돼요.");
+    }
+
+    @Test
     @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
     void footerOnlyAfterNudgeBecomesNoCardReply() {
         // given
