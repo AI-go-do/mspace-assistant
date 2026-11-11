@@ -295,6 +295,7 @@ class ModelEvalTest {
         var model = new Scripted(Map.of(
                 "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("오늘은 수업이 없어요. 자료구조는 내일이에요.")),
                 "스터디 방 하나 잡아 줘", List.of(say("빈 방을 찾을 수 없어요. (입력한 시간표 기준)"))));
+        var notAsking = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("내일부터 7일 안의 날짜를 다시 확인해 보세요."))));
         var asks = new Scripted(Map.of(
                 "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("자료구조와 운영체제 수업이 있어요. 수업이 없는 시간도 알려 드릴까요?")),
                 "스터디 방 하나 잡아 줘", List.of(say("날짜와 시각, 인원이 어떻게 될까요?"))));
@@ -304,11 +305,13 @@ class ModelEvalTest {
         EvalRunner.Report wrong = run(model, "C13", "C17");
         EvalRunner.Report good = run(asks, "C13", "C17");
         EvalRunner.Report goodTime = run(asksTime, "C17");
+        EvalRunner.Report mentionsDate = run(notAsking, "C17");
 
         // then
         assertThat(wrong.runs()).allSatisfy(r -> assertThat(r.score().pass()).isFalse());
         assertThat(wrong.runs().getFirst().score().misses()).anyMatch(m -> m.contains("수업이 없"));
         assertThat(good.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
+        assertThat(mentionsDate.runs().getFirst().score().pass()).isFalse();
         assertThat(goodTime.runs().getFirst().score().pass()).as(goodTime.runs().getFirst().score().misses().toString()).isTrue();
     }
 
