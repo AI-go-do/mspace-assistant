@@ -1236,12 +1236,7 @@
      {
       "tool": "create_reservation",
       "arg": "roomId",
-      "oneOf": [
-       1,
-       2,
-       3,
-       4
-      ]
+      "equals": 3
      },
      {
       "tool": "create_reservation",
@@ -1405,12 +1400,7 @@
      {
       "tool": "create_reservation",
       "arg": "roomId",
-      "oneOf": [
-       1,
-       2,
-       3,
-       4
-      ]
+      "equals": 2
      },
      {
       "tool": "create_reservation",
@@ -1477,7 +1467,6 @@
       "tool": "create_reservation",
       "arg": "roomId",
       "oneOf": [
-       1,
        2,
        3,
        4
@@ -1571,12 +1560,7 @@
      {
       "tool": "create_reservation",
       "arg": "roomId",
-      "oneOf": [
-       1,
-       2,
-       3,
-       4
-      ]
+      "equals": 2
      },
      {
       "tool": "create_reservation",
@@ -1624,7 +1608,8 @@
      "얼마나",
      "몇 명",
      "인원"
-    ]
+    ],
+    "asks": true
    }
   }
  ]

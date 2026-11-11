@@ -92,6 +92,7 @@ EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prom
 EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 맥락 세트만 (카드 뒤 고치기·긴 대화, 11/11). 점수판에 섞지 않으려면 EVAL_OUT을 따로
+# 키는 위 1)처럼 먼저 read -rs로 받아 export하고, 끝나면 unset GEMINI_API_KEY (키가 없으면 문항이 0점으로 기록돼요)
 EVAL_OUT=/tmp/mspace-eval-context EVAL_ONLY=C36,C37,C38,C39,C40,C41,C42,C43 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 몇 개만
