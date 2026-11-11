@@ -1,0 +1,1830 @@
+[ {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C01",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "ms" : 1679,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "to" : "16:00",
+        "from" : "14:00",
+        "date" : "2026-11-11"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1688,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "내일 오후 2시부터 4시까지 2번, 3번, 4번, 5번 방이 비어 있어요.   이대로 잡아 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C02",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "room_status" ],
+  "calls" : [ {
+    "ms" : 1270,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "room_status"
+    } ]
+  }, {
+    "ms" : 1320,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "지금 바로 쓸 수 있는 방은 2번 방과 3번 방이 있어요. 두 방 모두 오늘 12:00까지 쓸 수 있습니다.   몇 분이나 이용하시나요? 나 포함 몇 명이서 쓰실 건가요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C03",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations" ],
+  "calls" : [ {
+    "ms" : 3340,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 3206,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 오후 2시부터 4시까지 2번 방 예약이 1건 있습니다.  예약을 취소하시겠습니까?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C04",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "usage_rules" ],
+  "calls" : [ {
+    "ms" : 1127,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "usage_rules"
+    } ]
+  }, {
+    "ms" : 1271,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "방은 한 번에 최대 2시간까지 쓸 수 있어요.   이용 규칙이나 다른 궁금한 점이 있으신가요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "ms" : 3288,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "date" : "2026-11-11",
+        "from" : "14:00",
+        "to" : "16:00",
+        "headcount" : 3,
+        "roomId" : 2
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 3597,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "headcount" : 3,
+        "startAt" : "2026-11-11T14:00:00+09:00",
+        "roomId" : 2,
+        "endAt" : "2026-11-11T16:00:00+09:00"
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 6334,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 14:00–16:00, 3명으로 예약할까요?  화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C06",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "ms" : 1535,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "headcount" : 6,
+        "date" : "2026-11-13",
+        "to" : "17:30",
+        "from" : "16:00"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1948,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "roomId" : 5,
+        "endAt" : "2026-11-13T17:30:00+09:00",
+        "headcount" : 6,
+        "startAt" : "2026-11-13T16:00:00+09:00"
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 2500,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "5번 방, 2026-11-13 16:00–17:30, 6명 예약 확인안입니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C07",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "ms" : 2065,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "from" : "17:00",
+        "roomId" : 3,
+        "to" : "18:00",
+        "date" : "2026-11-10",
+        "headcount" : 4
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 2173,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "endAt" : "2026-11-10T18:00:00+09:00",
+        "headcount" : 4,
+        "roomId" : 3,
+        "startAt" : "2026-11-10T17:00:00+09:00"
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 2236,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "3번 방, 2026-11-10 17:00–18:00, 4명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓰는 사람의 학번은 확인 화면에서 넣으시면 됩니다.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "cancel_reservation" ],
+  "calls" : [ {
+    "ms" : 809,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 922,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "reservationId" : 101
+      },
+      "name" : "cancel_reservation"
+    } ]
+  }, {
+    "ms" : 983,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "예약 101번(2번 방, 11월 11일 14:00~16:00) 취소 확인안입니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C09",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "checkout_reservation" ],
+  "calls" : [ {
+    "ms" : 1381,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 1449,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "reservationId" : 102
+      },
+      "name" : "checkout_reservation"
+    } ]
+  }, {
+    "ms" : 1216,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "예약 102 사용을 끝내고 퇴실할까요? 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "continue_reservation" ],
+  "calls" : [ {
+    "ms" : 1496,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 1632,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "reservationId" : 102,
+        "minutes" : 30
+      },
+      "name" : "continue_reservation"
+    } ]
+  }, {
+    "ms" : 1366,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "예약 102 사용을 30분 연장할까요?   화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C11",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations" ],
+  "calls" : [ {
+    "ms" : 1941,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 2494,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "사용 중인 2번 방 예약이 있네요. 몇 분 늘릴까요? (30분 단위, 최대 2시간)  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "room_status", "start_now_reservation" ],
+  "calls" : [ {
+    "ms" : 1332,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "room_status"
+    } ]
+  }, {
+    "ms" : 1366,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "roomId" : 2,
+        "endAt" : "2026-11-10T11:30:00+09:00",
+        "headcount" : 3
+      },
+      "name" : "start_now_reservation"
+    } ]
+  }, {
+    "ms" : 2056,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방을 지금부터 11:30까지 3명이서 바로 쓰는 확인안입니다. 화면의 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 골라 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C13",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_schedule" ],
+  "calls" : [ {
+    "ms" : 1490,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_schedule"
+    } ]
+  }, {
+    "ms" : 1445,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "오늘 수업은 자료구조(09:00~10:15)와 운영체제(13:30~14:45)가 있어요.   수업이 끝나는 오후 3시 이후에 빈방을 찾아드릴까요?  (입력한 시간표 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C14",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_schedule", "find_available_rooms" ],
+  "calls" : [ {
+    "ms" : 1049,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_schedule"
+    } ]
+  }, {
+    "ms" : 1745,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "from" : "15:00",
+        "date" : "2026-11-10"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1767,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "오늘 마지막 수업이 14시 45에 끝나서 15시 00부터 비어 있는 방을 찾아봤어요.  - 2번 방 (3~5명): 15:00 ~ 22:00 비어 있음 - 3번 방 (3~5명): 15:00 ~ 22:00 비어 있음 -…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C15",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "week_plan" ],
+  "calls" : [ {
+    "ms" : 1383,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "minutes" : 120,
+        "headcount" : null
+      },
+      "name" : "week_plan"
+    } ]
+  }, {
+    "ms" : 1836,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "이번 주에 수업 끝나고 2시간 쓸 수 있는 날은 다음과 같아요.  - 11월 10일(화) 15:00~17:00 (2번 방) - 11월 11일(수) 15:00~17:00 (2번 방) - 11월 12일(목) 15:00~…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "my_reservations", "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "ms" : 821,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 1273,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "date" : "2026-11-10",
+        "from" : "14:00",
+        "to" : "16:00",
+        "headcount" : 4
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1225,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "startAt" : "2026-11-10T14:00:00+09:00",
+        "roomId" : 3,
+        "headcount" : 4,
+        "endAt" : "2026-11-10T16:00:00+09:00"
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 1042,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "3번 방, 2026-11-10 14:00–16:00, 4명으로 예약할까요?  화면의 [확인]을 눌러 주세요. 함께 쓸 친구는 확인 카드에서 고를 수 있어요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C17",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 1277,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "날짜와 시각, 인원이 어떻게 될까요? (예: 내일 오후 2시, 4명)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C18",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "ms" : 1230,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "date" : "2026-11-11",
+        "to" : "17:00",
+        "headcount" : 4,
+        "from" : "15:00"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1513,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "roomId" : 2,
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "headcount" : 4
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 1306,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 15:00 ~ 17:00, 4명 예약 확인안입니다. 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "ms" : 1200,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "date" : "2026-11-11",
+        "headcount" : 3,
+        "to" : "20:30",
+        "from" : "19:00"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1488,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "내일(11월 11일) 저녁 7시부터 8시 반까지 셋이서 쓸 수 있는 방은 1번, 2번, 3번, 4번 방이 있어요.   이대로 1번 방으로 예약해 드릴까요?  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C20",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 1157,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "저는 M-SPACE 예약 비서라서 점심 메뉴는 추천해 드릴 수 없어요.   회의실이나 스터디룸 예약이 필요하시면 말씀해 주세요! 오늘 빈방을 찾아 드릴까요?"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C21",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 1426,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "안녕하세요! 저는 M-SPACE(회의·스터디 방 1~5번) 예약 비서예요.   스터디 방 빈 시간 확인, 예약 제안, 예약 확인·취소·퇴실·연장, 입실 번호 안내, 그리고 이용 규칙이나 시간표 안내를 도와드릴 수 있…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C22",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 296,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C23",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ "show_access_code" ],
+  "calls" : [ {
+    "ms" : 967,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "show_access_code"
+    } ]
+  }, {
+    "ms" : 239,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요."
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C24",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms" ],
+  "calls" : [ {
+    "ms" : 1211,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "to" : "16:00",
+        "from" : "14:00",
+        "headcount" : "25",
+        "date" : "2026-11-11"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1368,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "내일 오후 2시부터 2시간 동안 2명이서 쓸 수 있는 방은 없어요. 인원에 맞는 방이 없어요. 1~4번 방은 3~5명, 5번 방은 5~8명이 쓸 수 있어요. 3명 이상으로 인원을 바꿔서 다시 찾아볼까요?  (예약 시…"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C25",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 414,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C26",
+  "set" : "대화",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "find_available_rooms", "create_reservation" ],
+  "calls" : [ {
+    "ms" : 1213,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "to" : "17:00",
+        "from" : "15:00",
+        "date" : "2026-11-11",
+        "headcount" : 4
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 1140,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "roomId" : 2,
+        "startAt" : "2026-11-11T15:00:00+09:00",
+        "headcount" : 4
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 1155,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 2026-11-11 15:00~17:00, 4명으로 예약할까요? 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C27",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 218,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C28",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 259,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C29",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 294,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C30",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 226,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ "create_reservation" ],
+  "calls" : [ {
+    "ms" : 1521,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "startAt" : "2026-11-11T14:00:00+09:00",
+        "headcount" : 3,
+        "roomId" : 2,
+        "endAt" : "2026-11-11T16:00:00+09:00"
+      },
+      "name" : "create_reservation"
+    } ]
+  }, {
+    "ms" : 264,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : "AI 비서의 답이 끊겼어요. 아래 카드는 그대로 쓸 수 있어요."
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C32",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 323,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C33",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 341,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C34",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 1127,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "to" : "17:00",
+        "from" : "15:00",
+        "date" : "2026-11-11",
+        "headcount" : 4
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 252,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C35",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 266,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C36",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 288,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C37",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 401,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C38",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 245,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C39",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 239,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C40",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 247,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C41",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 274,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C42",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 350,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C43",
+  "set" : "맥락",
+  "points" : 86,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 804,
+    "error" : "",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "되묻지 않음(물음표·[알려 주세요, 알려주세요, 말씀해 주세요, 말씀해주세요] 없음)" ],
+  "reply" : "인원(나 포함 몇 명)을 알려 주시면 바로 예약해 드릴게요!"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C01",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 241,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C02",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 416,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C03",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 251,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C04",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 312,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 309,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C06",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 220,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C07",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 270,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 306,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C09",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 231,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 459,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C11",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 2980,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : { },
+      "name" : "my_reservations"
+    } ]
+  }, {
+    "ms" : 306,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 237,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C13",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 260,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C14",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 511,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C15",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 264,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 205,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C17",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 442,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C18",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 280,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 1196,
+    "error" : "",
+    "toolCalls" : [ {
+      "args" : {
+        "to" : "20:30",
+        "from" : "19:00",
+        "headcount" : 3,
+        "date" : "2026-11-11"
+      },
+      "name" : "find_available_rooms"
+    } ]
+  }, {
+    "ms" : 276,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C20",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 218,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C21",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 253,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C22",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 292,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C23",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 238,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C24",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 380,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C25",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 208,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C26",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 249,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C27",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 278,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C28",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 237,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C29",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 255,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C30",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 302,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 295,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C32",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 521,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C33",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 234,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C34",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 260,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C35",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 310,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C36",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 239,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C37",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 300,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C38",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 215,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C39",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 247,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C40",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 462,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C41",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 296,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C42",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 236,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C43",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "ms" : 269,
+    "error" : "LLM_RATE_LIMITED",
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+} ]
