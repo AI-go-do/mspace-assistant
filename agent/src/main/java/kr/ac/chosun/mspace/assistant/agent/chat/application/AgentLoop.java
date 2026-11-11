@@ -210,7 +210,7 @@ public class AgentLoop {
         try (ToolGateway.Session session = tools.open(headers)) {
             String system = systemPrompt(persona, myTeams);
             while (true) {
-                if (progress.calls > 0 && pastDeadline(deadline, progress.calls)) {
+                if ((progress.calls > 0 || progress.nudged) && pastDeadline(deadline, progress.calls)) {
                     return progress.result(TIME_LIMIT_REPLY, true);
                 }
                 LlmReply reply;
@@ -225,22 +225,25 @@ public class AgentLoop {
                     return progress.result(CARDS_ONLY_REPLY, false);
                 }
                 if (!reply.wantsTools()) {
-                    if (!progress.hasCards() && ReplyPolish.claimsCard(reply.text())) {
-                        if (!progress.nudged) {
-                            // 쓰기 도구를 안 불렀는데 "카드를 띄웠어요"라고 하면 화면에는 카드가 없다 (평가 C30·C36).
-                            // 한 번만 바로잡아 다시 묻는다. 이 두 줄은 기억에 남기지 않는다(다음 채팅이 따라 하지 않게)
-                            progress.nudged = true;
-                            LlmMessage said = new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), List.of());
-                            LlmMessage nudge = new LlmMessage.User(NO_CARD_NUDGE);
-                            conversation.add(said);
-                            conversation.add(nudge);
-                            progress.scratch.add(said);
-                            progress.scratch.add(nudge);
-                            continue;
+                    if (!progress.hasCards() && progress.nudged) {
+                        // 바로잡은 뒤에도 카드가 없으면 카드 주장과 "[확인]" 안내를 지운다 (주장 없이 [확인]만 남은 답 포함)
+                        if (ReplyPolish.claimsCard(reply.text())) {
+                            log.warn("agent card claim without card");
                         }
-                        log.warn("agent card claim without card");
                         return progress.result(grounded(ReplyPolish.dropCardClaims(reply.text()), progress.lookedUpAt,
                                 progress.usedSchedule), false);
+                    }
+                    if (!progress.hasCards() && ReplyPolish.claimsCard(reply.text())) {
+                        // 쓰기 도구를 안 불렀는데 "카드를 띄웠어요"라고 하면 화면에는 카드가 없다 (평가 C30·C36).
+                        // 한 번만 바로잡아 다시 묻는다. 이 두 줄은 기억에 남기지 않는다(다음 채팅이 따라 하지 않게)
+                        progress.nudged = true;
+                        LlmMessage said = new LlmMessage.Assistant(PrivacyMask.mask(reply.text()), List.of());
+                        LlmMessage nudge = new LlmMessage.User(NO_CARD_NUDGE);
+                        conversation.add(said);
+                        conversation.add(nudge);
+                        progress.scratch.add(said);
+                        progress.scratch.add(nudge);
+                        continue;
                     }
                     return progress.result(grounded(reply.text(), progress.lookedUpAt, progress.usedSchedule), false);
                 }

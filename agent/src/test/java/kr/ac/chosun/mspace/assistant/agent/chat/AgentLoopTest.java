@@ -154,34 +154,49 @@ class AgentLoopTest {
     }
 
     @Test
-    @DisplayName("쓰기 도구 없이 '카드를 띄웠어요'라고 하면 한 번 바로잡아 다시 묻고, 그때 부른 카드가 화면에 간다 (평가 C30)")
+    @DisplayName("쓰기 도구 없이 '카드를 띄웠어요'라고 하면 한 번 바로잡아 다시 묻고, 그때 부른 카드가 화면에 간다. 바로잡은 글은 기억에 안 남는다 (평가 C30)")
     void fakeCardClaimIsNudgedOnce() {
+        // given
         var llm = new ScriptedLlm()
                 .then(say("5번 방으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."))
                 .then(tool("create_reservation", Map.of("roomId", 5)))
                 .then(say("5번 방으로 확인 카드를 띄웠어요."));
         var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(PROPOSAL, false)));
+        var memory = new kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryConversationMemory(
+                new MemoryProperties(true, null, java.time.Duration.ofHours(24), 0), CLOCK);
+        var loop = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                memory, new MemoryProperties(true, null, java.time.Duration.ofHours(24), 0));
 
-        ChatResult result = loop(llm, tools).run(ME, List.of(), "6명으로 늘려 줘");
+        // when
+        ChatResult result = loop.run(ME, List.of(), "6명으로 늘려 줘");
 
+        // then
         assertThat(tools.called).containsExactly("create_reservation");
         assertThat(result.confirmations()).hasSize(1);
         assertThat(llm.seen.get(1).getLast()).isInstanceOfSatisfying(LlmMessage.User.class,
                 u -> assertThat(u.text()).startsWith("[안내]"));
-        assertThat(llm.seen.get(2)).as("바로잡는 글은 다음 요청까지만, 결과에는 안 남는다")
-                .anyMatch(m -> m instanceof LlmMessage.User u && u.text().startsWith("[안내]"));
+        List<LlmMessage> saved = memory.load(MemberKey.of(ME));
+        assertThat(saved).as("바로잡는 [안내]와 거짓 답은 기억에서 빠진다")
+                .noneMatch(m -> m instanceof LlmMessage.User u && u.text().startsWith("[안내]"))
+                .noneMatch(m -> m instanceof LlmMessage.Assistant a && a.text().contains("[확인]을 눌러"));
+        assertThat(saved).as("학생 말과 도구 호출·결과는 남는다")
+                .anyMatch(m -> m instanceof LlmMessage.User u && u.text().equals("6명으로 늘려 줘"))
+                .anyMatch(m -> m instanceof LlmMessage.ToolResult r && r.name().equals("create_reservation"));
     }
 
     @Test
     @DisplayName("바로잡아도 또 카드 없이 '띄웠어요'라고 하면 그 문장을 지우고 끝낸다 (없는 카드를 찾게 하지 않음)")
     void fakeCardClaimTwiceIsDropped() {
+        // given
         var llm = new ScriptedLlm()
                 .then(say("확인 카드를 바꿨어요. 맞으면 화면의 [확인]을 눌러 주세요."))
                 .then(say("모레 15:00–17:00로 확인 카드를 다시 띄웠어요."));
         var tools = new FakeTools(Map.of("create_reservation", new ToolGateway.Outcome(PROPOSAL, false)));
 
+        // when
         ChatResult result = loop(llm, tools).run(ME, List.of(), "아 내일 말고 모레로");
 
+        // then
         assertThat(result.confirmations()).isEmpty();
         assertThat(result.reply()).doesNotContain("띄웠").doesNotContain("[확인]")
                 .contains("확인 카드를 만들지 못했어요");
@@ -189,12 +204,31 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("바로잡은 뒤 답에 카드 주장 없이 '[확인]을 눌러'만 남아도 지우고, 다른 줄의 안내는 남긴다")
+    void confirmHintAfterNudgeIsDroppedLineByLine() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(say("확인 카드를 생성했어요."))
+                .then(say("빈방은 2번 방이에요\n맞으면 화면의 [확인]을 눌러 주세요"));
+
+        // when
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "내일 3시로");
+
+        // then
+        assertThat(llm.seen).as("'생성했어요'도 카드 주장으로 보고 한 번 바로잡는다").hasSize(2);
+        assertThat(result.reply()).isEqualTo("빈방은 2번 방이에요");
+    }
+
+    @Test
     @DisplayName("카드 안내 문장('확인 카드에서 친구를 고르면 돼요')은 거짓 주장이 아니라 그대로 둔다")
     void cardGuidanceIsNotAClaim() {
+        // given
         var llm = new ScriptedLlm().then(say("함께할 친구는 확인 카드에서 고르면 돼요."));
 
+        // when
         ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "친구는 어떻게 넣어?");
 
+        // then
         assertThat(result.reply()).isEqualTo("함께할 친구는 확인 카드에서 고르면 돼요.");
         assertThat(llm.seen).hasSize(1);
     }
