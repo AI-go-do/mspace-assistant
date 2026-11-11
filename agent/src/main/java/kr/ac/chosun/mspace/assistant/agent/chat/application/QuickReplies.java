@@ -46,6 +46,10 @@ final class QuickReplies {
     /** 언제를 묻는 질문. "몇 시간"(길이)은 아니다 */
     private static final java.util.regex.Pattern ASKS_WHEN = java.util.regex.Pattern
             .compile("언제|며칠|날짜|시각|몇\\s*시(?!\\s*간)");
+    /** 언제를 물어도 새 예약 시점이 아닌 질문(퇴실·취소·입실 시각 등). 이때 예약 버튼은 엉뚱하다 */
+    private static final java.util.regex.Pattern NOT_BOOKING = java.util.regex.Pattern.compile("퇴실|취소|입실|반납|끝나|끝내");
+    /** 시각까지 정해진 버튼("15:00 2번 방 잡아 줘", "11월 7일 15:30 2번 방 잡아 줘") */
+    private static final java.util.regex.Pattern HAS_TIME = java.util.regex.Pattern.compile("\\d{1,2}:\\d{2}");
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -69,7 +73,7 @@ final class QuickReplies {
         if (EXTEND_VERB.matcher(q).find() && EXTEND_AMOUNT.matcher(q).find()) {
             return EXTEND;
         }
-        if (ASKS_WHEN.matcher(q).find()) {
+        if (ASKS_WHEN.matcher(q).find() && !NOT_BOOKING.matcher(q).find()) {
             return noSchedule ? WHEN.stream().filter(w -> !AFTER_CLASS.equals(w)).toList() : WHEN;
         }
         return List.of();
@@ -77,14 +81,14 @@ final class QuickReplies {
 
     /**
      * 질문 버튼(asked)과 도구 결과 버튼(fromTools) 중 하나. 연장 길이 질문은 늘 질문 버튼.
-     * "언제" 질문은 도구 결과 버튼에 "~잡아 줘"(빈방 대안 "15:00 2번 방 잡아 줘"처럼 시각까지 정해진 예약 말)가 있으면
-     * 그쪽이 더 구체적이라 도구 결과 버튼. 없으면(내 예약 조회 뒤 등) 질문 버튼
+     * "언제" 질문은 도구 결과 버튼에 시각까지 정해진 "~잡아 줘"(빈방 대안 "15:00 2번 방 잡아 줘")가 있으면
+     * 그쪽이 더 구체적이라 도구 결과 버튼. 없으면(내 예약 조회 뒤, "지난번처럼 다시 잡아 줘"뿐일 때 등) 질문 버튼
      */
     static List<String> pick(List<String> asked, List<String> fromTools) {
         if (asked.isEmpty()) {
             return fromTools;
         }
-        if (EXTEND.equals(asked) || fromTools.stream().noneMatch(t -> t.endsWith("잡아 줘"))) {
+        if (EXTEND.equals(asked) || fromTools.stream().noneMatch(t -> HAS_TIME.matcher(t).find() && t.endsWith("잡아 줘"))) {
             return asked;
         }
         return fromTools;
