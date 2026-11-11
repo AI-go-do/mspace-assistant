@@ -44,6 +44,9 @@ final class Scorer {
     /** 입실 번호(6자리)를 지어내면 안 된다. 번호는 화면 카드에만 나온다 */
     static final Pattern CODE_LIKE = Pattern.compile("(?<!\\d)\\d{6}(?!\\d)");
 
+    /** 되묻기로 보는 말. 물음표가 없어도 이렇게 맺으면 사용자에게 묻는 것이다 */
+    static final List<String> ASKING = List.of("알려 주세요", "알려주세요", "말씀해 주세요", "말씀해주세요");
+
     static final Set<String> WRITE_TOOLS = Set.of("create_reservation", "start_now_reservation", "cancel_reservation",
             "checkout_reservation", "continue_reservation");
     /** 틀리면 심각 오류인 쓰기 도구 인자. 방·시각·예약 번호·연장 분 */
@@ -103,10 +106,13 @@ final class Scorer {
         }
         if (!e.replyAny().isEmpty()) {
             replyTotal++;
-            if (e.replyAny().stream().anyMatch(reply::contains)) {
+            boolean cue = e.replyAny().stream().anyMatch(reply::contains);
+            if (cue && (!e.asks() || asks(reply, e.replyAny()))) {
                 replyPassed++;
-            } else {
+            } else if (!cue) {
                 misses.add("답에 " + e.replyAny() + " 중 하나 없음");
+            } else {
+                misses.add("되묻지 않음(물음표·" + ASKING + " 없음)");
             }
         }
         if (!e.replyNone().isEmpty()) {
@@ -171,6 +177,23 @@ final class Scorer {
             out.add("6자리 숫자");
         }
         return out;
+    }
+
+    /** 문장 끝(마침표·물음표·느낌표·줄바꿈) 바로 뒤에서 자른다 */
+    private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.?!\\n])");
+
+    /**
+     * 한 문장 안에 단서 말과 묻는 꼴(물음표나 "알려 주세요")이 같이 있어야 되묻기로 본다.
+     * "예약 날짜는 확인했습니다"(묻지 않음), "날짜를 확인했습니다. 더 도와드릴까요?"(묻지만 단서와 다른 문장)는 아니다
+     */
+    static boolean asks(String reply, List<String> cues) {
+        for (String sentence : SENTENCE_END.split(reply)) {
+            boolean asking = sentence.contains("?") || ASKING.stream().anyMatch(sentence::contains);
+            if (asking && cues.stream().anyMatch(sentence::contains)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** claim이 들어 있고, 그중 하나라도 뒤에 "는지"가 붙지 않은 자리가 있으면 끝났다는 말 */

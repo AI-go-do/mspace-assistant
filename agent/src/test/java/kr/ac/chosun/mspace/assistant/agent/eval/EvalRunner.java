@@ -104,6 +104,12 @@ final class EvalRunner {
                     error = e.getClass().getSimpleName();
                 }
                 List<RecordingLlm.Call> calls = llm.drain();
+                if (error == null) {
+                    // 카드가 나온 뒤 모델 호출이 실패하면 AgentLoop는 정해진 글(CARDS_ONLY_REPLY)로 답한다.
+                    // 그 글은 모델 답이 아니니, 모델 오류로 센다(11/10 CodeRabbit #110)
+                    error = calls.stream().map(RecordingLlm.Call::errorCode).filter(java.util.Objects::nonNull)
+                            .filter(code -> !code.isBlank()).findFirst().orElse(null);
+                }
                 Scorer.Score score = Scorer.score(c, result, calls, error);
                 String snippet = result == null ? "" : PrivacyMask.mask(result.reply()).replace("\n", " ");
                 runs.add(new CaseRun(run, c, score, calls, result == null ? List.of() : result.tools(),

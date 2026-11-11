@@ -262,6 +262,72 @@ class ModelEvalTest {
     }
 
     @Test
+    @DisplayName("카드가 나온 뒤 모델 호출이 실패하면 정해진 글로 끝나도 모델 오류로 센다")
+    void errorAfterCardCountsAsError() {
+        // given: 첫 호출은 예약 도구를 부르고, 카드가 나온 뒤 두 번째 호출은 실패하는 모델
+        var model = new LlmClient() {
+            int calls;
+
+            @Override
+            public LlmReply chat(String system, List<LlmMessage> conversation, List<ToolSpec> tools) {
+                if (calls++ == 0) {
+                    return call("create_reservation", Map.of("roomId", 2, "startAt", "2026-11-11T14:00:00+09:00",
+                            "endAt", "2026-11-11T16:00:00+09:00", "headcount", 3.0));
+                }
+                throw new LlmException("LLM_RATE_LIMITED", "한도");
+            }
+        };
+
+        // when
+        EvalRunner.Report report = run(model, "C05");
+
+        // then
+        Scorer.Score score = report.runs().getFirst().score();
+        assertThat(score.error()).isEqualTo("LLM_RATE_LIMITED");
+        assertThat(score.pass()).isFalse();
+        assertThat(score.points()).isZero();
+        assertThat(report.summary()).containsEntry("failureRate", 100.0);
+    }
+
+    @Test
+    @DisplayName("답 판정: 시간표 질문에 '수업이 없어요'라고 단정하면 틀리고('수업이 없는 시간'은 괜찮음), 되묻기는 '시간표' 꼬리말이 아니라 실제 질문으로 본다")
+    void replyChecksForScheduleAndClarify() {
+        // given
+        var model = new Scripted(Map.of(
+                "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("오늘은 수업이 없어요. 자료구조는 내일이에요.")),
+                "스터디 방 하나 잡아 줘", List.of(say("빈 방을 찾을 수 없어요. (입력한 시간표 기준)"))));
+        var notAsking = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("내일부터 7일 안의 날짜를 다시 확인해 보세요."))));
+        var confirmedTime = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간과 인원은 확인했습니다."))));
+        var confirmedDate = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 날짜는 확인했습니다."))));
+        var otherQuestion = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("날짜를 확인했습니다. 더 도와드릴까요?"))));
+        var asksPlain = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간 알려 주세요."))));
+        var asks = new Scripted(Map.of(
+                "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("자료구조와 운영체제 수업이 있어요. 수업이 없는 시간도 알려 드릴까요?")),
+                "스터디 방 하나 잡아 줘", List.of(say("스터디 방을 잡으려면 날짜와 시각이 필요해요. 어느 날 몇 시부터 쓰실 건가요?"))));
+        var asksTime = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간과 인원을 알려 주세요."))));
+
+        // when
+        EvalRunner.Report wrong = run(model, "C13", "C17");
+        EvalRunner.Report good = run(asks, "C13", "C17");
+        EvalRunner.Report goodTime = run(asksTime, "C17");
+        EvalRunner.Report mentionsDate = run(notAsking, "C17");
+        EvalRunner.Report timeStatement = run(confirmedTime, "C17");
+        EvalRunner.Report dateStatement = run(confirmedDate, "C17");
+        EvalRunner.Report plainAsk = run(asksPlain, "C17");
+        EvalRunner.Report unrelatedAsk = run(otherQuestion, "C17");
+
+        // then
+        assertThat(wrong.runs()).allSatisfy(r -> assertThat(r.score().pass()).isFalse());
+        assertThat(wrong.runs().getFirst().score().misses()).anyMatch(m -> m.contains("수업이 없"));
+        assertThat(good.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
+        assertThat(List.of(mentionsDate, timeStatement, dateStatement, unrelatedAsk))
+                .allSatisfy(r -> assertThat(r.runs().getFirst().score().pass()).isFalse());
+        assertThat(timeStatement.runs().getFirst().score().misses()).anyMatch(m -> m.startsWith("되묻지 않음"));
+        assertThat(plainAsk.runs().getFirst().score().pass()).as(plainAsk.runs().getFirst().score().misses().toString()).isTrue();
+        assertThat(goodTime.runs().getFirst().score().pass()).as(goodTime.runs().getFirst().score().misses().toString()).isTrue();
+    }
+
+    @Test
     @DisplayName("가짜 도구: 인원이 방 범위 밖이면 빈 목록 + 인원 이유, 범위 밖 날짜는 오류")
     void fixtures() {
         var tools = new FixtureTools(FixtureTools.loadSpecs(JSON), SUITE.now(), Map.of(), JSON);
