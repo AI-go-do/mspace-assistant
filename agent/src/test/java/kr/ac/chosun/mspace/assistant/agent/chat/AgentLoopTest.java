@@ -464,16 +464,20 @@ class AgentLoopTest {
                 .then(say("확인 버튼을 클릭해 주세요."))
                 .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
         var explain = new ScriptedLlm().then(say("예약은 [확인]을 클릭해야 완료돼요."));
+        var negative = new ScriptedLlm().then(say("아직 [확인] 버튼을 클릭해 주지 마세요."));
 
         // when
         ChatResult fixed = loop(bare, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
         ChatResult kept = loop(explain, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+        ChatResult notYet = loop(negative, new FakeTools(Map.of())).run(ME, List.of(), "잠깐만");
 
         // then
         assertThat(bare.seen).hasSize(2);
         assertThat(fixed.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
         assertThat(explain.seen).hasSize(1);
         assertThat(kept.reply()).isEqualTo("예약은 [확인]을 클릭해야 완료돼요.");
+        assertThat(negative.seen).hasSize(1);
+        assertThat(notYet.reply()).isEqualTo("아직 [확인] 버튼을 클릭해 주지 마세요.");
     }
 
     @Test
