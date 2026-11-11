@@ -1,0 +1,30 @@
+[ {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4e",
+  "run" : 1,
+  "id" : "C42",
+  "set" : "맥락",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ "create_reservation" ],
+  "calls" : [ {
+    "ms" : 2319,
+    "toolCalls" : [ {
+      "args" : {
+        "endAt" : "2026-11-11T17:00:00+09:00",
+        "startAt" : "2026-11-11T16:00:00+09:00",
+        "roomId" : 2,
+        "headcount" : 3
+      },
+      "name" : "create_reservation"
+    } ],
+    "error" : ""
+  }, {
+    "ms" : 1401,
+    "toolCalls" : [ ],
+    "error" : ""
+  } ],
+  "misses" : [ ],
+  "reply" : "2번 방, 내일 16:00–17:00, 3명으로 확인 카드를 띄웠어요. 맞으면 화면의 [확인]을 눌러 주세요.  (예약 시스템 10:25 조회 기준)"
+} ]
