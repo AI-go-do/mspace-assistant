@@ -317,6 +317,9 @@ final class ReplyPolish {
     /** "[확인]을 눌러 주세요"처럼 지금 확인 버튼을 누르라는 말. "[확인]을 누르면 ~돼요" 같은 설명은 아니다 */
     static final Pattern PRESS_CONFIRM = Pattern.compile("\\[확인\\] ?(?:을|를)? ?(?:바로 |지금 )?눌러");
 
+    /** "카드가 나오면 [확인]을 눌러 주세요"처럼 카드가 뜬 뒤를 말하는 조건 안내. 지금 카드가 있다는 말이 아니다 */
+    private static final Pattern WHEN_CARD_SHOWS = Pattern.compile("(?:나오|뜨|보이|생기|올라오)면");
+
     /** 확인 카드를 가리키는 말. "확인카드"처럼 붙여 써도 된다 */
     private static final Pattern CONFIRM_CARD_WORD = Pattern.compile("확인 ?카드|\\[확인\\]");
 
@@ -326,7 +329,7 @@ final class ReplyPolish {
      * 같은 문장에 "확인 카드"나 "[확인]"이 있을 때만 확인 카드 주장으로 본다
      */
     static boolean isConfirmClaim(String sentence, boolean otherCardShown) {
-        if (PRESS_CONFIRM.matcher(sentence).find()) {
+        if (PRESS_CONFIRM.matcher(sentence).find() && !WHEN_CARD_SHOWS.matcher(sentence).find()) {
             return true;
         }
         if (!CARD_CLAIM.matcher(sentence).find()) {

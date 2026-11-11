@@ -230,7 +230,7 @@ public class AgentLoop {
                         if (ReplyPolish.claimsConfirmCard(reply.text(), progress.hasCards())) {
                             log.warn("agent card claim without card");
                         }
-                        return progress.result(grounded(ReplyPolish.dropCardClaims(reply.text(), progress.hasCards()), progress.lookedUpAt,
+                        return progress.result(grounded(ReplyPolish.dropCardClaims(ReplyPolish.stripFooters(reply.text()), progress.hasCards()), progress.lookedUpAt,
                                 progress.usedSchedule), false);
                     }
                     if (progress.confirmations.isEmpty() && ReplyPolish.claimsConfirmCard(reply.text(), progress.hasCards())) {

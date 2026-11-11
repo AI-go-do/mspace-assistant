@@ -346,6 +346,35 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("'확인 카드가 나오면 [확인]을 눌러 주세요'(조건 안내)는 주장이 아니라 그대로 둔다")
+    void conditionalPressGuidanceIsKept() {
+        // given
+        var llm = new ScriptedLlm().then(say("날짜와 시각을 말해 주세요. 확인 카드가 나오면 화면의 [확인]을 눌러 주세요."));
+
+        // when
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+
+        // then
+        assertThat(llm.seen).hasSize(1);
+        assertThat(result.reply()).isEqualTo("날짜와 시각을 말해 주세요. 확인 카드가 나오면 화면의 [확인]을 눌러 주세요.");
+    }
+
+    @Test
+    @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
+    void footerOnlyAfterNudgeBecomesNoCardReply() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(say("확인 카드를 띄웠어요."))
+                .then(say("확인 카드를 띄웠어요.\n\n(예약 시스템 15:00 조회 기준)"));
+
+        // when
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(result.reply()).isEqualTo("확인 카드를 만들지 못했어요. 날짜·시각·인원을 한 번 더 말해 주시면 다시 잡아 볼게요.");
+    }
+
+    @Test
     @DisplayName("카드 안내 문장('확인 카드에서 친구를 고르면 돼요')은 거짓 주장이 아니라 그대로 둔다")
     void cardGuidanceIsNotAClaim() {
         // given
