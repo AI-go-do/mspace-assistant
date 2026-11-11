@@ -481,9 +481,12 @@ class AgentLoopTest {
     }
 
     @Test
-    @DisplayName("'눌러서 ~해 주세요'·'클릭해 보세요'는 누르라는 말로 보고, '주시면 안 돼요'는 그대로 둔다")
-    void connectiveAndTryPressAreNudgedAndProhibitionIsKept() {
-        for (String press : List.of("확인 버튼을 눌러서 예약을 완료해 주세요.", "확인 버튼을 클릭해 보세요.")) {
+    @DisplayName("'눌러서 ~해 주세요'·'클릭해 보세요'·'눌러서 취소하지 말고 ~해 주세요'는 누르라는 말로 보고 다시 묻는다")
+    void connectiveAndTryPressAreNudged() {
+        for (String press : List.of(
+                "확인 버튼을 눌러서 예약을 완료해 주세요.",
+                "확인 버튼을 클릭해 보세요.",
+                "확인 버튼을 눌러서 취소하지 말고 예약을 완료해 주세요.")) {
             // given
             var llm = new ScriptedLlm()
                     .then(say(press))
@@ -496,18 +499,25 @@ class AgentLoopTest {
             assertThat(llm.seen).as(press).hasSize(2);
             assertThat(result.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
         }
-        var prohibit = new ScriptedLlm().then(say("아직 [확인] 버튼을 클릭해 주시면 안 돼요."));
-        ChatResult kept = loop(prohibit, new FakeTools(Map.of())).run(ME, List.of(), "잠깐만");
-        assertThat(prohibit.seen).hasSize(1);
-        assertThat(kept.reply()).isEqualTo("아직 [확인] 버튼을 클릭해 주시면 안 돼요.");
-        var separate = new ScriptedLlm().then(say("확인 버튼을 클릭해서 예약할 수 있어요, 궁금하면 문의해 주세요."));
-        ChatResult explained = loop(separate, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
-        assertThat(separate.seen).hasSize(1);
-        assertThat(explained.reply()).isEqualTo("확인 버튼을 클릭해서 예약할 수 있어요, 궁금하면 문의해 주세요.");
-        var dont = new ScriptedLlm().then(say("확인 버튼을 눌러서 예약을 진행하지 말아 주세요."));
-        ChatResult warned = loop(dont, new FakeTools(Map.of())).run(ME, List.of(), "잠깐만");
-        assertThat(dont.seen).hasSize(1);
-        assertThat(warned.reply()).isEqualTo("확인 버튼을 눌러서 예약을 진행하지 말아 주세요.");
+    }
+
+    @Test
+    @DisplayName("누르지 말라는 안내, 쉼표 뒤 별도 요청이 붙은 절차 설명은 누르라는 말로 보지 않고 그대로 둔다")
+    void prohibitionAndSeparateClauseAreKept() {
+        for (String kept : List.of(
+                "아직 [확인] 버튼을 클릭해 주시면 안 돼요.",
+                "확인 버튼을 눌러서 예약을 진행하지 말아 주세요.",
+                "확인 버튼을 클릭해서 예약할 수 있어요, 궁금하면 문의해 주세요.")) {
+            // given
+            var llm = new ScriptedLlm().then(say(kept));
+
+            // when
+            ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+
+            // then
+            assertThat(llm.seen).as(kept).hasSize(1);
+            assertThat(result.reply()).isEqualTo(kept);
+        }
     }
 
     @Test
