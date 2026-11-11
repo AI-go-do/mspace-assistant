@@ -361,7 +361,7 @@ final class ReplyPolish {
         return line.split("(?<=[.!?。])\\s+");
     }
 
-    /** 확인 카드가 있다고 말하는 문장과 "[확인]" 문장을 지운다. 다 지워지면 안내 한 줄 */
+    /** 확인 카드가 있다고 말하는 문장과 "[확인]" 문장을 지운다. "카드가 나오면 [확인]을…" 같은 조건 안내는 둔다. 다 지워지면 안내 한 줄 */
     static String dropCardClaims(String text, boolean otherCardShown) {
         if (text == null) {
             return null;
@@ -371,7 +371,8 @@ final class ReplyPolish {
         for (String line : text.split("\\R")) {
             StringBuilder kept = new StringBuilder();
             for (String sentence : sentences(line)) {
-                if (isConfirmClaim(sentence, otherCardShown) || sentence.contains("[확인]")) {
+                if (isConfirmClaim(sentence, otherCardShown)
+                        || (sentence.contains("[확인]") && !WHEN_CARD_SHOWS.matcher(sentence).find())) {
                     continue;
                 }
                 kept.append(kept.isEmpty() ? "" : " ").append(sentence);

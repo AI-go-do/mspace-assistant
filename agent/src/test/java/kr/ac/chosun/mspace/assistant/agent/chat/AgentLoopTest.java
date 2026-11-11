@@ -376,6 +376,22 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("다시 물은 답의 조건 안내('확인 카드가 나오면 [확인]을 눌러')는 지우지 않는다")
+    void conditionalPressGuidanceSurvivesAfterNudge() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(say("확인 카드를 띄웠어요."))
+                .then(say("날짜와 시각을 말해 주세요. 확인 카드가 나오면 화면의 [확인]을 눌러 주세요."));
+
+        // when
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(llm.seen).hasSize(2);
+        assertThat(result.reply()).isEqualTo("날짜와 시각을 말해 주세요. 확인 카드가 나오면 화면의 [확인]을 눌러 주세요.");
+    }
+
+    @Test
     @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
     void footerOnlyAfterNudgeBecomesNoCardReply() {
         // given
