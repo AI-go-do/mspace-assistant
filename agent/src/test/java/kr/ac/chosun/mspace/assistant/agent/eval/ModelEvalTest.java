@@ -317,9 +317,9 @@ class ModelEvalTest {
         EvalRunner.Report unrelatedAsk = run(otherQuestion, "C17");
 
         // then
-        assertThat(wrong.runs()).allSatisfy(r -> assertThat(r.score().pass()).isFalse());
+        assertThat(wrong.runs()).isNotEmpty().allSatisfy(r -> assertThat(r.score().pass()).isFalse());
         assertThat(wrong.runs().getFirst().score().misses()).anyMatch(m -> m.contains("수업이 없"));
-        assertThat(good.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
+        assertThat(good.runs()).isNotEmpty().allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
         assertThat(List.of(mentionsDate, timeStatement, dateStatement, unrelatedAsk))
                 .allSatisfy(r -> assertThat(r.runs().getFirst().score().pass()).isFalse());
         assertThat(timeStatement.runs().getFirst().score().misses()).anyMatch(m -> m.startsWith("되묻지 않음"));
