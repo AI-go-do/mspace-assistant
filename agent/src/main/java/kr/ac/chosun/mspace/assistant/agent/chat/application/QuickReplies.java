@@ -33,6 +33,20 @@ final class QuickReplies {
             java.util.regex.Pattern.compile("몇\\s*분\\s*(?:이|께서)\\s*(?:이용|쓰|사용|함께|오|가)" + QUESTION_END,
                     java.util.regex.Pattern.CANON_EQ));
 
+    /** 비서가 몇 분 늘릴지 물을 때. 버튼 글만 보내도 뜻이 통하게 "연장해 줘"까지 넣는다 (최대 2시간·30분 단위) */
+    static final List<String> EXTEND = List.of("30분 연장해 줘", "1시간 연장해 줘", "2시간 연장해 줘");
+
+    /** 비서가 언제 쓸지 물을 때. 길이는 넣지 않는다(앞에서 말한 길이나 기본 2시간을 모델이 쓴다) */
+    static final String AFTER_CLASS = "오늘 수업 끝나고 잡아 줘";
+    static final List<String> WHEN = List.of("지금 바로 잡아 줘", AFTER_CLASS, "내일 오후 2시로 잡아 줘");
+
+    /** 늘릴 길이를 묻는 질문: 질문 문장에 "늘리·연장"과 "몇 분·얼마·몇 시간"이 함께 있다 */
+    private static final java.util.regex.Pattern EXTEND_VERB = java.util.regex.Pattern.compile("늘리|늘릴|연장");
+    private static final java.util.regex.Pattern EXTEND_AMOUNT = java.util.regex.Pattern.compile("몇\\s*분|얼마|몇\\s*시간");
+    /** 언제를 묻는 질문. "몇 시간"(길이)은 아니다 */
+    private static final java.util.regex.Pattern ASKS_WHEN = java.util.regex.Pattern
+            .compile("언제|며칠|날짜|시각|몇\\s*시(?!\\s*간)");
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private QuickReplies() {
@@ -41,6 +55,58 @@ final class QuickReplies {
     /** 답이 인원을 묻는 질문이면 true. 이때는 도구 결과 규칙 대신 {@link #HEADCOUNT} 버튼을 띄운다 */
     static boolean asksHeadcount(String reply) {
         return reply != null && ASKS_HEADCOUNT.stream().anyMatch(p -> p.matcher(reply).find());
+    }
+
+    /**
+     * 비서 답의 마지막 질문에 맞춘 답 버튼(되묻기를 한 번 누름으로 끝내게). 인원 질문은 {@link #asksHeadcount}가 따로 본다.
+     * 맞는 질문이 없으면 빈 목록. 시간표가 없다고 나온 대화(noSchedule)면 "수업 끝나고" 버튼은 뺀다(눌러도 시간표가 없음)
+     */
+    static List<String> forQuestion(String reply, boolean noSchedule) {
+        String q = lastQuestion(reply);
+        if (q == null) {
+            return List.of();
+        }
+        if (EXTEND_VERB.matcher(q).find() && EXTEND_AMOUNT.matcher(q).find()) {
+            return EXTEND;
+        }
+        if (ASKS_WHEN.matcher(q).find()) {
+            return noSchedule ? WHEN.stream().filter(w -> !AFTER_CLASS.equals(w)).toList() : WHEN;
+        }
+        return List.of();
+    }
+
+    /**
+     * 질문 버튼(asked)과 도구 결과 버튼(fromTools) 중 하나. 연장 길이 질문은 늘 질문 버튼.
+     * "언제" 질문은 도구 결과 버튼이 없거나 시작 버튼뿐일 때만 (빈방 대안 "15:00 2번 방 잡아 줘"가 더 구체적이라 앞선다)
+     */
+    static List<String> pick(List<String> asked, List<String> fromTools) {
+        if (asked.isEmpty()) {
+            return fromTools;
+        }
+        if (EXTEND.equals(asked) || fromTools.isEmpty() || START.equals(fromTools)) {
+            return asked;
+        }
+        return fromTools;
+    }
+
+    /** 답에서 마지막 물음표로 끝나는 문장. 물음표가 없으면 null */
+    static String lastQuestion(String reply) {
+        if (reply == null) {
+            return null;
+        }
+        int end = Math.max(reply.lastIndexOf('?'), reply.lastIndexOf('？'));
+        if (end < 0) {
+            return null;
+        }
+        int start = 0;
+        for (int i = end - 1; i >= 0; i--) {
+            char c = reply.charAt(i);
+            if (c == '.' || c == '!' || c == '\n' || c == '?' || c == '？') {
+                start = i + 1;
+                break;
+            }
+        }
+        return reply.substring(start, end + 1);
     }
 
     /**

@@ -187,6 +187,20 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("연장 길이를 되물으면 시작 버튼 대신 [30분·1시간·2시간 연장해 줘] 버튼이 붙는다")
+    void asksExtendWithButtons() {
+        // given: 도구 없이 몇 분인지 되묻는 답 (지시문 규칙)
+        var llm = new ScriptedLlm().then(say("몇 분 늘릴까요? (30분 단위, 최대 2시간)"));
+
+        // when
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "연장해 줘");
+
+        // then
+        assertThat(result.suggestions()).containsExactly("30분 연장해 줘", "1시간 연장해 줘", "2시간 연장해 줘");
+        assertThat(result.confirmations()).isEmpty();
+    }
+
+    @Test
     @DisplayName("팀(FR-AGT-105): 저장한 팀은 지시문에 이름·인원만 들어가고 팀원 학번·이름은 안 들어간다")
     void teamsInPromptWithoutMembers() {
         // given
