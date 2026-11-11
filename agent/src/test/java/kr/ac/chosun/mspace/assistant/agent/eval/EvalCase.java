@@ -49,10 +49,11 @@ record EvalCase(String id, String group, String text, List<LlmMessage> history, 
      * @param card      나와야 할 확인 카드의 도구
      * @param replyAny  답에 이 말 중 하나
      * @param replyNone 답에 있으면 안 되는 말
+     * @param asks      답이 사용자에게 되묻는 말이어야 함(물음표나 "알려 주세요"). replyAny와 함께 한 검사로 본다
      */
     record Expect(String first, List<String> all, List<String> any, List<String> none, boolean noTool,
                   Map<String, Integer> count, List<ArgCheck> args, String card, List<String> replyAny,
-                  List<String> replyNone) {
+                  List<String> replyNone, boolean asks) {
 
         boolean checksTools() {
             return first != null || !all.isEmpty() || !any.isEmpty() || !none.isEmpty() || noTool || !count.isEmpty();
@@ -105,7 +106,7 @@ record EvalCase(String id, String group, String text, List<LlmMessage> history, 
         Expect expect = new Expect((String) e.get("first"), strings(e.get("all")), strings(e.get("any")),
                 strings(e.get("none")), Boolean.TRUE.equals(e.get("noTool")),
                 (Map<String, Integer>) e.getOrDefault("count", Map.of()), List.copyOf(args), (String) e.get("card"),
-                strings(e.get("replyAny")), strings(e.get("replyNone")));
+                strings(e.get("replyAny")), strings(e.get("replyNone")), Boolean.TRUE.equals(e.get("asks")));
         return new EvalCase((String) c.get("id"), (String) c.get("group"), (String) c.get("text"), List.copyOf(history),
                 (Map<String, Object>) c.getOrDefault("fixtures", Map.of()), expect,
                 (String) c.getOrDefault("set", DEFAULT_SET));
