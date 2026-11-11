@@ -481,6 +481,28 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("'눌러서 ~해 주세요'·'클릭해 보세요'는 누르라는 말로 보고, '주시면 안 돼요'는 그대로 둔다")
+    void connectiveAndTryPressAreNudgedAndProhibitionIsKept() {
+        for (String press : List.of("확인 버튼을 눌러서 예약을 완료해 주세요.", "확인 버튼을 클릭해 보세요.")) {
+            // given
+            var llm = new ScriptedLlm()
+                    .then(say(press))
+                    .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+
+            // when
+            ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+            // then
+            assertThat(llm.seen).as(press).hasSize(2);
+            assertThat(result.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
+        }
+        var prohibit = new ScriptedLlm().then(say("아직 [확인] 버튼을 클릭해 주시면 안 돼요."));
+        ChatResult kept = loop(prohibit, new FakeTools(Map.of())).run(ME, List.of(), "잠깐만");
+        assertThat(prohibit.seen).hasSize(1);
+        assertThat(kept.reply()).isEqualTo("아직 [확인] 버튼을 클릭해 주시면 안 돼요.");
+    }
+
+    @Test
     @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
     void footerOnlyAfterNudgeBecomesNoCardReply() {
         // given
