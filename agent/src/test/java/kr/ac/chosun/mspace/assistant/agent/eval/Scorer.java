@@ -107,7 +107,7 @@ final class Scorer {
         if (!e.replyAny().isEmpty()) {
             replyTotal++;
             boolean cue = e.replyAny().stream().anyMatch(reply::contains);
-            if (cue && (!e.asks() || asks(reply))) {
+            if (cue && (!e.asks() || asks(reply, e.replyAny()))) {
                 replyPassed++;
             } else if (!cue) {
                 misses.add("답에 " + e.replyAny() + " 중 하나 없음");
@@ -179,9 +179,21 @@ final class Scorer {
         return out;
     }
 
-    /** "예약 날짜는 확인했습니다"처럼 말만 꺼낸 것이 아니라 정말 묻는지 본다 */
-    static boolean asks(String reply) {
-        return reply.contains("?") || ASKING.stream().anyMatch(reply::contains);
+    /** 문장 끝(마침표·물음표·느낌표·줄바꿈) 바로 뒤에서 자른다 */
+    private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.?!\\n])");
+
+    /**
+     * 한 문장 안에 단서 말과 묻는 꼴(물음표나 "알려 주세요")이 같이 있어야 되묻기로 본다.
+     * "예약 날짜는 확인했습니다"(묻지 않음), "날짜를 확인했습니다. 더 도와드릴까요?"(묻지만 단서와 다른 문장)는 아니다
+     */
+    static boolean asks(String reply, List<String> cues) {
+        for (String sentence : SENTENCE_END.split(reply)) {
+            boolean asking = sentence.contains("?") || ASKING.stream().anyMatch(sentence::contains);
+            if (asking && cues.stream().anyMatch(sentence::contains)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** claim이 들어 있고, 그중 하나라도 뒤에 "는지"가 붙지 않은 자리가 있으면 끝났다는 말 */

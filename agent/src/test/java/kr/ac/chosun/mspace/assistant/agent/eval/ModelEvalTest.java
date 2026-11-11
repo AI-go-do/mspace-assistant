@@ -285,6 +285,7 @@ class ModelEvalTest {
         Scorer.Score score = report.runs().getFirst().score();
         assertThat(score.error()).isEqualTo("LLM_RATE_LIMITED");
         assertThat(score.pass()).isFalse();
+        assertThat(score.points()).isZero();
         assertThat(report.summary()).containsEntry("failureRate", 100.0);
     }
 
@@ -298,10 +299,11 @@ class ModelEvalTest {
         var notAsking = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("내일부터 7일 안의 날짜를 다시 확인해 보세요."))));
         var confirmedTime = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간과 인원은 확인했습니다."))));
         var confirmedDate = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 날짜는 확인했습니다."))));
+        var otherQuestion = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("날짜를 확인했습니다. 더 도와드릴까요?"))));
         var asksPlain = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간 알려 주세요."))));
         var asks = new Scripted(Map.of(
                 "오늘 수업 뭐 있어?", List.of(call("my_schedule", Map.of()), say("자료구조와 운영체제 수업이 있어요. 수업이 없는 시간도 알려 드릴까요?")),
-                "스터디 방 하나 잡아 줘", List.of(say("날짜와 시각, 인원이 어떻게 될까요?"))));
+                "스터디 방 하나 잡아 줘", List.of(say("스터디 방을 잡으려면 날짜와 시각이 필요해요. 어느 날 몇 시부터 쓰실 건가요?"))));
         var asksTime = new Scripted(Map.of("스터디 방 하나 잡아 줘", List.of(say("예약 시간과 인원을 알려 주세요."))));
 
         // when
@@ -312,12 +314,13 @@ class ModelEvalTest {
         EvalRunner.Report timeStatement = run(confirmedTime, "C17");
         EvalRunner.Report dateStatement = run(confirmedDate, "C17");
         EvalRunner.Report plainAsk = run(asksPlain, "C17");
+        EvalRunner.Report unrelatedAsk = run(otherQuestion, "C17");
 
         // then
         assertThat(wrong.runs()).allSatisfy(r -> assertThat(r.score().pass()).isFalse());
         assertThat(wrong.runs().getFirst().score().misses()).anyMatch(m -> m.contains("수업이 없"));
         assertThat(good.runs()).allSatisfy(r -> assertThat(r.score().pass()).as(r.score().misses().toString()).isTrue());
-        assertThat(List.of(mentionsDate, timeStatement, dateStatement))
+        assertThat(List.of(mentionsDate, timeStatement, dateStatement, unrelatedAsk))
                 .allSatisfy(r -> assertThat(r.runs().getFirst().score().pass()).isFalse());
         assertThat(timeStatement.runs().getFirst().score().misses()).anyMatch(m -> m.startsWith("되묻지 않음"));
         assertThat(plainAsk.runs().getFirst().score().pass()).as(plainAsk.runs().getFirst().score().misses().toString()).isTrue();
