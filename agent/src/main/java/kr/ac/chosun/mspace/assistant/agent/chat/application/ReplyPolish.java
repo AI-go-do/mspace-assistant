@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -303,6 +304,112 @@ final class ReplyPolish {
             default -> particle;
         };
     }
+
+    /**
+     * "확인 카드를 띄웠어요", "카드를 바꿨어요", "확인 카드가 생성됐어요", "확인 카드 띄웠어요"처럼 이번 답에서 카드를 만들었다고 말하는 표현.
+     * 조사(를·가·도)는 있어도 없어도 된다. "확인 카드에서 친구를 고르면 돼요" 같은 안내,
+     * "입실 번호 카드를 띄웠어요"(쓰기 도구가 아닌 카드)는 아니다. 확인 카드는 쓰기 도구를 불러야만 생긴다
+     */
+    static final Pattern CARD_CLAIM = Pattern.compile(
+            "(?<!번호 )(?<!번호)카드 ?(?:를|가|도)? ?(?:다시 |새로 )?"
+                    + "(?:띄웠|띄워 ?드렸|바꿨|바꾸었|고쳤|만들었|생성했|수정했|변경했|보여 ?드렸|올렸|준비했"
+                    + "|생성됐|생성되었|만들어졌|준비됐|준비되었|바뀌었|바꼈|수정됐|수정되었|변경됐|변경되었|떴|올라갔)");
+
+    /**
+     * "[확인]을 눌러 주세요"·"확인 버튼을 클릭해 줘"처럼 지금 확인 버튼을 누르라는 지시.
+     * 동사 뒤가 "주세요·줘·요·봐"일 때만 본다. "클릭해야 완료돼요"(설명)·"눌러서는 안 돼요"(금지)는 아니다
+     */
+    static final Pattern PRESS_CONFIRM = Pattern.compile(
+            "(?:\\[확인\\] ?(?:버튼 ?)?|확인 ?버튼 ?)(?:을|를)? ?(?:바로 |지금 )?(?:눌러|클릭해|탭해|터치해)"
+            + "(?: ?(?:주|줘|요|봐|보(?=세요|십시오))(?!시? ?지 ?마|시?면 ?안)|(?:서|고) (?![^.!?,，\\n]{0,40}?지 ?말아? ?(?:주세요|주십시오|줘))[^.!?,，\\n]{0,40}?(?:주세요|주십시오|줘))");
+
+    /**
+     * "카드가 나오면 [확인]을 눌러 주세요"처럼 확인 카드가 뜬 뒤를 말하는 조건 안내. 지금 카드가 있다는 말이 아니다.
+     * 조건의 주어가 카드나 [확인]이어야 한다. "빈방이 보이면 [확인]을 눌러"는 지금 버튼이 있다는 말이라 해당하지 않는다
+     */
+    private static final Pattern WHEN_CARD_SHOWS = Pattern.compile(
+            "(?:카드|\\[확인\\]|버튼) ?(?:이|가|도)? ?(?:[가-힣]+ )?(?:화면에 )?(?:나오|뜨|보이|생기|올라오)면");
+
+    /**
+     * [확인] 안내가 "카드가 나오면" 조건 아래에 있는지. 조건은 [확인] 바로 앞, 같은 마디(쉼표로 끊김) 안에 있어야 한다.
+     * "카드가 뜨면 알려 드릴게요, 지금 [확인]을 눌러 주세요"는 조건이 알림에만 걸려 있어 해당하지 않는다
+     */
+    static boolean isConditionalConfirm(String sentence) {
+        Matcher press = PRESS_CONFIRM.matcher(sentence);
+        boolean any = false;
+        while (press.find()) {
+            any = true;
+            // "카드가 뜨면, [확인]을…"처럼 조건 바로 뒤 쉼표는 마디를 끊지 않는다
+            String before = sentence.substring(0, press.start()).replaceAll("면\\s*[,，]", "면 ");
+            String clause = before.substring(Math.max(before.lastIndexOf(','), before.lastIndexOf('，')) + 1);
+            if (!WHEN_CARD_SHOWS.matcher(clause).find()) {
+                return false;
+            }
+        }
+        return any || WHEN_CARD_SHOWS.matcher(sentence).find();
+    }
+
+    /** 확인 카드를 가리키는 말. "확인카드"처럼 붙여 써도 된다 */
+    private static final Pattern CONFIRM_CARD_WORD = Pattern.compile("확인 ?카드|\\[확인\\]");
+
+    /**
+     * 확인 카드가 없는데 있다고 말하는 문장인지. 카드를 만들었다는 말이나 [확인]을 누르라는 말이다.
+     * 입실 번호 카드가 이미 화면에 있으면(otherCardShown) "카드를 띄웠어요"는 그 카드일 수 있으니,
+     * 같은 문장에 "확인 카드"나 "[확인]"이 있을 때만 확인 카드 주장으로 본다
+     */
+    static boolean isConfirmClaim(String sentence, boolean otherCardShown) {
+        if (PRESS_CONFIRM.matcher(sentence).find() && !isConditionalConfirm(sentence)) {
+            return true;
+        }
+        if (!CARD_CLAIM.matcher(sentence).find()) {
+            return false;
+        }
+        return !otherCardShown || CONFIRM_CARD_WORD.matcher(sentence).find();
+    }
+
+    /** 답의 어느 문장이든 확인 카드가 있다고 말하면 true. 문장마다 따로 본다 */
+    static boolean claimsConfirmCard(String text, boolean otherCardShown) {
+        if (text == null) {
+            return false;
+        }
+        for (String line : text.split("\\R")) {
+            for (String sentence : sentences(line)) {
+                if (isConfirmClaim(sentence, otherCardShown)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String[] sentences(String line) {
+        return line.split("(?<=[.!?。])\\s+");
+    }
+
+    /** 확인 카드가 있다고 말하거나 지금 [확인]을 누르라는 문장만 지운다. 조건 안내·일반 설명은 둔다. 다 지워지면 안내 한 줄 */
+    static String dropCardClaims(String text, boolean otherCardShown) {
+        if (text == null) {
+            return null;
+        }
+        // 줄마다 따로, 줄 안에서는 문장마다 본다. 카드 주장 줄 때문에 다른 줄(빈방 안내 등)까지 지우지 않는다
+        List<String> lines = new ArrayList<>();
+        for (String line : text.split("\\R")) {
+            StringBuilder kept = new StringBuilder();
+            for (String sentence : sentences(line)) {
+                if (isConfirmClaim(sentence, otherCardShown)) {
+                    continue;
+                }
+                kept.append(kept.isEmpty() ? "" : " ").append(sentence);
+            }
+            if (!kept.toString().isBlank() || (line.isBlank() && !lines.isEmpty())) {
+                lines.add(kept.toString());
+            }
+        }
+        String out = String.join("\n", lines).strip();
+        return out.isEmpty() ? NO_CARD_REPLY : out;
+    }
+
+    static final String NO_CARD_REPLY = "확인 카드를 만들지 못했어요. 날짜·시각·인원을 한 번 더 말해 주시면 다시 잡아 볼게요.";
 
     /** 둘 다: 꼬리말 지우고 도구 이름 바꾸기 */
     static String polish(String text) {
