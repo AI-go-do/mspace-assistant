@@ -116,6 +116,7 @@ class AgentLoopTest {
     }
 
     static final String FREE = "{\"date\":\"2026-11-03\",\"rooms\":[{\"roomId\":2,\"free\":[]}],\"note\":null}";
+    static final String ACCESS_CODE = "{\"reservationId\":7,\"owner\":true,\"cardShown\":true,\"message\":\"카드로 보여 줬음\"}";
     static final String PROPOSAL = """
             {"confirmToken":"c_secret","expiresAt":"2026-11-02T15:02:00+09:00",
              "summary":"2번 방, 11월 3일(화) 14:00–16:00, 3명으로 예약할까요?","notes":["함께 쓰는 2명의 학번은 확인 화면에서 입력해요."],
@@ -217,6 +218,30 @@ class AgentLoopTest {
         // then
         assertThat(llm.seen).as("'생성했어요'도 카드 주장으로 보고 한 번 바로잡는다").hasSize(2);
         assertThat(result.reply()).isEqualTo("빈방은 2번 방이에요");
+    }
+
+    @Test
+    @DisplayName("입실 번호 카드만 있어도 확인 카드는 없으니 '확인 카드를 생성했어요'는 바로잡는다. '입실 번호 카드를 띄웠어요'는 그대로 둔다")
+    void accessCodeCardDoesNotCoverConfirmClaim() {
+        // given
+        var claim = new ScriptedLlm()
+                .then(tool("show_access_code", Map.of("reservationId", 7)))
+                .then(say("확인 카드를 생성했어요. 화면의 [확인]을 눌러 주세요."))
+                .then(say("입실 번호는 화면 카드에서 볼 수 있어요."));
+        var honest = new ScriptedLlm()
+                .then(tool("show_access_code", Map.of("reservationId", 7)))
+                .then(say("입실 번호 카드를 띄웠어요."));
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(ACCESS_CODE, false)));
+
+        // when
+        ChatResult fixed = loop(claim, tools).run(ME, List.of(), "입실 번호 알려 줘");
+        ChatResult kept = loop(honest, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        // then
+        assertThat(claim.seen).hasSize(3);
+        assertThat(fixed.reply()).doesNotContain("[확인]");
+        assertThat(honest.seen).hasSize(2);
+        assertThat(kept.reply()).startsWith("입실 번호 카드를 띄웠어요.");
     }
 
     @Test
