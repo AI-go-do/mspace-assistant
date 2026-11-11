@@ -360,6 +360,22 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("조건이 카드가 아니면('빈방이 보이면 [확인]을 눌러') 지금 버튼이 있다는 말로 보고 다시 묻는다")
+    void pressConfirmWithNonCardConditionIsNudged() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(say("빈방이 보이면 지금 화면의 [확인]을 눌러 주세요."))
+                .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+
+        // when
+        ChatResult result = loop(llm, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(llm.seen).hasSize(2);
+        assertThat(result.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
+    }
+
+    @Test
     @DisplayName("다시 물은 답이 카드 주장과 꼬리말뿐이면 꼬리말을 먼저 떼고 '카드를 만들지 못했어요' 안내로 바꾼다")
     void footerOnlyAfterNudgeBecomesNoCardReply() {
         // given
