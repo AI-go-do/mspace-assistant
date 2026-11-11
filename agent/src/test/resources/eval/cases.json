@@ -1205,6 +1205,412 @@
      }
     ]
    }
+  },
+  {
+   "id": "C36",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "아 내일 말고 모레로",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간 3번 방 4명으로 예약해 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "내일(11/11) 15:00–17:00 3번 방, 4명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 3
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-12T15:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-12T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C37",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "수요일 거 취소해 줘",
+   "fixtures": {
+    "my_reservations": {
+     "reservations": [
+      {
+       "id": 101,
+       "roomName": "2번 방",
+       "startAt": "2026-11-11T14:00:00+09:00",
+       "endAt": "2026-11-11T16:00:00+09:00",
+       "status": "BOOKED",
+       "owner": true,
+       "participantCount": 3
+      },
+      {
+       "id": 103,
+       "roomName": "4번 방",
+       "startAt": "2026-11-12T10:00:00+09:00",
+       "endAt": "2026-11-12T12:00:00+09:00",
+       "status": "BOOKED",
+       "owner": false,
+       "participantCount": 4
+      }
+     ]
+    }
+   },
+   "history": [
+    {
+     "role": "user",
+     "text": "내 예약 보여 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "예약이 2개 있어요. ① 11/11(수) 14:00–16:00 2번 방(대표자) ② 11/12(목) 10:00–12:00 4번 방(참여자)"
+    }
+   ],
+   "expect": {
+    "all": [
+     "cancel_reservation"
+    ],
+    "card": "cancel_reservation",
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "cancel_reservation",
+      "arg": "reservationId",
+      "equals": 101
+     }
+    ]
+   }
+  },
+  {
+   "id": "C38",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "아 아니다 퇴실 말고 30분 연장해 줘",
+   "fixtures": {
+    "my_reservations": {
+     "reservations": [
+      {
+       "id": 102,
+       "roomName": "2번 방",
+       "startAt": "2026-11-10T09:00:00+09:00",
+       "endAt": "2026-11-10T10:30:00+09:00",
+       "status": "IN_USE",
+       "owner": true,
+       "participantCount": 3
+      }
+     ]
+    }
+   },
+   "history": [
+    {
+     "role": "user",
+     "text": "다 썼어, 퇴실할게"
+    },
+    {
+     "role": "assistant",
+     "text": "2번 방(09:00–10:30) 퇴실 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "continue_reservation"
+    ],
+    "card": "continue_reservation",
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation"
+    ],
+    "args": [
+     {
+      "tool": "continue_reservation",
+      "arg": "reservationId",
+      "equals": 102
+     },
+     {
+      "tool": "continue_reservation",
+      "arg": "minutes",
+      "equals": 30
+     }
+    ]
+   }
+  },
+  {
+   "id": "C39",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "한 명 더 온대",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 2시간 2번 방 3명으로 예약해 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 15:00–17:00 2번 방, 3명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 2
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T15:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "C40",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "그럼 우리 3명이니까 처음 말한 시간으로 잡아 줘",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 오후 2시부터 2시간 쓸 방 찾고 있어"
+    },
+    {
+     "role": "assistant",
+     "text": "몇 명이서 쓰실까요?"
+    },
+    {
+     "role": "user",
+     "text": "잠깐, 방은 한 번에 몇 시간까지 돼?"
+    },
+    {
+     "role": "assistant",
+     "text": "한 번에 최대 2시간이에요."
+    },
+    {
+     "role": "user",
+     "text": "5번 방은 몇 명부터야?"
+    },
+    {
+     "role": "assistant",
+     "text": "5번 방은 5–8명이 쓸 수 있어요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "oneOf": [
+       2,
+       3,
+       4
+      ]
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T14:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T16:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "C41",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "목요일은?",
+   "history": [
+    {
+     "role": "user",
+     "text": "금요일 저녁 6시부터 1시간 반 4명 쓸 방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "금요일(11/13) 18:00–19:30에 4명이면 1번·2번·3번 방이 비어 있어요."
+    }
+   ],
+   "expect": {
+    "any": [
+     "find_available_rooms"
+    ],
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "find_available_rooms",
+      "arg": "date",
+      "equals": "2026-11-12"
+     },
+     {
+      "tool": "find_available_rooms",
+      "arg": "from",
+      "equals": "18:00"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C42",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "한 시간 뒤로 미뤄 줘",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 3시부터 1시간 2번 방 3명으로 잡아 줘"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 15:00–16:00 2번 방, 3명으로 확인 카드를 띄웠어요. 맞으면 [확인]을 눌러 주세요."
+    }
+   ],
+   "expect": {
+    "all": [
+     "create_reservation"
+    ],
+    "card": "create_reservation",
+    "none": [
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "args": [
+     {
+      "tool": "create_reservation",
+      "arg": "roomId",
+      "equals": 2
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "startAt",
+      "prefix": "2026-11-11T16:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "endAt",
+      "prefix": "2026-11-11T17:00"
+     },
+     {
+      "tool": "create_reservation",
+      "arg": "headcount",
+      "equals": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "C43",
+   "group": "맥락",
+   "set": "맥락",
+   "text": "응",
+   "history": [
+    {
+     "role": "user",
+     "text": "내일 2시 빈방 있어?"
+    },
+    {
+     "role": "assistant",
+     "text": "내일 14:00부터 2번·3번 방이 비어 있어요. 몇 시간, 몇 명이서 쓰실까요?"
+    }
+   ],
+   "expect": {
+    "none": [
+     "create_reservation",
+     "start_now_reservation",
+     "cancel_reservation",
+     "checkout_reservation",
+     "continue_reservation"
+    ],
+    "replyAny": [
+     "몇 시간",
+     "얼마나",
+     "몇 명",
+     "인원"
+    ],
+    "asks": true
+   }
   }
  ]
 }

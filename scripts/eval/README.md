@@ -13,7 +13,7 @@
 ## 구성
 | 파일 | 하는 일 |
 |---|---|
-| `agent/src/test/resources/eval/cases.json` | 고정 발화 35개. C01–C24 기본 세트(조회·예약·취소·퇴실·연장·즉시 시작·시간표·지난번처럼·대화형·범위 밖·안전), **C25–C35 대화 세트**(`"set": "대화"`, 11/10): 앞선 대화를 이어 받아 예약까지 가는지(빠진 것만 묻기·방 고르기·시각/인원 고치기·"모레 같은 시간"·딴 질문 뒤 돌아오기·"응 그걸로"). 시각은 **2026-11-10(화) 10:25** 고정 |
+| `agent/src/test/resources/eval/cases.json` | 고정 발화 43개. C01–C24 기본 세트(조회·예약·취소·퇴실·연장·즉시 시작·시간표·지난번처럼·대화형·범위 밖·안전), **C25–C35 대화 세트**(`"set": "대화"`, 11/10): 앞선 대화를 이어 받아 예약까지 가는지(빠진 것만 묻기·방 고르기·시각/인원 고치기·"모레 같은 시간"·딴 질문 뒤 돌아오기·"응 그걸로"), **C36–C43 맥락 세트**(`"set": "맥락"`, 11/11): 카드를 띄운 뒤 날짜·인원·시각 고치기("내일 말고 모레로", "한 명 더 온대", "한 시간 뒤로"), 예약 두 개 중 "수요일 거" 고르기, 퇴실 카드 뒤 "퇴실 말고 연장", 딴 질문 세 번 뒤 "처음 말한 시간", 요일만 바꾼 조회, 값 없는 "응"에 쓰기 도구 안 부르기. 시각은 **2026-11-10(화) 10:25** 고정 |
 | `agent/src/test/resources/eval/tools.json` | 진짜 mcp-server `tools/list` 스냅숏(도구 12개). 도구 설명을 고치면 `./dump-tools.sh`로 다시 떠요 |
 | `agent/src/test/java/.../eval/` | `FixtureTools`(가짜 도구), `RecordingLlm`(호출마다 시간·토큰·인자 기록, 분당 한도 지키기), `Scorer`(채점), `EvalRunner`, `ReportWriter`, `ModelEvalRunTest`(입구), `ModelEvalTest`(CI에서 채점기 검사) |
 | `prompts/v1.txt` | 지금 코드의 지시문(해시 `ce5cf5cf`). 날짜 자리는 `{{NOW}}` |
@@ -90,6 +90,10 @@ EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_PROMPT_FILE=$PWD/scripts/eval/prom
 
 # 대화 세트만 (여러 차례 주고받는 예약, 11/10)
 EVAL_ONLY=C25,C26,C27,C28,C29,C30,C31,C32,C33,C34,C35 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
+
+# 맥락 세트만 (카드 뒤 고치기·긴 대화, 11/11). 점수판에 섞지 않으려면 EVAL_OUT을 따로
+# 키는 위 1)처럼 먼저 read -rs로 받아 export하고, 끝나면 unset GEMINI_API_KEY (키가 없으면 문항이 0점으로 기록돼요)
+EVAL_OUT=/tmp/mspace-eval-context EVAL_ONLY=C36,C37,C38,C39,C40,C41,C42,C43 EVAL_MODELS=gemini:gemini-3.5-flash-lite EVAL_RUNS=2 ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 
 # 몇 개만
 EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent test -Dtest=ModelEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
