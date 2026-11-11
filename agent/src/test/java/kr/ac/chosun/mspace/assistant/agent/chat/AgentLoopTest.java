@@ -500,6 +500,10 @@ class AgentLoopTest {
         ChatResult kept = loop(prohibit, new FakeTools(Map.of())).run(ME, List.of(), "잠깐만");
         assertThat(prohibit.seen).hasSize(1);
         assertThat(kept.reply()).isEqualTo("아직 [확인] 버튼을 클릭해 주시면 안 돼요.");
+        var separate = new ScriptedLlm().then(say("확인 버튼을 클릭해서 예약할 수 있어요, 궁금하면 문의해 주세요."));
+        ChatResult explained = loop(separate, new FakeTools(Map.of())).run(ME, List.of(), "예약은 어떻게 해?");
+        assertThat(separate.seen).hasSize(1);
+        assertThat(explained.reply()).isEqualTo("확인 버튼을 클릭해서 예약할 수 있어요, 궁금하면 문의해 주세요.");
     }
 
     @Test
