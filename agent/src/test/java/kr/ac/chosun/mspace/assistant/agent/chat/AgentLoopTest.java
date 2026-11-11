@@ -284,6 +284,68 @@ class AgentLoopTest {
     }
 
     @Test
+    @DisplayName("입실 번호 카드가 있으면 카드 주장과 확인 카드 언급은 같은 문장일 때만 확인 카드 주장이다('확인카드'처럼 붙여 써도)")
+    void confirmClaimIsCheckedPerSentence() {
+        // given
+        var mixed = new ScriptedLlm()
+                .then(tool("show_access_code", Map.of("reservationId", 7)))
+                .then(say("화면에 카드를 띄웠어요. 확인 카드에서는 친구를 고를 수 있어요."));
+        var glued = new ScriptedLlm()
+                .then(tool("show_access_code", Map.of("reservationId", 7)))
+                .then(say("확인카드를 띄웠어요."))
+                .then(say("입실 번호는 화면 카드에서 볼 수 있어요."));
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(ACCESS_CODE, false)));
+
+        // when
+        ChatResult kept = loop(mixed, tools).run(ME, List.of(), "입실 번호 알려 줘");
+        loop(glued, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        // then
+        assertThat(mixed.seen).hasSize(2);
+        assertThat(kept.reply()).startsWith("화면에 카드를 띄웠어요. 확인 카드에서는 친구를 고를 수 있어요.");
+        assertThat(glued.seen).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("입실 번호 카드가 있으면 다시 물은 뒤의 '화면에 카드를 띄웠어요'는 지우지 않는다")
+    void accessCodeClaimSurvivesAfterNudge() {
+        // given
+        var llm = new ScriptedLlm()
+                .then(tool("show_access_code", Map.of("reservationId", 7)))
+                .then(say("확인 카드를 생성했어요."))
+                .then(say("화면에 카드를 띄웠어요."));
+        var tools = new FakeTools(Map.of("show_access_code", new ToolGateway.Outcome(ACCESS_CODE, false)));
+
+        // when
+        ChatResult result = loop(llm, tools).run(ME, List.of(), "입실 번호 알려 줘");
+
+        // then
+        assertThat(llm.seen).hasSize(3);
+        assertThat(result.reply()).startsWith("화면에 카드를 띄웠어요.");
+    }
+
+    @Test
+    @DisplayName("카드 없이 '[확인]을 눌러 주세요'만 하거나 조사 없이 '확인 카드 띄웠어요'라고 해도 다시 묻는다")
+    void pressConfirmWithoutCardIsNudged() {
+        // given
+        var press = new ScriptedLlm()
+                .then(say("화면의 [확인]을 눌러 주세요."))
+                .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+        var bare = new ScriptedLlm()
+                .then(say("확인 카드 띄웠어요."))
+                .then(say("어느 날 몇 시에 쓰실지 알려 주세요."));
+
+        // when
+        ChatResult pressed = loop(press, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+        loop(bare, new FakeTools(Map.of())).run(ME, List.of(), "방 잡아 줘");
+
+        // then
+        assertThat(press.seen).hasSize(2);
+        assertThat(pressed.reply()).isEqualTo("어느 날 몇 시에 쓰실지 알려 주세요.");
+        assertThat(bare.seen).hasSize(2);
+    }
+
+    @Test
     @DisplayName("카드 안내 문장('확인 카드에서 친구를 고르면 돼요')은 거짓 주장이 아니라 그대로 둔다")
     void cardGuidanceIsNotAClaim() {
         // given

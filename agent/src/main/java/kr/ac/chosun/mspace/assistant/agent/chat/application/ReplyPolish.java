@@ -305,20 +305,57 @@ final class ReplyPolish {
     }
 
     /**
-     * "확인 카드를 띄웠어요", "카드를 바꿨어요", "확인 카드가 생성됐어요"처럼 이번 답에서 카드를 만들었다고 말하는 문장.
-     * "확인 카드에서 친구를 고르면 돼요" 같은 안내, "입실 번호 카드를 띄웠어요"(쓰기 도구가 아닌 카드)는 아니다.
-     * 확인 카드는 쓰기 도구를 불러야만 생긴다
+     * "확인 카드를 띄웠어요", "카드를 바꿨어요", "확인 카드가 생성됐어요", "확인 카드 띄웠어요"처럼 이번 답에서 카드를 만들었다고 말하는 표현.
+     * 조사(를·가·도)는 있어도 없어도 된다. "확인 카드에서 친구를 고르면 돼요" 같은 안내,
+     * "입실 번호 카드를 띄웠어요"(쓰기 도구가 아닌 카드)는 아니다. 확인 카드는 쓰기 도구를 불러야만 생긴다
      */
     static final Pattern CARD_CLAIM = Pattern.compile(
-            "(?<!번호 )(?<!번호)카드(?:를 ?(?:다시 |새로 )?(?:띄웠|띄워 ?드렸|바꿨|바꾸었|고쳤|만들었|생성했|수정했|변경했|보여 ?드렸|올렸|준비했)"
-                    + "|가 ?(?:다시 |새로 )?(?:생성됐|생성되었|만들어졌|준비됐|준비되었|바뀌었|바꼈|수정됐|수정되었|변경됐|변경되었|떴|올라갔))");
+            "(?<!번호 )(?<!번호)카드 ?(?:를|가|도)? ?(?:다시 |새로 )?"
+                    + "(?:띄웠|띄워 ?드렸|바꿨|바꾸었|고쳤|만들었|생성했|수정했|변경했|보여 ?드렸|올렸|준비했"
+                    + "|생성됐|생성되었|만들어졌|준비됐|준비되었|바뀌었|바꼈|수정됐|수정되었|변경됐|변경되었|떴|올라갔)");
 
-    static boolean claimsCard(String text) {
-        return text != null && CARD_CLAIM.matcher(text).find();
+    /** "[확인]을 눌러 주세요"처럼 지금 확인 버튼을 누르라는 말. "[확인]을 누르면 ~돼요" 같은 설명은 아니다 */
+    static final Pattern PRESS_CONFIRM = Pattern.compile("\\[확인\\] ?(?:을|를)? ?(?:바로 |지금 )?눌러");
+
+    /** 확인 카드를 가리키는 말. "확인카드"처럼 붙여 써도 된다 */
+    private static final Pattern CONFIRM_CARD_WORD = Pattern.compile("확인 ?카드|\\[확인\\]");
+
+    /**
+     * 확인 카드가 없는데 있다고 말하는 문장인지. 카드를 만들었다는 말이나 [확인]을 누르라는 말이다.
+     * 입실 번호 카드가 이미 화면에 있으면(otherCardShown) "카드를 띄웠어요"는 그 카드일 수 있으니,
+     * 같은 문장에 "확인 카드"나 "[확인]"이 있을 때만 확인 카드 주장으로 본다
+     */
+    static boolean isConfirmClaim(String sentence, boolean otherCardShown) {
+        if (PRESS_CONFIRM.matcher(sentence).find()) {
+            return true;
+        }
+        if (!CARD_CLAIM.matcher(sentence).find()) {
+            return false;
+        }
+        return !otherCardShown || CONFIRM_CARD_WORD.matcher(sentence).find();
     }
 
-    /** 카드를 띄웠다는 문장과 "[확인]을 눌러" 문장을 지운다. 다 지워지면 안내 한 줄 */
-    static String dropCardClaims(String text) {
+    /** 답의 어느 문장이든 확인 카드가 있다고 말하면 true. 문장마다 따로 본다 */
+    static boolean claimsConfirmCard(String text, boolean otherCardShown) {
+        if (text == null) {
+            return false;
+        }
+        for (String line : text.split("\\R")) {
+            for (String sentence : sentences(line)) {
+                if (isConfirmClaim(sentence, otherCardShown)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String[] sentences(String line) {
+        return line.split("(?<=[.!?。])\\s+");
+    }
+
+    /** 확인 카드가 있다고 말하는 문장과 "[확인]" 문장을 지운다. 다 지워지면 안내 한 줄 */
+    static String dropCardClaims(String text, boolean otherCardShown) {
         if (text == null) {
             return null;
         }
@@ -326,8 +363,8 @@ final class ReplyPolish {
         List<String> lines = new ArrayList<>();
         for (String line : text.split("\\R")) {
             StringBuilder kept = new StringBuilder();
-            for (String sentence : line.split("(?<=[.!?。])\\s+")) {
-                if (CARD_CLAIM.matcher(sentence).find() || sentence.contains("[확인]")) {
+            for (String sentence : sentences(line)) {
+                if (isConfirmClaim(sentence, otherCardShown) || sentence.contains("[확인]")) {
                     continue;
                 }
                 kept.append(kept.isEmpty() ? "" : " ").append(sentence);
