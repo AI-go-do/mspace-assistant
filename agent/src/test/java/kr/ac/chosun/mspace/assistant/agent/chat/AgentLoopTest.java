@@ -16,6 +16,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemberKey;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.PersonaStore;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.Team;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.MemoryProperties;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.Persona;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ToolGateway;
@@ -165,6 +167,41 @@ class AgentLoopTest {
 
         assertThat(grounded.reply()).isEqualTo("다 비어 있어요\n\n(예약 시스템 15:00 조회 기준)");
         assertThat(greeting.reply()).isEqualTo("안녕하세요");
+    }
+
+    @Test
+    @DisplayName("간단히 예약하기(FR-AGT-105): 비서가 인원을 물으면 [나 포함 3·4·5명] 버튼과 친구 고르기 신호(PICK_FRIENDS), 지시문에 하나씩 묻는 규칙")
+    void asksHeadcountWithButtons() {
+        // given
+        var llm = new ScriptedLlm().then(say("내일 오후 3시부터 2시간으로 볼게요. 누구랑 하실 건가요? 나 포함 몇 명이서 쓰실 건가요?"));
+        var tools = new FakeTools(Map.of());
+
+        // when
+        ChatResult result = new AgentLoop(llm, tools, new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK)
+                .run(ME, List.of(), "내일 3시에 방 잡아 줘");
+
+        // then
+        assertThat(result.suggestions()).containsExactly("나 포함 3명", "나 포함 4명", "나 포함 5명");
+        assertThat(result.hints()).containsExactly(ChatResult.HINT_PICK_FRIENDS);
+        assertThat(llm.lastSystem).contains("누구랑 하실 건가요?").contains("친구 이름을 묻거나 받아 적지 않는다");
+    }
+
+    @Test
+    @DisplayName("팀(FR-AGT-105): 저장한 팀은 지시문에 이름·인원만 들어가고 팀원 학번·이름은 안 들어간다")
+    void teamsInPromptWithoutMembers() {
+        // given
+        var llm = new ScriptedLlm().then(say("팀 A 4명으로 볼게요"));
+        var teams = new kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryTeamStore();
+        teams.save(MemberKey.of(ME), List.of(new Team("팀 A", List.of(new Team.Member("99999002", "김*영"),
+                new Team.Member("99999003", "박*웅"), new Team.Member("99999004", "이*연")))));
+
+        // when
+        new AgentLoop(llm, new FakeTools(Map.of()), new AgentProperties(null, null, 8, null, null, null, 0, 0), CLOCK,
+                ConversationMemory.NONE, new MemoryProperties(false, null, null, 0), null, PersonaStore.NONE, teams)
+                .run(ME, List.of(), "팀 A랑 내일 3시에 잡아 줘");
+
+        // then
+        assertThat(llm.lastSystem).contains("팀 A(나 포함 4명)").doesNotContain("99999002").doesNotContain("김*영");
     }
 
     @Test
@@ -345,7 +382,7 @@ class AgentLoopTest {
         assertThat(result.stoppedByLimit()).isTrue();
         assertThat(result.reply()).contains("시간이 너무 오래 걸려서");
         assertThat(result.confirmations()).hasSize(1);
-        assertThat(llm.seen.size()).isLessThan(4);
+        assertThat(llm.seen).hasSizeLessThan(4);
     }
 
     @Test

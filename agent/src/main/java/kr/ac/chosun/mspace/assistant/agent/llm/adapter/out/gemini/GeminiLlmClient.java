@@ -133,37 +133,14 @@ public class GeminiLlmClient implements LlmClient {
         List<Map<String, Object>> results = new ArrayList<>();
         for (LlmMessage m : conversation) {
             if (m instanceof LlmMessage.ToolResult r) {
-                Map<String, Object> fr = new LinkedHashMap<>();
-                if (fromGemini(r.callId())) {
-                    fr.put("id", r.callId()); // Gemini가 준 호출 id가 있으면 응답에도 같은 id (병렬 호출 짝 맞추기)
-                }
-                fr.put("name", r.name());
-                fr.put("response", response(r));
-                results.add(Map.of("functionResponse", fr));
+                results.add(Map.of("functionResponse", functionResponse(r)));
                 continue;
             }
             flushResults(contents, results);
             switch (m) {
-                case LlmMessage.User u -> contents.add(content("user", List.of(Map.of("text", u.text()))));
-                case LlmMessage.Assistant a -> {
-                    List<Map<String, Object>> parts = new ArrayList<>();
-                    if (a.text() != null && !a.text().isBlank()) {
-                        parts.add(Map.of("text", a.text()));
-                    }
-                    for (ToolCall call : a.toolCalls()) {
-                        Map<String, Object> part = new LinkedHashMap<>();
-                        Map<String, Object> fc = new LinkedHashMap<>();
-                        if (fromGemini(call.id())) {
-                            fc.put("id", call.id());
-                        }
-                        fc.put("name", call.name());
-                        fc.put("args", call.arguments());
-                        part.put("functionCall", fc);
-                        if (call.signature() != null) {
-                            part.put("thoughtSignature", call.signature());
-                        }
-                        parts.add(part);
-                    }
+                case LlmMessage.User(String text) -> contents.add(content("user", List.of(Map.of("text", text))));
+                case LlmMessage.Assistant(String text, List<ToolCall> toolCalls) -> {
+                    List<Map<String, Object>> parts = modelParts(text, toolCalls);
                     if (!parts.isEmpty()) { // 빈 글의 비서 차례는 보내지 않는다 (빈 parts는 Gemini가 거절할 수 있음)
                         contents.add(content("model", parts));
                     }
@@ -173,6 +150,39 @@ public class GeminiLlmClient implements LlmClient {
         }
         flushResults(contents, results);
         return contents;
+    }
+
+    private Map<String, Object> functionResponse(LlmMessage.ToolResult r) {
+        Map<String, Object> fr = new LinkedHashMap<>();
+        if (fromGemini(r.callId())) {
+            fr.put("id", r.callId()); // Gemini가 준 호출 id가 있으면 응답에도 같은 id (병렬 호출 짝 맞추기)
+        }
+        fr.put("name", r.name());
+        fr.put("response", response(r));
+        return fr;
+    }
+
+    /** 비서 차례: 글(있으면) + 도구 호출마다 functionCall (생각 서명이 있으면 같이) */
+    private static List<Map<String, Object>> modelParts(String text, List<ToolCall> toolCalls) {
+        List<Map<String, Object>> parts = new ArrayList<>();
+        if (text != null && !text.isBlank()) {
+            parts.add(Map.of("text", text));
+        }
+        for (ToolCall call : toolCalls) {
+            Map<String, Object> part = new LinkedHashMap<>();
+            Map<String, Object> fc = new LinkedHashMap<>();
+            if (fromGemini(call.id())) {
+                fc.put("id", call.id());
+            }
+            fc.put("name", call.name());
+            fc.put("args", call.arguments());
+            part.put("functionCall", fc);
+            if (call.signature() != null) {
+                part.put("thoughtSignature", call.signature());
+            }
+            parts.add(part);
+        }
+        return parts;
     }
 
     private static void flushResults(List<Map<String, Object>> contents, List<Map<String, Object>> results) {
@@ -209,15 +219,9 @@ public class GeminiLlmClient implements LlmClient {
     }
 
     private static LlmReply toReply(GenerateResponse response) {
-        if (response == null || response.candidates() == null || response.candidates().isEmpty()
-                || response.candidates().getFirst() == null
-                || response.candidates().getFirst().content() == null) {
-            throw new Transient();
-        }
         StringBuilder text = new StringBuilder();
         List<ToolCall> calls = new ArrayList<>();
-        List<Part> parts = response.candidates().getFirst().content().parts();
-        for (Part part : parts == null ? List.<Part>of() : parts) {
+        for (Part part : firstParts(response)) {
             if (part == null) {
                 throw new Transient(); // [null] 같은 깨진 응답이 NullPointerException으로 새지 않게
             }
@@ -232,7 +236,28 @@ public class GeminiLlmClient implements LlmClient {
         if (text.isEmpty() && calls.isEmpty()) {
             throw new Transient(); // 글도 도구 호출도 없으면 빈 말풍선 대신 한 번 더 보내고, 그래도 없으면 '응답 없음'
         }
-        return new LlmReply(text.toString(), calls);
+        return new LlmReply(text.toString(), calls, usage(response.usageMetadata()));
+    }
+
+    /** 생각 토큰(thoughtsTokenCount)도 출력 요금에 들어가서 출력 쪽에 더한다 (확인 필요: 모델마다 다를 수 있음) */
+    private static LlmReply.Usage usage(UsageMetadata u) {
+        if (u == null || u.promptTokenCount() == null) {
+            return LlmReply.Usage.UNKNOWN;
+        }
+        int out = (u.candidatesTokenCount() == null ? 0 : u.candidatesTokenCount())
+                + (u.thoughtsTokenCount() == null ? 0 : u.thoughtsTokenCount());
+        return new LlmReply.Usage(u.promptTokenCount(), out);
+    }
+
+    /** 첫 후보의 parts. 후보·내용이 비었으면 한 번 더 보내게 Transient */
+    private static List<Part> firstParts(GenerateResponse response) {
+        if (response == null || response.candidates() == null || response.candidates().isEmpty()
+                || response.candidates().getFirst() == null
+                || response.candidates().getFirst().content() == null) {
+            throw new Transient();
+        }
+        List<Part> parts = response.candidates().getFirst().content().parts();
+        return parts == null ? List.of() : parts;
     }
 
     /** Gemini가 id를 안 주면 어댑터가 만든 id. 이 id는 Gemini로 다시 보내지 않는다 */
@@ -246,7 +271,10 @@ public class GeminiLlmClient implements LlmClient {
         return new LlmException("LLM_UNAVAILABLE", "AI 비서가 지금 응답하지 않아요. 잠시 후 다시 시도해 주세요.");
     }
 
-    record GenerateResponse(List<Candidate> candidates) {
+    record GenerateResponse(List<Candidate> candidates, UsageMetadata usageMetadata) {
+    }
+
+    record UsageMetadata(Integer promptTokenCount, Integer candidatesTokenCount, Integer thoughtsTokenCount) {
     }
 
     record Candidate(Content content, String finishReason) {

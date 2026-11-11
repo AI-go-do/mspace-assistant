@@ -2,7 +2,7 @@ package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.user;
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.error;
-import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.unauthorized;
+import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.loginRequired;
 
 import java.util.List;
 import java.util.Optional;
@@ -47,7 +47,7 @@ class AssistantSettingsController {
     ResponseEntity<Object> briefing(@RequestHeader HttpHeaders headers) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(briefing.today(user));
     }
@@ -57,7 +57,7 @@ class AssistantSettingsController {
     ResponseEntity<Object> persona(@RequestHeader HttpHeaders headers) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(PersonaView.of(personas.load(MemberKey.of(user))));
     }
@@ -67,7 +67,7 @@ class AssistantSettingsController {
     ResponseEntity<Object> changePersona(@RequestHeader HttpHeaders headers, @RequestBody(required = false) PersonaRequest request) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         Optional<Persona> persona = Persona.parse(request == null ? null : request.style());
         if (persona.isEmpty()) {

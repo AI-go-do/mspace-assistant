@@ -78,15 +78,18 @@ public class OllamaLlmClient implements LlmClient {
         }
     }
 
+    private static final String CONTENT = "content";
+    private static final String FUNCTION = "function";
+
     private static List<Map<String, Object>> messages(String system, List<LlmMessage> conversation) {
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", orEmpty(system)));
+        messages.add(Map.of("role", "system", CONTENT, orEmpty(system)));
         for (LlmMessage m : conversation) {
             messages.add(switch (m) {
-                case LlmMessage.User(String text) -> Map.of("role", "user", "content", orEmpty(text));
+                case LlmMessage.User(String text) -> Map.of("role", "user", CONTENT, orEmpty(text));
                 case LlmMessage.Assistant(String text, List<ToolCall> toolCalls) -> assistant(text, toolCalls);
                 case LlmMessage.ToolResult(var callId, String name, String json, boolean isError) -> Map.of("role", "tool",
-                        "tool_name", orEmpty(name), "content", isError ? "{\"error\":" + json + "}" : orEmpty(json));
+                        "tool_name", orEmpty(name), CONTENT, isError ? "{\"error\":" + json + "}" : orEmpty(json));
             });
         }
         return messages;
@@ -95,10 +98,10 @@ public class OllamaLlmClient implements LlmClient {
     private static Map<String, Object> assistant(String text, List<ToolCall> toolCalls) {
         Map<String, Object> msg = new LinkedHashMap<>();
         msg.put("role", "assistant");
-        msg.put("content", orEmpty(text));
+        msg.put(CONTENT, orEmpty(text));
         if (!toolCalls.isEmpty()) {
             msg.put("tool_calls", toolCalls.stream()
-                    .map(c -> Map.of("function", Map.of("name", orEmpty(c.name()),
+                    .map(c -> Map.of(FUNCTION, Map.of("name", orEmpty(c.name()),
                             "arguments", c.arguments() == null ? Map.of() : c.arguments())))
                     .toList());
         }
@@ -107,7 +110,7 @@ public class OllamaLlmClient implements LlmClient {
 
     private static Map<String, Object> tool(ToolSpec spec) {
         // Map.of는 null을 받지 않는다. 설명·스키마가 빠진 도구 하나 때문에 대화 전체가 500이 되지 않게 빈 값으로 둔다
-        return Map.of("type", "function", "function", Map.of(
+        return Map.of("type", FUNCTION, FUNCTION, Map.of(
                 "name", orEmpty(spec.name()), "description", orEmpty(spec.description()),
                 "parameters", spec.inputSchema() == null ? Map.of("type", "object") : spec.inputSchema()));
     }
@@ -120,27 +123,41 @@ public class OllamaLlmClient implements LlmClient {
         if (response == null || response.message() == null) {
             throw unavailable();
         }
+        List<ToolCall> calls = toolCalls(response.message());
+        String text = orEmpty(response.message().content());
+        if (calls.isEmpty() && text.isBlank()) {
+            // 빈 말풍선을 성공으로 돌려주지 않는다 (Gemini 어댑터와 같은 계약)
+            throw unavailable();
+        }
+        return new LlmReply(text, calls, usage(response));
+    }
+
+    private static List<ToolCall> toolCalls(Message message) {
         List<ToolCall> calls = new ArrayList<>();
-        for (OllamaToolCall c : response.message().toolCalls() == null ? List.<OllamaToolCall>of() : response.message().toolCalls()) {
+        if (message.toolCalls() == null) {
+            return calls;
+        }
+        for (OllamaToolCall c : message.toolCalls()) {
             if (c != null && c.function() != null && c.function().name() != null) {
                 Map<String, Object> args = c.function().arguments() == null ? Map.of() : c.function().arguments();
                 // Ollama는 호출 id를 주지 않아서 만든다. 결과는 tool_name으로 짝을 맞춘다
                 calls.add(new ToolCall("call_" + UUID.randomUUID(), c.function().name(), args, null));
             }
         }
-        String text = response.message().content() == null ? "" : response.message().content();
-        if (calls.isEmpty() && text.isBlank()) {
-            // 빈 말풍선을 성공으로 돌려주지 않는다 (Gemini 어댑터와 같은 계약)
-            throw unavailable();
-        }
-        return new LlmReply(text, calls);
+        return calls;
+    }
+
+    private static LlmReply.Usage usage(ChatResponse response) {
+        return response.promptEvalCount() == null || response.evalCount() == null
+                ? LlmReply.Usage.UNKNOWN : new LlmReply.Usage(response.promptEvalCount(), response.evalCount());
     }
 
     private static LlmException unavailable() {
         return new LlmException("LLM_UNAVAILABLE", "AI 비서가 지금 응답하지 않아요. 잠시 후 다시 시도해 주세요.");
     }
 
-    record ChatResponse(Message message, Boolean done) {
+    record ChatResponse(Message message, Boolean done,
+            @JsonProperty("prompt_eval_count") Integer promptEvalCount, @JsonProperty("eval_count") Integer evalCount) {
     }
 
     record Message(String role, String content,

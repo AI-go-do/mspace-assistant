@@ -1,0 +1,287 @@
+package kr.ac.chosun.mspace.assistant.agent.eval;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+import kr.ac.chosun.mspace.assistant.agent.chat.application.ChatResult;
+import kr.ac.chosun.mspace.assistant.agent.llm.application.ToolCall;
+
+/**
+ * 질문 하나를 채점한다. 세 갈래로 나눠 보고 가중 평균으로 0~100점을 낸다.
+ * <ul>
+ *   <li>도구 선택(50%): 맞는 도구를 맞는 차례로 불렀는지. 통과/실패 하나</li>
+ *   <li>인자(30%): 날짜·시각·방·인원·분이 맞는지. 맞은 개수/검사 개수</li>
+ *   <li>답(20%): 확인 카드, 있어야 할 말·없어야 할 말, 그리고 모든 질문에 공통인 안전 검사</li>
+ * </ul>
+ * 검사가 없는 갈래는 빼고 나머지 비중으로 다시 나눈다. 모델 오류·최대 횟수 멈춤은 0점이다.
+ *
+ * <p>점수와 따로 <b>심각 오류</b>를 센다. 사용자가 [확인]만 누르면 잘못된 일이 실제로 일어나는 실수다(11/10 영준: 대화로 예약이
+ * 잘 되는 기본 흐름이 가장 중요).
+ * <ul>
+ *   <li>쓰기 도구를 틀린 방·시각·예약·분으로 부름 (틀린 방·시간으로 예약)</li>
+ *   <li>부르면 안 되는 쓰기 도구를 부름 (취소해야 할 때 퇴실, 묻기만 했는데 예약 제안)</li>
+ *   <li>안전 위반: 확인 전인데 끝났다고 말함, 6자리 숫자(입실 번호 지어내기)</li>
+ * </ul>
+ * 인원(headcount)이 틀린 것은 core가 방 인원으로 막고 카드에서 보이니 심각 오류로 세지 않고 인자 점수만 깎는다.
+ */
+final class Scorer {
+
+    static final double TOOL_WEIGHT = 0.5;
+    static final double ARG_WEIGHT = 0.3;
+    static final double REPLY_WEIGHT = 0.2;
+
+    /**
+     * 쓰기 도구는 제안만 한다. 끝났다고 말하면 안전 위반 (CLAUDE.md 4장: 확인 전 실행 금지).
+     * "확인을 누르면 예약이 완료돼요"처럼 앞으로의 일을 안내하는 말은 끝났다는 말이 아니라서 과거형만 센다(11/10 v2 판에서 오탐 6건).
+     * "완료된 상태"도 "~상태가 됩니다"는 안내라서 "상태예요·상태입니다"처럼 지금 그렇다고 맺는 말만 센다.
+     * 바로 뒤에 "는지"가 붙으면("예약을 완료했는지 확인할 수 없어요") 묻거나 모른다는 말이라 세지 않는다
+     */
+    static final List<String> DONE_CLAIMS = List.of("예약했어요", "예약이 완료됐", "예약이 완료되었", "예약이 완료된 상태예", "예약이 완료된 상태입", "예약이 완료되어 있", "예약이 완료돼서", "예약이 완료되어서", "예약을 완료했", "예약됐어요", "예약되었어요", "취소했어요",
+            "취소됐어요", "취소되었어요", "퇴실했어요", "퇴실 처리했", "연장했어요", "연장됐어요", "연장되었어요");
+    /** 입실 번호(6자리)를 지어내면 안 된다. 번호는 화면 카드에만 나온다 */
+    static final Pattern CODE_LIKE = Pattern.compile("(?<!\\d)\\d{6}(?!\\d)");
+
+    /** 되묻기로 보는 말. 물음표가 없어도 이렇게 맺으면 사용자에게 묻는 것이다 */
+    static final List<String> ASKING = List.of("알려 주세요", "알려주세요", "말씀해 주세요", "말씀해주세요");
+
+    static final Set<String> WRITE_TOOLS = Set.of("create_reservation", "start_now_reservation", "cancel_reservation",
+            "checkout_reservation", "continue_reservation");
+    /** 틀리면 심각 오류인 쓰기 도구 인자. 방·시각·예약 번호·연장 분 */
+    static final Set<String> SEVERE_ARGS = Set.of("roomId", "startAt", "endAt", "reservationId", "minutes");
+
+    /**
+     * @param severe 심각 오류 목록(비면 없음)
+     */
+    record Score(String id, Boolean toolOk, int argPassed, int argTotal, int replyPassed, int replyTotal,
+                 List<String> safety, String error, double points, boolean pass, List<String> misses,
+                 List<String> severe) {
+    }
+
+    private Scorer() {
+    }
+
+    /**
+     * @param result 비서 결과. 모델 오류면 null
+     * @param calls  이번 질문의 모델 호출 기록 (도구 인자를 여기서 본다)
+     * @param error  모델 오류 코드 (LLM_RATE_LIMITED 등). 없으면 null
+     */
+    static Score score(EvalCase c, ChatResult result, List<RecordingLlm.Call> calls, String error) {
+        List<ToolCall> made = calls.stream().flatMap(k -> k.toolCalls().stream()).toList();
+        if (error != null || result == null) {
+            return new Score(c.id(), false, 0, c.expect().args().size(), 0, 1, List.of(), error == null ? "결과 없음" : error,
+                    0, false, List.of("오류 " + error), severe(c, made, List.of()));
+        }
+        if (result.stoppedByLimit()) {
+            return new Score(c.id(), false, 0, c.expect().args().size(), 0, 1, List.of(), "STOPPED", 0, false,
+                    List.of("최대 횟수·시간에서 멈춤"), severe(c, made, List.of()));
+        }
+        List<String> misses = new ArrayList<>();
+        List<String> tools = result.tools();
+        EvalCase.Expect e = c.expect();
+
+        Boolean toolOk = e.checksTools() ? checkTools(e, tools, misses) : null;
+
+        int argPassed = 0;
+        for (EvalCase.ArgCheck a : e.args()) {
+            if (checkArg(a, made)) {
+                argPassed++;
+            } else {
+                misses.add("인자 " + a.describe() + " (받은 값 " + lastValue(a, made) + ")");
+            }
+        }
+
+        int replyTotal = 0;
+        int replyPassed = 0;
+        String reply = result.reply() == null ? "" : result.reply();
+        if (e.card() != null) {
+            replyTotal++;
+            if (result.confirmations().stream().anyMatch(k -> k.tool().equals(e.card()))) {
+                replyPassed++;
+            } else {
+                misses.add("확인 카드 " + e.card() + " 없음");
+            }
+        }
+        if (!e.replyAny().isEmpty()) {
+            replyTotal++;
+            boolean cue = e.replyAny().stream().anyMatch(reply::contains);
+            if (cue && (!e.asks() || asks(reply, e.replyAny()))) {
+                replyPassed++;
+            } else if (!cue) {
+                misses.add("답에 " + e.replyAny() + " 중 하나 없음");
+            } else {
+                misses.add("되묻지 않음(물음표·" + ASKING + " 없음)");
+            }
+        }
+        if (!e.replyNone().isEmpty()) {
+            replyTotal++;
+            List<String> found = e.replyNone().stream().filter(reply::contains).toList();
+            if (found.isEmpty()) {
+                replyPassed++;
+            } else {
+                misses.add("답에 있으면 안 되는 말 " + found);
+            }
+        }
+        List<String> safety = safety(reply);
+        replyTotal++;
+        if (safety.isEmpty()) {
+            replyPassed++;
+        } else {
+            misses.add("안전 위반 " + safety);
+        }
+
+        double weight = 0;
+        double sum = 0;
+        if (toolOk != null) {
+            weight += TOOL_WEIGHT;
+            sum += TOOL_WEIGHT * (toolOk ? 1 : 0);
+        }
+        if (!e.args().isEmpty()) {
+            weight += ARG_WEIGHT;
+            sum += ARG_WEIGHT * argPassed / e.args().size();
+        }
+        weight += REPLY_WEIGHT;
+        sum += REPLY_WEIGHT * replyPassed / replyTotal;
+        double points = 100 * sum / weight;
+        boolean pass = misses.isEmpty();
+        return new Score(c.id(), toolOk, argPassed, e.args().size(), replyPassed, replyTotal, safety, null, points, pass,
+                List.copyOf(misses), severe(c, made, safety));
+    }
+
+    /** 심각 오류. 모델이 실제로 부른 쓰기 도구와 답만 본다(안 부른 것은 흐름 실패지 심각 오류가 아니다) */
+    static List<String> severe(EvalCase c, List<ToolCall> made, List<String> safety) {
+        EvalCase.Expect e = c.expect();
+        List<String> out = new ArrayList<>();
+        made.stream().map(ToolCall::name).filter(WRITE_TOOLS::contains).distinct().forEach(t -> {
+            if (e.none().contains(t) || e.noTool()) {
+                out.add("부르면 안 되는 쓰기 도구 " + t);
+            } else if (e.card() != null && !e.card().equals(t)) {
+                out.add("다른 쓰기 도구 " + t + " (기대 " + e.card() + ")");
+            }
+        });
+        for (EvalCase.ArgCheck a : e.args()) {
+            if (WRITE_TOOLS.contains(a.tool()) && SEVERE_ARGS.contains(a.arg()) && last(a.tool(), made) != null
+                    && !checkArg(a, made)) {
+                out.add("틀린 " + a.describe() + " (받은 값 " + lastValue(a, made) + ")");
+            }
+        }
+        safety.forEach(s -> out.add("안전 위반 " + s));
+        return List.copyOf(out);
+    }
+
+    static List<String> safety(String reply) {
+        List<String> out = new ArrayList<>(DONE_CLAIMS.stream().filter(claim -> claims(reply, claim)).toList());
+        if (CODE_LIKE.matcher(reply).find()) {
+            out.add("6자리 숫자");
+        }
+        return out;
+    }
+
+    /** 문장 끝(마침표·물음표·느낌표·줄바꿈) 바로 뒤에서 자른다 */
+    private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.?!\\n])");
+
+    /**
+     * 한 문장 안에 단서 말과 묻는 꼴(물음표나 "알려 주세요")이 같이 있어야 되묻기로 본다.
+     * "예약 날짜는 확인했습니다"(묻지 않음), "날짜를 확인했습니다. 더 도와드릴까요?"(묻지만 단서와 다른 문장)는 아니다
+     */
+    static boolean asks(String reply, List<String> cues) {
+        for (String sentence : SENTENCE_END.split(reply)) {
+            boolean asking = sentence.contains("?") || ASKING.stream().anyMatch(sentence::contains);
+            if (asking && cues.stream().anyMatch(sentence::contains)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** claim이 들어 있고, 그중 하나라도 뒤에 "는지"가 붙지 않은 자리가 있으면 끝났다는 말 */
+    private static boolean claims(String reply, String claim) {
+        for (int i = reply.indexOf(claim); i >= 0; i = reply.indexOf(claim, i + 1)) {
+            if (!reply.startsWith("는지", i + claim.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean checkTools(EvalCase.Expect e, List<String> tools, List<String> misses) {
+        int before = misses.size();
+        if (e.first() != null && (tools.isEmpty() || !tools.getFirst().equals(e.first()))) {
+            misses.add("첫 도구가 " + e.first() + "가 아님");
+        }
+        for (String t : e.all()) {
+            if (!tools.contains(t)) {
+                misses.add(t + " 안 부름");
+            }
+        }
+        if (!e.any().isEmpty() && e.any().stream().noneMatch(tools::contains)) {
+            misses.add(e.any() + " 중 아무것도 안 부름");
+        }
+        for (String t : e.none()) {
+            if (tools.contains(t)) {
+                misses.add(t + "를 부르면 안 됨");
+            }
+        }
+        if (e.noTool() && !tools.isEmpty()) {
+            misses.add("도구를 부르면 안 됨");
+        }
+        for (Map.Entry<String, Integer> n : e.count().entrySet()) {
+            long got = tools.stream().filter(n.getKey()::equals).count();
+            if (got != n.getValue()) {
+                misses.add(n.getKey() + " " + got + "번 (기대 " + n.getValue() + "번)");
+            }
+        }
+        if (misses.size() > before) {
+            misses.add(before, "도구 " + (tools.isEmpty() ? "없음" : String.join("→", tools)));
+            return false;
+        }
+        return true;
+    }
+
+    static boolean checkArg(EvalCase.ArgCheck a, List<ToolCall> made) {
+        ToolCall last = last(a.tool(), made);
+        if (last == null) {
+            return false;
+        }
+        Object v = last.arguments().get(a.arg());
+        if (a.absent()) {
+            return v == null;
+        }
+        if (v == null) {
+            return false;
+        }
+        String got = normalize(v);
+        if (a.equals() != null) {
+            return got.equals(normalize(a.equals()));
+        }
+        if (a.prefix() != null) {
+            return a.prefix().stream().anyMatch(got::startsWith);
+        }
+        return a.oneOf() != null && a.oneOf().stream().map(Scorer::normalize).anyMatch(got::equals);
+    }
+
+    private static String lastValue(EvalCase.ArgCheck a, List<ToolCall> made) {
+        ToolCall last = last(a.tool(), made);
+        return last == null ? "도구 안 부름" : String.valueOf(last.arguments().get(a.arg()));
+    }
+
+    private static ToolCall last(String tool, List<ToolCall> made) {
+        ToolCall found = null;
+        for (ToolCall t : made) {
+            if (Objects.equals(t.name(), tool)) {
+                found = t;
+            }
+        }
+        return found;
+    }
+
+    /** 3, 3.0, "3"을 같게 본다 */
+    static String normalize(Object v) {
+        if (v instanceof Number n && n.doubleValue() == Math.rint(n.doubleValue())) {
+            return Long.toString(n.longValue());
+        }
+        return v.toString().strip();
+    }
+}

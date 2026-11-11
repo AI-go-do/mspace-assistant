@@ -1,7 +1,7 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web;
 
 import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.user;
-import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.unauthorized;
+import static kr.ac.chosun.mspace.assistant.agent.chat.adapter.in.web.WebRequests.loginRequired;
 
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AccessCodeGateway;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.AgentProperties;
@@ -59,7 +59,7 @@ class ConfirmationController {
     ResponseEntity<Object> accessCode(@PathVariable long reservationId, @RequestHeader HttpHeaders headers) {
         UserHeaders user = user(props, headers);
         if (user.isEmpty()) {
-            return unauthorized();
+            return loginRequired();
         }
         ConfirmationGateway.Relayed relayed = accessCodes.accessCode(reservationId, user);
         return ResponseEntity.status(relayed.status()).cacheControl(CacheControl.noStore())

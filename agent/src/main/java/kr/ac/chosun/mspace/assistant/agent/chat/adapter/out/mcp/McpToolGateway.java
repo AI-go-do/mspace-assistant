@@ -67,7 +67,7 @@ class McpToolGateway implements ToolGateway {
         @Override
         public Outcome call(String name, Map<String, Object> arguments) {
             try {
-                CallToolResult result = client.callTool(new CallToolRequest(name, arguments));
+                CallToolResult result = client.callTool(CallToolRequest.builder(name).arguments(arguments).build());
                 String text = result.content().stream()
                         .filter(TextContent.class::isInstance).map(c -> ((TextContent) c).text())
                         .collect(Collectors.joining("\n"));

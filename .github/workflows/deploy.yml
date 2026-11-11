@@ -155,9 +155,18 @@ jobs:
           $C pull mcp agent gateway                   # 이미지를 모두 받은 뒤에만 교체(받기 실패 시 아무것도 안 바뀜)
           # 대화 맥락 Redis(infra#11)는 --no-deps로는 새로 안 생기므로 compose에 있으면 먼저 띄운다(이미 떠 있으면 그대로). 없는 infra면 건너뛴다
           if $C config --services | grep -qx redis; then $C up -d --no-deps redis || echo "redis를 못 띄움: 비서는 대화 기억 없이 동작(경고만)"; fi
-          $C up -d --no-deps mcp agent                    # 다른 서비스(DB 등)는 건드리지 않는다
-          # 입구 API 게이트웨이(gateway)는 설정이나 이미지가 바뀌었을 때만 다시 만든다(바뀐 게 없으면 그대로)
-          $C up -d --no-deps gateway
+          # 무중단 교체(infra scripts/rollout.sh): 새 컨테이너를 옆에 하나 더 띄워 health 확인 → 옛 것을 끈다.
+          # 새 것이 안 뜨면 새 것만 지우고 실패로 끝나서 옛 것이 계속 서비스한다. 바뀐 게 없는 서비스는 건너뛴다
+          # mcp·agent는 확인 토큰·채팅 작업을 메모리에 들고 있어 두 개를 같이 못 띄운다 → 예전처럼 다시 만든다(비서만 잠깐 끊김)
+          # infra에 아직 rollout.sh가 없으면(합쳐지기 전) 예전처럼 다시 만든다
+          if [ -x scripts/rollout.sh ]; then
+            scripts/rollout.sh "$T" gateway             # 입구(edge)를 먼저 준비한다. mcp·agent가 edge를 지나 core를 부른다
+            $C up -d --no-deps mcp agent                # 다른 서비스(DB 등)는 건드리지 않는다
+          else
+            $C up -d --no-deps mcp agent                # 다른 서비스(DB 등)는 건드리지 않는다
+            # 입구 API 게이트웨이(gateway)는 설정이나 이미지가 바뀌었을 때만 다시 만든다(바뀐 게 없으면 그대로)
+            $C up -d --no-deps gateway
+          fi
           sleep 20
           $C ps mcp agent
           for s in mcp agent gateway; do                        # 켜진 채로 남아 있어야 성공

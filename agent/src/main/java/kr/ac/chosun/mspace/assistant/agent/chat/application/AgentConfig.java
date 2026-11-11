@@ -5,6 +5,8 @@ import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryConve
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryPersonaStore;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisConversationMemory;
 import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisPersonaStore;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.InMemoryTeamStore;
+import kr.ac.chosun.mspace.assistant.agent.chat.adapter.out.memory.RedisTeamStore;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ImageReader;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -16,6 +18,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({AgentProperties.class, ChatJobProperties.class, MemoryProperties.class})
 class AgentConfig {
+
+    /** 저장소 설정값(store) 중 Redis */
+    private static final String REDIS = "redis";
 
     /** "내일"을 날짜로 바꾸는 기준 시각. 테스트는 고정 시계로 바꿔 끼운다 */
     @Bean
@@ -44,7 +49,7 @@ class AgentConfig {
         if (!props.enabled()) {
             return ConversationMemory.NONE;
         }
-        if ("redis".equals(props.store())) {
+        if (REDIS.equals(props.store())) {
             return new RedisConversationMemory(redis.getObject(), props);
         }
         return new InMemoryConversationMemory(props, clock);
@@ -53,9 +58,18 @@ class AgentConfig {
     /** 비서 성향 보관 (설계 5.v). 대화 맥락과 같은 저장소를 쓴다: redis면 Redis(TTL 없음), 아니면 메모리 */
     @Bean
     PersonaStore personaStore(MemoryProperties props, ObjectProvider<StringRedisTemplate> redis) {
-        if (props.enabled() && "redis".equals(props.store())) {
+        if (props.enabled() && REDIS.equals(props.store())) {
             return new RedisPersonaStore(redis.getObject());
         }
         return new InMemoryPersonaStore();
+    }
+
+    /** 내 팀 보관 (FR-AGT-105). 성향과 같은 저장소: redis면 Redis(TTL 없음), 아니면 메모리 */
+    @Bean
+    TeamStore teamStore(MemoryProperties props, ObjectProvider<StringRedisTemplate> redis) {
+        if (props.enabled() && REDIS.equals(props.store())) {
+            return new RedisTeamStore(redis.getObject());
+        }
+        return new InMemoryTeamStore();
     }
 }

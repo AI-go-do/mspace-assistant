@@ -1,8 +1,9 @@
 package kr.ac.chosun.mspace.assistant.agent.chat.application;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -19,9 +20,12 @@ final class ReplyPolish {
     private ReplyPolish() {
     }
 
-    /** 답 끝에 붙은 꼬리말 (여러 개가 이어져도 전부). 앞 줄바꿈·공백, 닫는 괄호 뒤 마침표까지 함께 지운다 */
-    static final Pattern FOOTER = Pattern.compile(
-            "\\s*\\(\\s*(?:예약 시스템 \\d{1,2}:\\d{2} 조회(?: 기준| · 입력한 시간표 기준)?|입력한 시간표 기준)\\s*\\)[.。]?\\s*$", Pattern.CANON_EQ);
+    /**
+     * 꼬리말 괄호 안의 글. 길이가 정해진 짧은 글에만 쓰도록 반복 수량자를 두지 않는다.
+     * 예전에는 답 전체에 "\\s*(...)\\s*$"를 find로 돌려, 공백이 길게 이어지면 시간이 제곱으로 늘 수 있었다(Sonar S5852)
+     */
+    static final Pattern FOOTER_BODY = Pattern.compile(
+            "예약 시스템 \\d{1,2}:\\d{2} 조회(?: 기준| · 입력한 시간표 기준)?|입력한 시간표 기준", Pattern.CANON_EQ);
 
     /** 도구 이름 → 학생용 말. 순서는 긴 이름부터 (start_now_reservation이 reservation에 먹히지 않게 단어 경계도 본다) */
     static final Map<String, String> TOOL_WORDS;
@@ -47,68 +51,239 @@ final class ReplyPolish {
     /** 위 표에 없는 snake_case 낱말(모델이 지어낸 도구 이름 등)은 이 말로. URL·메일 주소 안은 건드리지 않는다 */
     static final String UNKNOWN_WORD = "그 기능";
 
-    /** 도구 이름 앞뒤의 백틱·따옴표도 같이 지운다: `room_status` → 지금 빈 방 */
-    private static final Pattern TOOL_TOKEN = Pattern.compile("[`'\"]?(?<![\\w가-힣/.@])([a-z]++(?:_[a-z]++)++)(?![\\w/@])[`'\"]?");
+    /** 바꾼 말 바로 뒤에 붙은 조사. 받침에 맞게 고친다: 지금 바로 쓰기+을 → 지금 바로 쓰기를 (긴 것부터: 으로가 로보다 먼저) */
+    private static final List<String> PARTICLES = List.of("으로", "로", "을", "를", "이", "가", "은", "는", "과", "와");
 
-    /** URL·메일 주소. 이 안의 snake_case(경로 reset_password 등)는 바꾸면 링크가 깨진다 */
-    private static final Pattern ADDRESS = Pattern.compile("(?:https?://|www\\.)\\S++|[\\w.+-]++@[\\w-]++(?:\\.[\\w-]++)++");
-
-    /** 바꾼 말 바로 뒤에 붙은 조사. 받침에 맞게 고친다: 지금 바로 쓰기+을 → 지금 바로 쓰기를 */
-    private static final Pattern PARTICLE = Pattern.compile("^(으로|로|을|를|이|가|은|는|과|와)", Pattern.CANON_EQ);
+    private static final List<String> URL_PREFIXES = List.of("http://", "https://", "www.");
 
     /** 모델이 직접 쓴 꼬리말을 끝에서 모두 지운다. 없으면 그대로 */
     static String stripFooters(String text) {
         if (text == null) {
             return null;
         }
-        String out = text;
-        while (true) {
-            Matcher m = FOOTER.matcher(out);
-            if (!m.find()) {
-                return out;
-            }
-            out = out.substring(0, m.start());
+        // 끝 위치만 줄여 가다 마지막에 한 번만 자른다 (꼬리말이 여러 개여도 문자열을 매번 복사하지 않게)
+        int end = text.length();
+        int cut;
+        while ((cut = footerStart(text, end)) >= 0) {
+            end = cut;
         }
+        return end == text.length() ? text : text.substring(0, end);
     }
 
-    /** 도구 이름을 학생용 말로 바꾼다. 없으면 그대로 */
+    /**
+     * text[0, limit) 끝에 붙은 꼬리말 하나의 시작 위치(앞 공백 포함). 없으면 -1.
+     * 뒤에서부터 한 번만 훑어 길이에 비례하는 시간만 쓴다: 공백 → [. 。] → ")" → 안쪽 글 → "(" → 앞 공백
+     */
+    static int footerStart(String text, int limit) {
+        int end = skipSpaceBack(text, limit);
+        if (end > 0 && (text.charAt(end - 1) == '.' || text.charAt(end - 1) == '。')) {
+            end--;
+        }
+        if (end == 0 || text.charAt(end - 1) != ')') {
+            return -1;
+        }
+        int open = text.lastIndexOf('(', end - 2);
+        if (open < 0) {
+            return -1;
+        }
+        String body = text.substring(open + 1, end - 1).strip();
+        if (!FOOTER_BODY.matcher(body).matches()) {
+            return -1;
+        }
+        return skipSpaceBack(text, open);
+    }
+
+    private static int skipSpaceBack(String text, int from) {
+        int i = from;
+        while (i > 0 && Character.isWhitespace(text.charAt(i - 1))) {
+            i--;
+        }
+        return i;
+    }
+
+    /**
+     * 도구 이름(영문 소문자 snake_case)을 학생용 말로 바꾼다. 없으면 그대로.
+     * 앞뒤 백틱·따옴표도 같이 지운다: `room_status` → 지금 빈 방. URL·메일 주소 안은 건드리지 않는다(링크가 깨짐).
+     * 정규식 대신 한 번 훑어서 찾는다: 긴 입력에서 되짚기(backtracking)로 느려질 일이 없게(Sonar S5852)
+     */
     static String hideToolNames(String text) {
         if (text == null || text.indexOf('_') < 0) {
             return text;
         }
-        java.util.List<int[]> addresses = new java.util.ArrayList<>();
-        Matcher a = ADDRESS.matcher(text);
-        while (a.find()) {
-            addresses.add(new int[] {a.start(), a.end()});
-        }
-        Matcher m = TOOL_TOKEN.matcher(text);
+        List<int[]> addresses = addressRanges(text);
         StringBuilder sb = new StringBuilder();
         int last = 0;
-        while (m.find()) {
-            if (inside(addresses, m.start(1))) {
+        int cursor = 0;
+        int i = 0;
+        while (i < text.length()) {
+            if (!isSnakeChar(text.charAt(i))) {
+                i++;
                 continue;
             }
-            String word = TOOL_WORDS.getOrDefault(m.group(1), UNKNOWN_WORD);
-            sb.append(text, last, m.start()).append(word);
-            last = m.end();
-            Matcher p = PARTICLE.matcher(text.substring(last));
-            if (p.find()) {
-                String particle = p.group(1);
-                sb.append(particle(word, particle));
-                last += particle.length();
+            int j = runEnd(text, i);
+            // i는 앞으로만 가므로 이미 지난 주소 범위는 다시 보지 않는다(범위 검사가 입력 길이에 비례)
+            while (cursor < addresses.size() && addresses.get(cursor)[1] <= i) {
+                cursor++;
             }
+            boolean inAddress = cursor < addresses.size() && addresses.get(cursor)[0] <= i;
+            if (!inAddress && isToolToken(text, i, j)) {
+                j = replaceToken(text, sb, last, i, j);
+                last = j;
+            }
+            i = j;
         }
         sb.append(text, last, text.length());
         return sb.toString();
     }
 
-    private static boolean inside(java.util.List<int[]> ranges, int at) {
-        for (int[] r : ranges) {
-            if (at >= r[0] && at < r[1]) {
-                return true;
+    private static int runEnd(String text, int from) {
+        int j = from;
+        while (j < text.length() && isSnakeChar(text.charAt(j))) {
+            j++;
+        }
+        return j;
+    }
+
+    /** text[i, j)의 도구 이름(앞뒤 따옴표·뒤 조사 포함)을 학생 말로 바꿔 sb에 붙이고, 다음에 읽을 위치를 돌려준다 */
+    private static int replaceToken(String text, StringBuilder sb, int last, int i, int j) {
+        int from = i > last && isQuote(text.charAt(i - 1)) ? i - 1 : i;
+        int to = j < text.length() && isQuote(text.charAt(j)) ? j + 1 : j;
+        String word = TOOL_WORDS.getOrDefault(text.substring(i, j), UNKNOWN_WORD);
+        sb.append(text, last, from).append(word);
+        String particle = leadingParticle(text, to);
+        if (particle == null) {
+            return to;
+        }
+        sb.append(particle(word, particle));
+        return to + particle.length();
+    }
+
+    /** [i, j)가 앞뒤로 낱말에 붙지 않은 a_b(_c…) 꼴인지. 밑줄로 시작·끝나거나 두 개 이어지면 아님 */
+    private static boolean isToolToken(String text, int i, int j) {
+        if (i > 0 && isWordBefore(text.charAt(i - 1))) {
+            return false;
+        }
+        if (j < text.length() && isWordAfter(text.charAt(j))) {
+            return false;
+        }
+        if (text.charAt(i) == '_' || text.charAt(j - 1) == '_') {
+            return false;
+        }
+        boolean underscore = false;
+        for (int k = i + 1; k < j; k++) {
+            if (text.charAt(k) == '_') {
+                if (text.charAt(k - 1) == '_') {
+                    return false;
+                }
+                underscore = true;
             }
         }
-        return false;
+        return underscore;
+    }
+
+    private static boolean isSnakeChar(char c) {
+        return (c >= 'a' && c <= 'z') || c == '_';
+    }
+
+    private static boolean isAsciiWord(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    }
+
+    private static boolean isWordBefore(char c) {
+        return isAsciiWord(c) || (c >= '가' && c <= '힣') || c == '/' || c == '.' || c == '@';
+    }
+
+    private static boolean isWordAfter(char c) {
+        return isAsciiWord(c) || c == '/' || c == '@';
+    }
+
+    private static boolean isQuote(char c) {
+        return c == '`' || c == '\'' || c == '"';
+    }
+
+    private static String leadingParticle(String text, int at) {
+        for (String p : PARTICLES) {
+            if (text.startsWith(p, at)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * URL(http://, https://, www. 부터 공백 전까지)과 메일 주소(local@a.b) 위치. 이 안의 snake_case는 바꾸지 않는다.
+     * 시작 위치로 정렬하고 겹치는 범위는 합쳐서 돌려준다(hideToolNames가 커서로 한 번만 훑게)
+     */
+    static List<int[]> addressRanges(String text) {
+        List<int[]> ranges = new ArrayList<>();
+        for (String prefix : URL_PREFIXES) {
+            int from = text.indexOf(prefix);
+            while (from >= 0) {
+                int end = from + prefix.length();
+                while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+                    end++;
+                }
+                ranges.add(new int[] {from, end});
+                from = text.indexOf(prefix, end);
+            }
+        }
+        int at = text.indexOf('@');
+        while (at >= 0) {
+            int start = at;
+            while (start > 0 && isMailLocal(text.charAt(start - 1))) {
+                start--;
+            }
+            int end = mailDomainEnd(text, at + 1);
+            if (start < at && end > 0) {
+                ranges.add(new int[] {start, end});
+            }
+            at = text.indexOf('@', at + 1);
+        }
+        return merged(ranges);
+    }
+
+    private static List<int[]> merged(List<int[]> ranges) {
+        ranges.sort((a, b) -> Integer.compare(a[0], b[0]));
+        List<int[]> out = new ArrayList<>();
+        for (int[] r : ranges) {
+            int[] prev = out.isEmpty() ? null : out.get(out.size() - 1);
+            if (prev != null && r[0] <= prev[1]) {
+                prev[1] = Math.max(prev[1], r[1]);
+            } else {
+                out.add(new int[] {r[0], r[1]});
+            }
+        }
+        return out;
+    }
+
+    private static boolean isMailLocal(char c) {
+        return isAsciiWord(c) || c == '.' || c == '+' || c == '-';
+    }
+
+    private static boolean isLabelChar(char c) {
+        return isAsciiWord(c) || c == '-';
+    }
+
+    /** 도메인(label(.label)+)이 끝나는 위치. 점으로 나뉜 조각이 둘 이상 아니면 -1 */
+    private static int mailDomainEnd(String text, int from) {
+        int labels = 0;
+        int end = from;
+        int i = from;
+        boolean more = true;
+        while (more) {
+            int j = i;
+            while (j < text.length() && isLabelChar(text.charAt(j))) {
+                j++;
+            }
+            more = j > i;
+            if (more) {
+                labels++;
+                end = j;
+                more = j < text.length() && text.charAt(j) == '.';
+                i = j + 1;
+            }
+        }
+        return labels >= 2 ? end : -1;
     }
 
     /** 앞말의 끝 글자 받침에 맞는 조사 (으로/로는 ㄹ 받침이면 로) */

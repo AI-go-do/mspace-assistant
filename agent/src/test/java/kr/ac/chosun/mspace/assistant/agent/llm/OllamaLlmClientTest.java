@@ -61,6 +61,17 @@ class OllamaLlmClientTest {
     }
 
     @Test
+    @DisplayName("토큰 수: prompt_eval_count·eval_count를 Usage로")
+    void usage() {
+        ollama.stubFor(post("/api/chat").willReturn(okJson("""
+                {"message":{"role":"assistant","content":"안녕하세요"},"done":true,"prompt_eval_count":900,"eval_count":15}""")));
+
+        LlmReply reply = client(Duration.ofSeconds(2)).chat("지시문", List.of(new LlmMessage.User("안녕")), List.of());
+
+        assertThat(reply.usage()).isEqualTo(new LlmReply.Usage(900, 15));
+    }
+
+    @Test
     @DisplayName("도구 결과는 role=tool, tool_name으로 돌려보낸다")
     void sendsToolResult() {
         ollama.stubFor(post("/api/chat").willReturn(okJson("{\"message\":{\"role\":\"assistant\",\"content\":\"2번 방이 비어요\"}}")));
