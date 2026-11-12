@@ -49,7 +49,7 @@ public class ReadTimetableImage {
             - startTime, endTime: 24시간 HH:mm. 칸마다 위 끝·아래 끝을 눈금에 맞춰 따로 읽는다. 칸이 붙어 있어도 다음 칸 시작을 끝으로 쓰지 않는다. 눈금 한 칸 안에서 반쯤이면 :30
             - name: 과목명만. 교수 이름, 강의실, 학번, 사람 이름은 절대 적지 않는다
             - 같은 과목이 여러 요일에 있으면 요일마다 한 항목씩
-            - 읽을 수 없으면 {"hours":[],"classes":[]}
+            - 눈금 숫자를 못 찾으면 hours는 []로 두고 classes는 읽은 대로 적는다. 수업 칸을 하나도 못 읽으면 {"hours":[],"classes":[]}
             """;
 
     private final ImageReader reader;

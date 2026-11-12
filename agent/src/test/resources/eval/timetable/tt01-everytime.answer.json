@@ -1,5 +1,5 @@
 {
-  "source": "11/12 영준이 올린 에브리타임 캡처(이름·학번 없음). 정답은 영준이 표로 준 것",
+  "source": "11/12 팀원이 올린 에브리타임 캡처(이름·학번 없음). 정답은 같은 팀원이 표로 준 것",
   "classes": [
     {"dayOfWeek": "MON", "startTime": "08:30", "endTime": "14:30", "name": "근로"},
     {"dayOfWeek": "MON", "startTime": "15:00", "endTime": "16:30", "name": "비평적 글쓰기"},

@@ -6,6 +6,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +17,7 @@ import java.util.List;
 import kr.ac.chosun.mspace.assistant.agent.chat.application.ReadTimetableImage.ClassDraft;
 import kr.ac.chosun.mspace.assistant.agent.eval.TimetableScorer;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ImageReader;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -53,11 +58,14 @@ class TimetableGeometryTest {
     @Test
     @DisplayName("read(): 진짜 흐름에서도 그림을 같이 넘겨 잰다 (JPEG)")
     void readUsesImage() throws IOException {
+        // given
         byte[] image = resource("tt01-everytime.jpg");
         when(reader.read(anyString(), any(), any())).thenReturn(new String(resource("tt01-hand-made-model-answer.json"), StandardCharsets.UTF_8));
 
+        // when
         ReadTimetableImage.Draft draft = service.read("image/jpeg", image);
 
+        // then
         assertThat(draft.classes()).contains(
                 new ClassDraft("WED", "13:00", "14:30", "근로"),
                 new ClassDraft("TUE", "15:00", "18:00", "영상문화콘텐츠 기획 개발"),
@@ -67,6 +75,7 @@ class TimetableGeometryTest {
     @Test
     @DisplayName("정각 가로줄을 찾아 눈금을 맞춘다: 8시~18시 줄, 한 시간 약 42.5픽셀")
     void calibratesOnGridLines() throws IOException {
+        // given
         TimetableGeometry g = TimetableGeometry.of(resource("tt01-everytime.jpg")).orElseThrow();
         JsonNode hours = json.readTree(resource("tt01-hand-made-model-answer.json")).path("hours");
         List<TimetableGeometry.HourLabel> labels = new java.util.ArrayList<>();
@@ -76,8 +85,10 @@ class TimetableGeometryTest {
                     new TimetableGeometry.Box(b.get(0).asDouble(), b.get(1).asDouble(), b.get(2).asDouble(), b.get(3).asDouble())));
         }
 
+        // when
         TimetableGeometry.Calibration cal = g.calibrate(labels).orElseThrow();
 
+        // then
         assertThat(cal.gridAligned()).isTrue();
         assertThat(cal.slope()).isBetween(42.0, 43.0);
         assertThat(cal.hourAt(79.5)).isCloseTo(8.0, org.assertj.core.data.Offset.offset(0.05));
@@ -86,15 +97,18 @@ class TimetableGeometryTest {
     @Test
     @DisplayName("눈금(hours)이 없거나 그림을 못 열면 재지 않고 모델 시각을 그대로 쓴다 (지금보다 나빠지지 않게)")
     void fallsBackToModelTimes() throws IOException {
+        // given
         String modelAnswer = new String(resource("tt01-hand-made-model-answer.json"), StandardCharsets.UTF_8);
         JsonNode root = json.readTree(modelAnswer);
         String noHours = json.writeValueAsString(((tools.jackson.databind.node.ObjectNode) root).put("hours", (String) null));
         byte[] notImage = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0};
 
+        // when
         List<ClassDraft> a = service.parse(noHours, resource("tt01-everytime.jpg")).classes();
         List<ClassDraft> b = service.parse(modelAnswer, notImage).classes();
-
         List<ClassDraft> modelOnly = service.parse(modelAnswer).classes();
+
+        // then
         assertThat(a).isEqualTo(modelOnly);
         assertThat(b).isEqualTo(modelOnly);
     }
@@ -102,14 +116,78 @@ class TimetableGeometryTest {
     @Test
     @DisplayName("상자가 색칠 안 된 곳(금요일 빈칸)을 가리키면 그 칸만 모델 시각")
     void emptyBoxKeepsModelTime() throws IOException {
+        // given
         String answer = """
                 {"hours":%s,
                  "classes":[{"dayOfWeek":"FRI","startTime":"09:00","endTime":"10:00","name":"없는 수업","box_2d":[150,810,240,970]}]}"""
                 .formatted(json.writeValueAsString(json.readTree(resource("tt01-hand-made-model-answer.json")).path("hours")));
 
+        // when
         List<ClassDraft> out = service.parse(answer, resource("tt01-everytime.jpg")).classes();
 
+        // then
         assertThat(out).containsExactly(new ClassDraft("FRI", "09:00", "10:00", "없는 수업"));
+    }
+
+    @Test
+    @DisplayName("같은 색 수업 두 개가 1픽셀 흰 경계로 붙어 있어도 합치지 않는다 (글자 끊김과 구분)")
+    void sameColorNeighborsStaySeparate() throws IOException {
+        // given: 한 시간 40픽셀, 8시 줄 y=40. 월요일 칸에 같은 색 9:00~10:30, 10:30~12:00 + 첫 칸 안에 흰 글자
+        int w = 400;
+        int h = 600;
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, w, h);
+        g.setColor(new Color(230, 230, 230));
+        for (int hour = 8; hour <= 20; hour++) {
+            g.drawLine(0, 40 + (hour - 8) * 40, w, 40 + (hour - 8) * 40);
+        }
+        g.setColor(new Color(240, 135, 120));
+        g.fillRect(50, 81, 100, 59);   // 9:00(y80) 다음 줄부터 139까지
+        g.fillRect(50, 141, 100, 59);  // 140은 흰 경계, 10:30~12:00
+        g.setColor(Color.WHITE);
+        g.fillRect(58, 92, 70, 12);    // 글자 자리(흰색)
+        g.dispose();
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", png);
+        StringBuilder hours = new StringBuilder("[");
+        for (int hour = 8; hour <= 18; hour++) {
+            double y = (40 + (hour - 8) * 40 + 4) / 600.0 * 1000;
+            hours.append(hour > 8 ? "," : "").append("{\"hour\":").append(hour).append(",\"box_2d\":[")
+                    .append(Math.round(y)).append(",10,").append(Math.round(y + 15)).append(",40]}");
+        }
+        hours.append("]");
+        // 모델 상자는 일부러 아래로 흔듦(첫 칸 아래 끝을 둘째 칸 안까지)
+        String answer = """
+                {"hours":%s,"classes":[
+                  {"dayOfWeek":"MON","startTime":"09:00","endTime":"11:00","name":"자료구조","box_2d":[140,125,250,375]},
+                  {"dayOfWeek":"MON","startTime":"11:00","endTime":"12:00","name":"자료구조 실습","box_2d":[240,125,333,375]}]}"""
+                .formatted(hours);
+
+        // when
+        List<ClassDraft> out = service.parse(answer, png.toByteArray()).classes();
+
+        // then
+        assertThat(out).containsExactly(
+                new ClassDraft("MON", "09:00", "10:30", "자료구조"),
+                new ClassDraft("MON", "10:30", "12:00", "자료구조 실습"));
+    }
+
+    @Test
+    @DisplayName("픽셀이 너무 많은 그림(압축은 작아도)은 풀지 않고 재기를 건너뛴다 (메모리 보호)")
+    void hugeImageIsNotDecoded() throws IOException {
+        // given: 4100×4100 흑백 PNG. 파일은 작지만 픽셀은 1,681만 개로 상한(1,600만) 초과
+        BufferedImage img = new BufferedImage(4100, 4100, BufferedImage.TYPE_BYTE_BINARY);
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", png);
+
+        // when
+        var geometry = TimetableGeometry.of(png.toByteArray());
+
+        // then
+        assertThat(png.size()).isLessThan(ReadTimetableImage.MAX_BYTES);
+        assertThat(geometry).isEmpty();
     }
 
     private List<ClassDraft> answers() throws IOException {

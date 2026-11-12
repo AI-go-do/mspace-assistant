@@ -8,7 +8,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Iterator;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 /**
  * 시간표 캡처에서 칸의 위·아래 끝을 <b>픽셀로 재서</b> 시각으로 바꾼다 (모델은 "어디쯤"만, 코드가 "정확히 몇 시").
@@ -56,6 +59,8 @@ final class TimetableGeometry {
     static final int ROUND_MINUTES = 5;
     /** 30분 칸(정각·30분)에 이만큼 가까우면 그 칸으로 붙인다. 대학 시간표 대부분이 30분 칸이고, 칸 끝 1~2픽셀 오차를 흡수한다 */
     static final int SNAP_MINUTES = 6;
+    /** 풀기 전에 막는 픽셀 수(약 4000×4000). 폰 캡처는 보통 1200×2700 안팎이다 */
+    static final long MAX_PIXELS = 16_000_000L;
 
     private final BufferedImage img;
     private final int width;
@@ -72,9 +77,25 @@ final class TimetableGeometry {
         if (image == null || image.length == 0) {
             return Optional.empty();
         }
-        try {
-            BufferedImage img = ImageIO.read(new ByteArrayInputStream(image));
-            return img == null || img.getWidth() < 50 || img.getHeight() < 50 ? Optional.empty() : Optional.of(new TimetableGeometry(img));
+        // 5MB 안이라도 압축이 잘 되는 PNG는 픽셀이 매우 많을 수 있어, 풀기 전에 머리말로 크기부터 본다(메모리 부족 막기)
+        try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(image))) {
+            Iterator<ImageReader> readers = in == null ? java.util.Collections.emptyIterator() : ImageIO.getImageReaders(in);
+            if (!readers.hasNext()) {
+                return Optional.empty();
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(in, true, true);
+                int w = reader.getWidth(0);
+                int h = reader.getHeight(0);
+                if (w < 50 || h < 50 || (long) w * h > MAX_PIXELS) {
+                    return Optional.empty();
+                }
+                BufferedImage img = reader.read(0);
+                return img == null ? Optional.empty() : Optional.of(new TimetableGeometry(img));
+            } finally {
+                reader.dispose();
+            }
         } catch (IOException | RuntimeException e) {
             return Optional.empty();
         }
@@ -206,8 +227,8 @@ final class TimetableGeometry {
             if (seed < 0) {
                 continue;
             }
-            tops.add(extend(x, seed, -1, top, maxGap, color));
-            bottoms.add(extend(x, seed, +1, bottom, maxGap, color));
+            tops.add(extend(x, seed, -1, top, maxGap, color, x0 + w / 10, x1 - w / 10));
+            bottoms.add(extend(x, seed, +1, bottom, maxGap, color, x0 + w / 10, x1 - w / 10));
         }
         if (tops.size() < 3) {
             return Optional.empty();
@@ -252,16 +273,53 @@ final class TimetableGeometry {
         return -1;
     }
 
-    private int extend(int x, int from, int dir, int limit, int maxGap, int[] color) {
+    /**
+     * 같은 색이 끊겨도 maxGap까지는 글자로 보고 이어 본다. 다만 칸 너비 전체가 꽉 찬 줄 바로 다음에 칸 색이 거의 없는 얇은 줄(3픽셀 이하)이 오고
+     * 다시 꽉 찬 줄이 나오면 글자가 아니라 칸 사이 경계선이라 거기서 멈춘다. 글자 줄은 10픽셀 안팎이라 이 조건에 안 걸린다.
+     * 같은 색 수업 두 개가 위아래로 붙어도 하나로 합치지 않게.
+     */
+    private int extend(int x, int from, int dir, int limit, int maxGap, int[] color, int xa, int xb) {
         int last = from;
         for (int y = from + dir; dir < 0 ? y >= limit : y <= limit; y += dir) {
             if (same(x, y, color)) {
                 last = y;
-            } else if (Math.abs(y - last) > maxGap) {
+            } else if (Math.abs(y - last) > maxGap || separator(y, dir, xa, xb, color)) {
                 break;
             }
         }
         return last;
+    }
+
+    private boolean separator(int y, int dir, int xa, int xb, int[] color) {
+        if (coverage(y, xa, xb, color) >= 0.1 || coverage(y - dir, xa, xb, color) < 0.9) {
+            return false;
+        }
+        for (int k = 1; k <= 3; k++) {
+            int yy = y + dir * k;
+            if (yy < 0 || yy >= height) {
+                return false;
+            }
+            if (coverage(yy, xa, xb, color) >= 0.9) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 그 줄(xa~xb)에서 칸 색인 픽셀 비율 */
+    private double coverage(int y, int xa, int xb, int[] color) {
+        if (y < 0 || y >= height) {
+            return 0;
+        }
+        int hit = 0;
+        int all = 0;
+        for (int x = Math.max(0, xa); x <= Math.min(width - 1, xb); x++) {
+            all++;
+            if (same(x, y, color)) {
+                hit++;
+            }
+        }
+        return all == 0 ? 0 : (double) hit / all;
     }
 
     private boolean same(int x, int y, int[] color) {

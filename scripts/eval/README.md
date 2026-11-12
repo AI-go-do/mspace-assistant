@@ -148,5 +148,6 @@ read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY; echo
 EVAL_TIMETABLE=1 ./mvnw -q -pl agent test -Dtest=TimetableEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 - 사진 1장 × `EVAL_RUNS`(기본 2) × 2 = **호출 4번**. 대화 평가와 같은 키·하루 한도를 쓰니 한도가 남았을 때(17:00 KST에 새로 시작) 돌려요
+- 한도·장애로 답이 없던 회차는 0점으로 섞지 않고 "실패" 칸에 따로 세요
 - 모델은 `EVAL_TIMETABLE_MODEL`(기본 `gemini-3.5-flash-lite`)
 - CI에서는 `TimetableGeometryTest`가 손 만든 모델 답(위치를 일부러 흔듦)으로 픽셀 재기만 검사해요
