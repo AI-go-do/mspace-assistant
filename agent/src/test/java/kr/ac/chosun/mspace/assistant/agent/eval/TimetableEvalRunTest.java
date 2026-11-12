@@ -80,11 +80,17 @@ class TimetableEvalRunTest {
             String id = image.getFileName().toString().replaceFirst("\\.(jpg|png)$", "");
             byte[] bytes = Files.readAllBytes(image);
             String mime = image.toString().endsWith(".png") ? "image/png" : "image/jpeg";
-            List<ClassDraft> answers = answers(json, image.resolveSibling(id + ".answer.json"));
             // 레포 밖 사진(실제 사람 시간표일 수 있음)은 과목명이 들어가는 원문·틀린 칸을 결과에 남기지 않고 점수만 남긴다
             boolean outside = !image.getParent().equals(repoDir);
-            // 파일 이름에도 이름·학번이 있을 수 있어 결과에는 순번만 쓴다(정답 파일은 위에서 원래 이름으로 이미 읽음)
+            // 파일 이름에도 이름·학번이 있을 수 있어 결과에는 순번만 쓴다(정답 파일은 원래 이름으로 읽음)
             String label = outside ? "outside-" + (++outsideCount) : id;
+            List<ClassDraft> answers;
+            try {
+                answers = answers(json, image.resolveSibling(id + ".answer.json"));
+            } catch (IOException | RuntimeException e) {
+                // 원인 예외를 붙이지 않는다: 메시지에 원래 파일 이름(이름·학번이 있을 수 있음)이 들어 있다
+                throw new IllegalStateException("정답 파일을 읽지 못했어요: " + label);
+            }
             for (int run = 1; run <= runs; run++) {
                 String t1 = call(reader, v1, mime, bytes);
                 Thread.sleep(5000);  // 분당 한도(15회) 여유
