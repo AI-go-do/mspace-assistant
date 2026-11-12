@@ -35,7 +35,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>v2</b>: 새 지시문(위치 box_2d 같이 받기). 같은 답으로 두 줄을 낸다
  *     <ul><li>v2-모델 시각: 지시문만 바꾼 효과</li><li>v2+픽셀 재기: 지시문 + 코드 보정 = 지금 코드</li></ul></li>
  * </ol>
- * 한 판에 한 가지만 바꾼 줄이 나란히 나오게 했다. 정답·사진은 agent/src/test/resources/eval/timetable/ (tt*.jpg + tt*.answer.json).
+ * 한 판에 한 가지만 바꾼 줄이 나란히 나오게 했다. 정답·사진은 agent/src/test/resources/eval/timetable/ (ttNN*.png|jpg + 같은 이름.answer.json, 합성 그림만).
+ * 실제 캡처처럼 레포에 둘 수 없는 사진은 EVAL_TIMETABLE_DIR(레포 밖 폴더)에 같은 규칙으로 두면 함께 잰다.
  *
  * <pre>
  * read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY
@@ -57,10 +58,16 @@ class TimetableEvalRunTest {
         String v1 = Files.readString(Path.of(env("EVAL_TIMETABLE_V1", "../scripts/eval/prompts/timetable-v1.txt")), StandardCharsets.UTF_8);
         int runs = Integer.parseInt(env("EVAL_RUNS", "2"));
 
-        Path dir = Path.of(TimetableEvalRunTest.class.getResource("/eval/timetable").toURI());
-        List<Path> images;
-        try (Stream<Path> s = Files.list(dir)) {
-            images = s.filter(p -> p.getFileName().toString().matches("tt\\d+.*\\.(jpg|png)")).sorted().toList();
+        List<Path> dirs = new ArrayList<>(List.of(Path.of(TimetableEvalRunTest.class.getResource("/eval/timetable").toURI())));
+        if (!env("EVAL_TIMETABLE_DIR", "").isBlank()) {
+            dirs.add(Path.of(env("EVAL_TIMETABLE_DIR", "")));
+        }
+        Path repoDir = dirs.get(0);
+        List<Path> images = new ArrayList<>();
+        for (Path dir : dirs) {
+            try (Stream<Path> s = Files.list(dir)) {
+                s.filter(p -> p.getFileName().toString().matches("tt\\d+[^.]*\\.(jpg|png)")).sorted().forEach(images::add);
+            }
         }
         assertThat(images).isNotEmpty();
 
@@ -68,20 +75,31 @@ class TimetableEvalRunTest {
         Map<String, List<TimetableScorer.Result>> rows = new LinkedHashMap<>();
         Map<String, Integer> failures = new LinkedHashMap<>();
         List<Map<String, Object>> detail = new ArrayList<>();
+        int outsideCount = 0;
         for (Path image : images) {
             String id = image.getFileName().toString().replaceFirst("\\.(jpg|png)$", "");
             byte[] bytes = Files.readAllBytes(image);
             String mime = image.toString().endsWith(".png") ? "image/png" : "image/jpeg";
-            List<ClassDraft> answers = answers(json, dir.resolve(id + ".answer.json"));
+            // 레포 밖 사진(실제 사람 시간표일 수 있음)은 과목명이 들어가는 원문·틀린 칸을 결과에 남기지 않고 점수만 남긴다
+            boolean outside = !image.getParent().equals(repoDir);
+            // 파일 이름에도 이름·학번이 있을 수 있어 결과에는 순번만 쓴다(정답 파일은 원래 이름으로 읽음)
+            String label = outside ? "outside-" + (++outsideCount) : id;
+            List<ClassDraft> answers;
+            try {
+                answers = answers(json, image.resolveSibling(id + ".answer.json"));
+            } catch (IOException | RuntimeException e) {
+                // 원인 예외를 붙이지 않는다: 메시지에 원래 파일 이름(이름·학번이 있을 수 있음)이 들어 있다
+                throw new IllegalStateException("정답 파일을 읽지 못했어요: " + label);
+            }
             for (int run = 1; run <= runs; run++) {
                 String t1 = call(reader, v1, mime, bytes);
                 Thread.sleep(5000);  // 분당 한도(15회) 여유
                 String t2 = call(reader, service.instruction(), mime, bytes);
                 Thread.sleep(5000);
                 // 한도·장애로 답이 없으면 0점으로 섞지 않고 실패로 따로 센다(모델이 못 읽은 것과 구분)
-                add(rows, failures, detail, id, run, "v1 · 모델 시각 (기준)", t1 == null ? null : service.modelTimes(t1), answers, t1);
-                add(rows, failures, detail, id, run, "v2 · 모델 시각 (지시문만)", t2 == null ? null : service.modelTimes(t2), answers, t2);
-                add(rows, failures, detail, id, run, "v2 · 픽셀 재기 (지금 코드)", t2 == null ? null : service.measured(t2, bytes), answers, null);
+                add(rows, failures, detail, label, run, "v1 · 모델 시각 (기준)", t1 == null ? null : service.modelTimes(t1), answers, t1, outside);
+                add(rows, failures, detail, label, run, "v2 · 모델 시각 (지시문만)", t2 == null ? null : service.modelTimes(t2), answers, t2, outside);
+                add(rows, failures, detail, label, run, "v2 · 픽셀 재기 (지금 코드)", t2 == null ? null : service.measured(t2, bytes), answers, null, outside);
             }
         }
 
@@ -133,7 +151,7 @@ class TimetableEvalRunTest {
     }
 
     private static void add(Map<String, List<TimetableScorer.Result>> rows, Map<String, Integer> failures, List<Map<String, Object>> detail,
-            String image, int run, String mode, List<ClassDraft> predicted, List<ClassDraft> answers, String raw) {
+            String image, int run, String mode, List<ClassDraft> predicted, List<ClassDraft> answers, String raw, boolean outside) {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("image", image);
         d.put("run", run);
@@ -148,6 +166,11 @@ class TimetableEvalRunTest {
         TimetableScorer.Result r = TimetableScorer.score(predicted, answers);
         rows.computeIfAbsent(mode, k -> new ArrayList<>()).add(r);
         d.put("score", r.score());
+        if (outside) {
+            d.put("misses", List.of("레포 밖 사진: 틀린 칸 " + r.misses().size() + "개(과목명은 저장하지 않음)"));
+            detail.add(d);
+            return;
+        }
         d.put("misses", r.misses());
         if (raw != null) {
             d.put("raw", raw);  // 모델 답 원문(과목명·시각·위치만. 사진에 이름·학번 없음)
