@@ -627,7 +627,8 @@
      "continue_reservation"
     ],
     "replyAny": [
-     "본인"
+     "본인",
+     "내 예약만"
     ]
    }
   },
