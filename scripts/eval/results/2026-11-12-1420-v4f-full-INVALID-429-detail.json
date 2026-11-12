@@ -1,0 +1,1489 @@
+[ {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C01",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 724,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C02",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 258,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C03",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "ms" : 1493,
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ]
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 419,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C04",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 332,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 289,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C06",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "ms" : 8082,
+    "toolCalls" : [ {
+      "name" : "find_available_rooms",
+      "args" : {
+        "headcount" : 6,
+        "date" : "2026-11-13",
+        "from" : "16:00",
+        "to" : "17:30"
+      }
+    } ]
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 759,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C07",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 277,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 288,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C09",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "ms" : 790,
+    "toolCalls" : [ {
+      "name" : "my_reservations",
+      "args" : { }
+    } ]
+  }, {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 302,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 329,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C11",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 246,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 290,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C13",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 719,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C14",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 249,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C15",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 456,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 269,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C17",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 247,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C18",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 320,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 283,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C20",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 529,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C21",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 445,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C22",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 249,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C23",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 298,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C24",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 816,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C25",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 311,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C26",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 846,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C27",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 262,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C28",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 291,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C29",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 443,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C30",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 306,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 562,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C32",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 476,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C33",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 264,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C34",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 252,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C35",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 291,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C36",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 264,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C37",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 533,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C38",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 255,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C39",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 229,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C40",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 272,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C41",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 239,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C42",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 302,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 1,
+  "id" : "C43",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 244,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C01",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 342,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C02",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 418,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C03",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 648,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C04",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 283,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C05",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 272,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C06",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 372,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C07",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 290,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C08",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 242,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C09",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 304,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C10",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 441,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C11",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 233,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C12",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 289,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C13",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 256,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C14",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 357,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C15",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 245,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C16",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 224,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C17",
+  "set" : "기본",
+  "points" : 100,
+  "pass" : true,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "",
+    "ms" : 4860,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ ],
+  "reply" : "언제, 몇 시에 사용할 예정이신가요? 그리고 함께 쓰실 분을 포함해 총 몇 명인지 알려주세요. (길이를 말씀하지 않으시면 2시간으로 잡아드릴게요.)"
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C18",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 515,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C19",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 219,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C20",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 260,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C21",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 253,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C22",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 314,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C23",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 271,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C24",
+  "set" : "기본",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 241,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C25",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 289,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C26",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 767,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C27",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 291,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C28",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 290,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C29",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 250,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C30",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 292,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C31",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 274,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C32",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 326,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C33",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 317,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C34",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 457,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C35",
+  "set" : "대화",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 233,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C36",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 310,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C37",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 290,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C38",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 263,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C39",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 301,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C40",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 270,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C41",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 306,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C42",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 476,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+}, {
+  "model" : "gemini-3.5-flash-lite",
+  "prompt" : "v4f",
+  "run" : 2,
+  "id" : "C43",
+  "set" : "맥락",
+  "points" : 0,
+  "pass" : false,
+  "severe" : [ ],
+  "tools" : [ ],
+  "calls" : [ {
+    "error" : "LLM_RATE_LIMITED",
+    "ms" : 249,
+    "toolCalls" : [ ]
+  } ],
+  "misses" : [ "오류 LLM_RATE_LIMITED" ],
+  "reply" : ""
+} ]
