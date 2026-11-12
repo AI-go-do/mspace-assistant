@@ -75,6 +75,7 @@ class TimetableEvalRunTest {
         Map<String, List<TimetableScorer.Result>> rows = new LinkedHashMap<>();
         Map<String, Integer> failures = new LinkedHashMap<>();
         List<Map<String, Object>> detail = new ArrayList<>();
+        int outsideCount = 0;
         for (Path image : images) {
             String id = image.getFileName().toString().replaceFirst("\\.(jpg|png)$", "");
             byte[] bytes = Files.readAllBytes(image);
@@ -82,15 +83,17 @@ class TimetableEvalRunTest {
             List<ClassDraft> answers = answers(json, image.resolveSibling(id + ".answer.json"));
             // 레포 밖 사진(실제 사람 시간표일 수 있음)은 과목명이 들어가는 원문·틀린 칸을 결과에 남기지 않고 점수만 남긴다
             boolean outside = !image.getParent().equals(repoDir);
+            // 파일 이름에도 이름·학번이 있을 수 있어 결과에는 순번만 쓴다(정답 파일은 위에서 원래 이름으로 이미 읽음)
+            String label = outside ? "outside-" + (++outsideCount) : id;
             for (int run = 1; run <= runs; run++) {
                 String t1 = call(reader, v1, mime, bytes);
                 Thread.sleep(5000);  // 분당 한도(15회) 여유
                 String t2 = call(reader, service.instruction(), mime, bytes);
                 Thread.sleep(5000);
                 // 한도·장애로 답이 없으면 0점으로 섞지 않고 실패로 따로 센다(모델이 못 읽은 것과 구분)
-                add(rows, failures, detail, id, run, "v1 · 모델 시각 (기준)", t1 == null ? null : service.modelTimes(t1), answers, t1, outside);
-                add(rows, failures, detail, id, run, "v2 · 모델 시각 (지시문만)", t2 == null ? null : service.modelTimes(t2), answers, t2, outside);
-                add(rows, failures, detail, id, run, "v2 · 픽셀 재기 (지금 코드)", t2 == null ? null : service.measured(t2, bytes), answers, null, outside);
+                add(rows, failures, detail, label, run, "v1 · 모델 시각 (기준)", t1 == null ? null : service.modelTimes(t1), answers, t1, outside);
+                add(rows, failures, detail, label, run, "v2 · 모델 시각 (지시문만)", t2 == null ? null : service.modelTimes(t2), answers, t2, outside);
+                add(rows, failures, detail, label, run, "v2 · 픽셀 재기 (지금 코드)", t2 == null ? null : service.measured(t2, bytes), answers, null, outside);
             }
         }
 
