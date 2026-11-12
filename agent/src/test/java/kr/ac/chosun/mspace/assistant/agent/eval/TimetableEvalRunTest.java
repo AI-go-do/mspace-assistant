@@ -62,6 +62,7 @@ class TimetableEvalRunTest {
         if (!env("EVAL_TIMETABLE_DIR", "").isBlank()) {
             dirs.add(Path.of(env("EVAL_TIMETABLE_DIR", "")));
         }
+        Path repoDir = dirs.get(0);
         List<Path> images = new ArrayList<>();
         for (Path dir : dirs) {
             try (Stream<Path> s = Files.list(dir)) {
@@ -79,15 +80,17 @@ class TimetableEvalRunTest {
             byte[] bytes = Files.readAllBytes(image);
             String mime = image.toString().endsWith(".png") ? "image/png" : "image/jpeg";
             List<ClassDraft> answers = answers(json, image.resolveSibling(id + ".answer.json"));
+            // 레포 밖 사진(실제 사람 시간표일 수 있음)은 과목명이 들어가는 원문·틀린 칸을 결과에 남기지 않고 점수만 남긴다
+            boolean outside = !image.getParent().equals(repoDir);
             for (int run = 1; run <= runs; run++) {
                 String t1 = call(reader, v1, mime, bytes);
                 Thread.sleep(5000);  // 분당 한도(15회) 여유
                 String t2 = call(reader, service.instruction(), mime, bytes);
                 Thread.sleep(5000);
                 // 한도·장애로 답이 없으면 0점으로 섞지 않고 실패로 따로 센다(모델이 못 읽은 것과 구분)
-                add(rows, failures, detail, id, run, "v1 · 모델 시각 (기준)", t1 == null ? null : service.modelTimes(t1), answers, t1);
-                add(rows, failures, detail, id, run, "v2 · 모델 시각 (지시문만)", t2 == null ? null : service.modelTimes(t2), answers, t2);
-                add(rows, failures, detail, id, run, "v2 · 픽셀 재기 (지금 코드)", t2 == null ? null : service.measured(t2, bytes), answers, null);
+                add(rows, failures, detail, id, run, "v1 · 모델 시각 (기준)", t1 == null ? null : service.modelTimes(t1), answers, t1, outside);
+                add(rows, failures, detail, id, run, "v2 · 모델 시각 (지시문만)", t2 == null ? null : service.modelTimes(t2), answers, t2, outside);
+                add(rows, failures, detail, id, run, "v2 · 픽셀 재기 (지금 코드)", t2 == null ? null : service.measured(t2, bytes), answers, null, outside);
             }
         }
 
@@ -139,7 +142,7 @@ class TimetableEvalRunTest {
     }
 
     private static void add(Map<String, List<TimetableScorer.Result>> rows, Map<String, Integer> failures, List<Map<String, Object>> detail,
-            String image, int run, String mode, List<ClassDraft> predicted, List<ClassDraft> answers, String raw) {
+            String image, int run, String mode, List<ClassDraft> predicted, List<ClassDraft> answers, String raw, boolean outside) {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("image", image);
         d.put("run", run);
@@ -154,6 +157,11 @@ class TimetableEvalRunTest {
         TimetableScorer.Result r = TimetableScorer.score(predicted, answers);
         rows.computeIfAbsent(mode, k -> new ArrayList<>()).add(r);
         d.put("score", r.score());
+        if (outside) {
+            d.put("misses", List.of("레포 밖 사진: 틀린 칸 " + r.misses().size() + "개(과목명은 저장하지 않음)"));
+            detail.add(d);
+            return;
+        }
         d.put("misses", r.misses());
         if (raw != null) {
             d.put("raw", raw);  // 모델 답 원문(과목명·시각·위치만. 사진에 이름·학번 없음)
