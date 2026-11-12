@@ -6,6 +6,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import kr.ac.chosun.mspace.assistant.agent.llm.application.ImageReader;
 import tools.jackson.core.JacksonException;
@@ -31,15 +32,24 @@ public class ReadTimetableImage {
     private static final Set<String> DAYS = Set.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
 
+    /**
+     * 지시문 v2 (11/12). v1은 시각만 받아 칸 끝을 다음 칸 시작에 붙이거나 30분씩 밀렸다(TS-18).
+     * v2는 칸·눈금 글자의 위치(box_2d)를 같이 받아 코드가 픽셀로 끝을 잰다({@link TimetableGeometry}).
+     * 시각(startTime·endTime)은 위치로 못 잴 때 쓰는 예비 값이다.
+     */
     static final String INSTRUCTION = """
             너는 대학생 시간표 캡처 화면을 읽어 JSON으로 옮기는 도우미다.
             JSON 외의 글은 쓰지 않는다. 형식:
-            {"classes":[{"dayOfWeek":"MON","startTime":"09:00","endTime":"10:30","name":"과목명"}]}
-            - dayOfWeek: MON TUE WED THU FRI SAT SUN 중 하나 (월=MON, 화=TUE, 수=WED, 목=THU, 금=FRI, 토=SAT, 일=SUN)
-            - startTime, endTime: 24시간 HH:mm. 칸의 위아래 경계를 눈금에 맞춰 읽는다
+            {"hours":[{"hour":9,"box_2d":[0,0,0,0]}],
+             "classes":[{"dayOfWeek":"MON","startTime":"09:00","endTime":"10:30","name":"과목명","box_2d":[0,0,0,0]}]}
+            - box_2d: 그림 안 위치 [ymin, xmin, ymax, xmax]. 그림 전체를 0~1000으로 본 정수
+            - hours: 왼쪽 시간 눈금 숫자마다 하나. hour는 24시간으로 적는다(12 다음의 1, 2, 3 …은 13, 14, 15 …). box_2d는 그 숫자 글자의 위치
+            - classes: 색칠된 수업 칸마다 하나. box_2d는 색칠된 칸 전체(색이 시작하는 위 끝부터 끝나는 아래 끝까지)
+            - dayOfWeek: MON TUE WED THU FRI SAT SUN 중 하나 (월=MON, 화=TUE, 수=WED, 목=THU, 금=FRI, 토=SAT, 일=SUN). 칸이 놓인 열의 머리 글자로 정한다
+            - startTime, endTime: 24시간 HH:mm. 칸마다 위 끝·아래 끝을 눈금에 맞춰 따로 읽는다. 칸이 붙어 있어도 다음 칸 시작을 끝으로 쓰지 않는다. 눈금 한 칸 안에서 반쯤이면 :30
             - name: 과목명만. 교수 이름, 강의실, 학번, 사람 이름은 절대 적지 않는다
             - 같은 과목이 여러 요일에 있으면 요일마다 한 항목씩
-            - 읽을 수 없으면 {"classes":[]}
+            - 읽을 수 없으면 {"hours":[],"classes":[]}
             """;
 
     private final ImageReader reader;
@@ -69,7 +79,7 @@ public class ReadTimetableImage {
             throw new InvalidImage("사진 파일이 아니에요. PNG, JPEG, WebP 사진을 올려 주세요.");
         }
         String text = reader.read(INSTRUCTION, mime, image);
-        return parse(text);
+        return parse(text, image);
     }
 
     /** 선언된 형식과 실제 바이트(매직 넘버)가 맞는지. 아무 바이트나 외부 AI로 보내지 않기 위해 */
@@ -94,7 +104,15 @@ public class ReadTimetableImage {
         return true;
     }
 
+    /** 위치로 재지 않고 모델이 적은 시각만 쓴다 (v1 방식, 평가 비교용) */
     Draft parse(String text) {
+        return parse(text, null);
+    }
+
+    /**
+     * @param image 원본 그림. 있으면 칸 위치(box_2d)로 위·아래 끝을 픽셀로 재서 모델 시각을 고친다. 못 재는 칸은 모델 시각 그대로
+     */
+    Draft parse(String text, byte[] image) {
         JsonNode root;
         try {
             root = json.readTree(stripFence(text));
@@ -102,11 +120,12 @@ public class ReadTimetableImage {
             return new Draft(List.of(), 0, "시간표를 읽지 못했어요. 더 선명한 사진으로 다시 올리거나 직접 입력해 주세요.");
         }
         JsonNode classes = root.path("classes");
+        Measurer measurer = Measurer.of(image, root.path("hours"));
         List<ClassDraft> out = new ArrayList<>();
         int dropped = 0;
         if (classes.isArray()) {
             for (JsonNode c : classes) {
-                ClassDraft d = normalize(c);
+                ClassDraft d = normalize(c, measurer);
                 if (d == null || out.contains(d) || out.size() >= MAX_CLASSES) {
                     dropped++;  // 틀린 줄·중복·한도 초과 모두 "읽지 못한 칸"으로 알린다
                 } else {
@@ -125,13 +144,72 @@ public class ReadTimetableImage {
         return new Draft(List.copyOf(out), dropped, note);
     }
 
-    private static ClassDraft normalize(JsonNode c) {
+    /** 그림 + 눈금 보정이 다 될 때만 칸을 잰다. 하나라도 안 되면 NONE(모델 시각 그대로) */
+    private record Measurer(TimetableGeometry geometry, TimetableGeometry.Calibration calibration) {
+
+        static final Measurer NONE = new Measurer(null, null);
+
+        static Measurer of(byte[] image, JsonNode hours) {
+            if (image == null || !hours.isArray()) {
+                return NONE;
+            }
+            List<TimetableGeometry.HourLabel> labels = new ArrayList<>();
+            for (JsonNode h : hours) {
+                JsonNode hour = h.path("hour");
+                Optional<TimetableGeometry.Box> box = box(h.path("box_2d"));
+                if (hour.isNumber() && box.isPresent()) {
+                    labels.add(new TimetableGeometry.HourLabel(hour.asInt(), box.get()));
+                }
+            }
+            Optional<TimetableGeometry> geometry = TimetableGeometry.of(image);
+            if (geometry.isEmpty()) {
+                return NONE;
+            }
+            return geometry.get().calibrate(labels).map(c -> new Measurer(geometry.get(), c)).orElse(NONE);
+        }
+
+        /** {시작, 끝}. 잰 길이가 10분 미만이면 잘못 잰 것으로 보고 빈 값 */
+        Optional<LocalTime[]> times(JsonNode boxNode) {
+            if (geometry == null) {
+                return Optional.empty();
+            }
+            return box(boxNode).flatMap(b -> geometry.measure(b, calibration)).flatMap(edges -> {
+                Optional<LocalTime> start = TimetableGeometry.timeAt(edges[0], calibration);
+                Optional<LocalTime> end = TimetableGeometry.timeAt(edges[1], calibration);
+                if (start.isEmpty() || end.isEmpty() || end.get().isBefore(start.get().plusMinutes(10))) {
+                    return Optional.empty();
+                }
+                return Optional.of(new LocalTime[] {start.get(), end.get()});
+            });
+        }
+
+        private static Optional<TimetableGeometry.Box> box(JsonNode n) {
+            if (!n.isArray() || n.size() != 4) {
+                return Optional.empty();
+            }
+            double[] v = new double[4];
+            for (int i = 0; i < 4; i++) {
+                if (!n.get(i).isNumber()) {
+                    return Optional.empty();
+                }
+                v[i] = n.get(i).asDouble();
+            }
+            return TimetableGeometry.Box.of(v);
+        }
+    }
+
+    private static ClassDraft normalize(JsonNode c, Measurer measurer) {
         if (!c.isObject()) {
             return null;
         }
         String day = c.path("dayOfWeek").asString("").trim().toUpperCase(Locale.ROOT);
         LocalTime start = time(c.path("startTime").asString(""));
         LocalTime end = time(c.path("endTime").asString(""));
+        Optional<LocalTime[]> measured = measurer.times(c.path("box_2d"));
+        if (measured.isPresent()) {
+            start = measured.get()[0];
+            end = measured.get()[1];
+        }
         String name = c.path("name").asString("").trim().replaceAll("\\s+", " ");
         if (!DAYS.contains(day) || start == null || end == null || !end.isAfter(start) || name.isEmpty()) {
             return null;
