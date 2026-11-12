@@ -328,6 +328,25 @@ class ModelEvalTest {
     }
 
     @Test
+    @DisplayName("되묻기: '인원을 알려 주시면 예약해 드릴게요'처럼 조건으로 물어도 되묻기로 보고, 알려 주는 말은 묻기가 아니다")
+    void conditionalAskCountsAsAsking() {
+        // given
+        List<String> cues = List.of("몇 시간", "얼마나", "몇 명", "인원");
+
+        // when
+        boolean conditional = Scorer.asks("인원(나 포함 몇 명)을 알려 주시면 바로 예약해 드릴게요!", cues);
+        boolean noSpace = Scorer.asks("인원을 말씀해주시면 잡아 드릴게요.", cues);
+        boolean statement = Scorer.asks("인원은 4명으로 확인했어요.", cues);
+        boolean telling = Scorer.asks("2번 방은 인원 3–5명이에요. 빈방도 알려 드릴게요.", cues);
+
+        // then
+        assertThat(conditional).isTrue();
+        assertThat(noSpace).isTrue();
+        assertThat(statement).isFalse();
+        assertThat(telling).isFalse();
+    }
+
+    @Test
     @DisplayName("가짜 도구: 인원이 방 범위 밖이면 빈 목록 + 인원 이유, 범위 밖 날짜는 오류")
     void fixtures() {
         var tools = new FixtureTools(FixtureTools.loadSpecs(JSON), SUITE.now(), Map.of(), JSON);

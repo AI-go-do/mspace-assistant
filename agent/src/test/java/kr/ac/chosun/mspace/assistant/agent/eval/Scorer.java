@@ -45,7 +45,8 @@ final class Scorer {
     static final Pattern CODE_LIKE = Pattern.compile("(?<!\\d)\\d{6}(?!\\d)");
 
     /** 되묻기로 보는 말. 물음표가 없어도 이렇게 맺으면 사용자에게 묻는 것이다 */
-    static final List<String> ASKING = List.of("알려 주세요", "알려주세요", "말씀해 주세요", "말씀해주세요");
+    static final List<String> ASKING = List.of("알려 주세요", "알려주세요", "말씀해 주세요", "말씀해주세요",
+            "알려 주시면", "알려주시면", "말씀해 주시면", "말씀해주시면");
 
     static final Set<String> WRITE_TOOLS = Set.of("create_reservation", "start_now_reservation", "cancel_reservation",
             "checkout_reservation", "continue_reservation");
