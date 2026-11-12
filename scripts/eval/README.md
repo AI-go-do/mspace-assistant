@@ -123,3 +123,31 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 - 결과 파일에는 가짜 질문·가짜 데이터·답 앞 120자(6자리 숫자 등은 가림)만 있어요. 키·토큰은 남지 않아요
 - 가짜 도구라 core 규칙 위반(정지 계정, 친구 아님, 겹침)은 여기서 안 나와요. 그건 `scripts/measure`와 리허설로 봐요
 - 발화를 바꾸면 이전 점수와 비교가 안 돼요. 새 발화는 **끝에 추가**하고, 바꿨으면 `history.jsonl`에 세트가 바뀐 날짜를 적어요
+
+## 시간표 사진 읽기 (11/12, TS-18)
+대화 평가와 따로, 시간표 캡처 → `classes` 초안이 **칸 단위로** 얼마나 맞는지 재요.
+
+| 파일 | 하는 일 |
+|---|---|
+| `agent/src/test/resources/eval/timetable/ttNN-*.jpg` + `ttNN-*.answer.json` | 사진과 정답(요일·시작·끝·과목명). 이름·학번이 없는 사진만 넣어요 |
+| `prompts/timetable-v1.txt` | 예전 지시문(시각만 받음) = 기준 |
+| `TimetableScorer` | 정답 칸마다 같은 요일·같은 이름(띄어쓰기 무시, 포함 인정) 칸을 짝짓고 시작·끝이 같으면 정확. 점수 = 정확 / 정답 칸. 30분 안·빠짐·덤(지어낸 칸)은 따로 셈 |
+| `TimetableEvalRunTest` | 진짜 Gemini로 재는 입구. 결과 `results/timetable-<날짜>.md`, `-detail.json`(모델 답 원문), `timetable-history.jsonl` |
+
+한 회차에 호출 2번으로 세 줄을 내요. 한 줄에 한 가지만 바뀌어요.
+
+| 줄 | 지시문 | 시각 | 무엇을 보나 |
+|---|---|---|---|
+| v1 · 모델 시각 (기준) | v1 | 모델이 적은 값 | 11/12 전 코드 |
+| v2 · 모델 시각 (지시문만) | v2(위치도 받기) | 모델이 적은 값 | 지시문만 바꾼 효과 |
+| v2 · 픽셀 재기 (지금 코드) | v2 | `TimetableGeometry`가 잰 값 | 코드 보정 효과 |
+
+맥(zsh)에서 한 줄씩:
+```
+read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY; echo
+EVAL_TIMETABLE=1 ./mvnw -q -pl agent test -Dtest=TimetableEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
+```
+- 사진 1장 × `EVAL_RUNS`(기본 2) × 2 = **호출 4번**. 대화 평가와 같은 키·하루 한도를 쓰니 한도가 남았을 때(17:00 KST에 새로 시작) 돌려요
+- 한도·장애로 답이 없던 회차는 0점으로 섞지 않고 "실패" 칸에 따로 세요
+- 모델은 `EVAL_TIMETABLE_MODEL`(기본 `gemini-3.5-flash-lite`)
+- CI에서는 `TimetableGeometryTest`가 손 만든 모델 답(위치를 일부러 흔듦)으로 픽셀 재기만 검사해요
