@@ -1,0 +1,83 @@
+{
+  "source": "합성 그림(scripts/eval/timetable/make_synthetic.py). 과목·강의실·시각은 모두 지어낸 값",
+  "classes": [
+    {
+      "dayOfWeek": "MON",
+      "startTime": "09:00",
+      "endTime": "10:30",
+      "name": "자료구조"
+    },
+    {
+      "dayOfWeek": "MON",
+      "startTime": "10:30",
+      "endTime": "12:00",
+      "name": "자료구조 실습"
+    },
+    {
+      "dayOfWeek": "MON",
+      "startTime": "13:00",
+      "endTime": "14:30",
+      "name": "운영체제"
+    },
+    {
+      "dayOfWeek": "TUE",
+      "startTime": "10:30",
+      "endTime": "12:00",
+      "name": "확률과 통계"
+    },
+    {
+      "dayOfWeek": "TUE",
+      "startTime": "13:30",
+      "endTime": "15:00",
+      "name": "컴퓨터네트워크"
+    },
+    {
+      "dayOfWeek": "TUE",
+      "startTime": "15:00",
+      "endTime": "18:00",
+      "name": "캡스톤디자인"
+    },
+    {
+      "dayOfWeek": "WED",
+      "startTime": "09:00",
+      "endTime": "09:50",
+      "name": "영어회화"
+    },
+    {
+      "dayOfWeek": "WED",
+      "startTime": "13:00",
+      "endTime": "14:30",
+      "name": "운영체제"
+    },
+    {
+      "dayOfWeek": "WED",
+      "startTime": "15:00",
+      "endTime": "16:30",
+      "name": "근로"
+    },
+    {
+      "dayOfWeek": "THU",
+      "startTime": "10:30",
+      "endTime": "12:00",
+      "name": "확률과 통계"
+    },
+    {
+      "dayOfWeek": "THU",
+      "startTime": "13:30",
+      "endTime": "15:00",
+      "name": "컴퓨터네트워크"
+    },
+    {
+      "dayOfWeek": "THU",
+      "startTime": "15:00",
+      "endTime": "18:00",
+      "name": "데이터베이스"
+    },
+    {
+      "dayOfWeek": "FRI",
+      "startTime": "14:00",
+      "endTime": "17:00",
+      "name": "동아리 활동"
+    }
+  ]
+}

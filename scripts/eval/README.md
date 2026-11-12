@@ -129,7 +129,8 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 
 | 파일 | 하는 일 |
 |---|---|
-| `agent/src/test/resources/eval/timetable/ttNN-*.jpg` + `ttNN-*.answer.json` | 사진과 정답(요일·시작·끝·과목명). 이름·학번이 없는 사진만 넣어요 |
+| `agent/src/test/resources/eval/timetable/tt01-synthetic.png` + `.answer.json` | **합성 그림**과 정답. 과목·강의실·시각은 모두 지어낸 값이고 `timetable/make_synthetic.py`로 다시 만들어요. 같은 색 칸이 붙은 곳, 다른 색 칸이 붙은 곳, 50분 수업을 넣었어요 |
+| 레포 밖 폴더(`EVAL_TIMETABLE_DIR`) | 실제 캡처처럼 레포에 둘 수 없는 사진. 같은 이름 규칙(`ttNN*.jpg` + `.answer.json`)으로 두면 함께 재요. **실제 사람 시간표는 레포에 넣지 않아요**(11/12, 인터넷에서 구한 캡처를 뺌) |
 | `prompts/timetable-v1.txt` | 예전 지시문(시각만 받음) = 기준 |
 | `TimetableScorer` | 정답 칸마다 같은 요일·같은 이름(띄어쓰기 무시, 포함 인정) 칸을 짝짓고 시작·끝이 같으면 정확. 점수 = 정확 / 정답 칸. 30분 안·빠짐·덤(지어낸 칸)은 따로 셈 |
 | `TimetableEvalRunTest` | 진짜 Gemini로 재는 입구. 결과 `results/timetable-<날짜>.md`, `-detail.json`(모델 답 원문), `timetable-history.jsonl` |
@@ -145,9 +146,9 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 맥(zsh)에서 한 줄씩:
 ```
 read -rs "GEMINI_API_KEY?Gemini 키: " && export GEMINI_API_KEY; echo
-EVAL_TIMETABLE=1 ./mvnw -q -pl agent test -Dtest=TimetableEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
+EVAL_TIMETABLE=1 EVAL_TIMETABLE_DIR=<레포 밖 사진 폴더> ./mvnw -q -pl agent test -Dtest=TimetableEvalRunTest -Deval=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
-- 사진 1장 × `EVAL_RUNS`(기본 2) × 2 = **호출 4번**. 대화 평가와 같은 키·하루 한도를 쓰니 한도가 남았을 때(17:00 KST에 새로 시작) 돌려요
+- 사진 1장마다 `EVAL_RUNS`(기본 2) × 2 = **호출 4번**(합성 1장 + 실제 1장이면 8번). 대화 평가와 같은 키·하루 한도를 쓰니 한도가 남았을 때(17:00 KST에 새로 시작) 돌려요
 - 한도·장애로 답이 없던 회차는 0점으로 섞지 않고 "실패" 칸에 따로 세요
 - 모델은 `EVAL_TIMETABLE_MODEL`(기본 `gemini-3.5-flash-lite`)
 - CI에서는 `TimetableGeometryTest`가 손 만든 모델 답(위치를 일부러 흔듦)으로 픽셀 재기만 검사해요

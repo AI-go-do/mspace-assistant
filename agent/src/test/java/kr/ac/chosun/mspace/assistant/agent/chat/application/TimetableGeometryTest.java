@@ -24,8 +24,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 칸 끝을 픽셀로 재기 (TS-18). 진짜 캡처(eval/timetable/tt01) + <b>손으로 만든 모델 답</b>으로 검사한다.
- * 손으로 만든 답은 시각을 11/12 실제로 틀리게 읽은 값 그대로 두고, 위치(box_2d)는 위아래로 8~25(0~1000 기준, 최대 약 19분)씩 일부러 흔들었다.
+ * 칸 끝을 픽셀로 재기 (TS-18). <b>합성 시간표 그림</b>(eval/timetable/tt01-synthetic, scripts/eval/timetable/make_synthetic.py) + <b>손으로 만든 모델 답</b>으로 검사한다.
+ * 실제 사람 시간표는 레포에 두지 않는다. 그림의 과목·강의실·시각은 모두 지어낸 값이다.
+ * 손으로 만든 답은 시각을 11/12 실제 캡처에서 본 실수 모양(끝을 더 내려 읽기, 틀린 끝에 다음 칸 붙이기, 30분 늦게 시작)으로 적고,
+ * 위치(box_2d)는 위아래로 8~25(0~1000 기준, 최대 약 18분)씩 일부러 흔들었다.
  * 진짜 모델이 얼마나 맞히는지는 이 테스트가 아니라 TimetableEvalRunTest(-Deval=true, 키 필요)가 잰다.
  */
 class TimetableGeometryTest {
@@ -35,11 +37,11 @@ class TimetableGeometryTest {
     final ReadTimetableImage service = new ReadTimetableImage(reader, json);
 
     @Test
-    @DisplayName("tt01: 모델 시각이 틀려도(5/11) 위치로 재면 11칸 모두 정답 시각")
+    @DisplayName("합성 시간표: 모델 시각이 틀려도(4/13) 위치로 재면 13칸 모두 정답 시각 (같은 색 붙은 칸·50분 수업 포함)")
     void measuresAllBlocks() throws IOException {
         // given
-        byte[] image = resource("tt01-everytime.jpg");
-        String modelAnswer = new String(resource("tt01-hand-made-model-answer.json"), StandardCharsets.UTF_8);
+        byte[] image = resource("tt01-synthetic.png");
+        String modelAnswer = new String(resource("tt01-synthetic-hand-made-model-answer.json"), StandardCharsets.UTF_8);
         List<ClassDraft> answers = answers();
 
         // when
@@ -49,35 +51,35 @@ class TimetableGeometryTest {
         // then
         TimetableScorer.Result before = TimetableScorer.score(modelOnly.classes(), answers);
         TimetableScorer.Result after = TimetableScorer.score(measured.classes(), answers);
-        assertThat(before.exact()).as("11/12 화면에서 본 결과 재현: %s", before.misses()).isEqualTo(5);
-        assertThat(after.exact()).as("틀린 칸: %s", after.misses()).isEqualTo(11);
+        assertThat(before.exact()).as("손 만든 모델 시각: %s", before.misses()).isEqualTo(4);
+        assertThat(after.exact()).as("틀린 칸: %s", after.misses()).isEqualTo(13);
         assertThat(after.extra()).isZero();
         assertThat(measured.dropped()).isZero();
     }
 
     @Test
-    @DisplayName("read(): 진짜 흐름에서도 그림을 같이 넘겨 잰다 (JPEG)")
+    @DisplayName("read(): 진짜 흐름에서도 그림을 같이 넘겨 잰다 (PNG)")
     void readUsesImage() throws IOException {
         // given
-        byte[] image = resource("tt01-everytime.jpg");
-        when(reader.read(anyString(), any(), any())).thenReturn(new String(resource("tt01-hand-made-model-answer.json"), StandardCharsets.UTF_8));
+        byte[] image = resource("tt01-synthetic.png");
+        when(reader.read(anyString(), any(), any())).thenReturn(new String(resource("tt01-synthetic-hand-made-model-answer.json"), StandardCharsets.UTF_8));
 
         // when
-        ReadTimetableImage.Draft draft = service.read("image/jpeg", image);
+        ReadTimetableImage.Draft draft = service.read("image/png", image);
 
         // then
         assertThat(draft.classes()).contains(
-                new ClassDraft("WED", "13:00", "14:30", "근로"),
-                new ClassDraft("TUE", "15:00", "18:00", "영상문화콘텐츠 기획 개발"),
-                new ClassDraft("MON", "17:00", "18:00", "인하인스타"));
+                new ClassDraft("MON", "10:30", "12:00", "자료구조 실습"),
+                new ClassDraft("TUE", "15:00", "18:00", "캡스톤디자인"),
+                new ClassDraft("WED", "09:00", "09:50", "영어회화"));
     }
 
     @Test
-    @DisplayName("정각 가로줄을 찾아 눈금을 맞춘다: 8시~18시 줄, 한 시간 약 42.5픽셀")
+    @DisplayName("정각 가로줄을 찾아 눈금을 맞춘다: 9시 줄 y=150, 한 시간 80픽셀")
     void calibratesOnGridLines() throws IOException {
         // given
-        TimetableGeometry g = TimetableGeometry.of(resource("tt01-everytime.jpg")).orElseThrow();
-        JsonNode hours = json.readTree(resource("tt01-hand-made-model-answer.json")).path("hours");
+        TimetableGeometry g = TimetableGeometry.of(resource("tt01-synthetic.png")).orElseThrow();
+        JsonNode hours = json.readTree(resource("tt01-synthetic-hand-made-model-answer.json")).path("hours");
         List<TimetableGeometry.HourLabel> labels = new java.util.ArrayList<>();
         for (JsonNode h : hours) {
             JsonNode b = h.path("box_2d");
@@ -90,21 +92,21 @@ class TimetableGeometryTest {
 
         // then
         assertThat(cal.gridAligned()).isTrue();
-        assertThat(cal.slope()).isBetween(42.0, 43.0);
-        assertThat(cal.hourAt(79.5)).isCloseTo(8.0, org.assertj.core.data.Offset.offset(0.05));
+        assertThat(cal.slope()).isBetween(79.5, 80.5);
+        assertThat(cal.hourAt(150)).isCloseTo(9.0, org.assertj.core.data.Offset.offset(0.05));
     }
 
     @Test
     @DisplayName("눈금(hours)이 없거나 그림을 못 열면 재지 않고 모델 시각을 그대로 쓴다 (지금보다 나빠지지 않게)")
     void fallsBackToModelTimes() throws IOException {
         // given
-        String modelAnswer = new String(resource("tt01-hand-made-model-answer.json"), StandardCharsets.UTF_8);
+        String modelAnswer = new String(resource("tt01-synthetic-hand-made-model-answer.json"), StandardCharsets.UTF_8);
         JsonNode root = json.readTree(modelAnswer);
         String noHours = json.writeValueAsString(((tools.jackson.databind.node.ObjectNode) root).put("hours", (String) null));
         byte[] notImage = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0};
 
         // when
-        List<ClassDraft> a = service.parse(noHours, resource("tt01-everytime.jpg")).classes();
+        List<ClassDraft> a = service.parse(noHours, resource("tt01-synthetic.png")).classes();
         List<ClassDraft> b = service.parse(modelAnswer, notImage).classes();
         List<ClassDraft> modelOnly = service.parse(modelAnswer).classes();
 
@@ -119,11 +121,11 @@ class TimetableGeometryTest {
         // given
         String answer = """
                 {"hours":%s,
-                 "classes":[{"dayOfWeek":"FRI","startTime":"09:00","endTime":"10:00","name":"없는 수업","box_2d":[150,810,240,970]}]}"""
-                .formatted(json.writeValueAsString(json.readTree(resource("tt01-hand-made-model-answer.json")).path("hours")));
+                 "classes":[{"dayOfWeek":"FRI","startTime":"09:00","endTime":"10:00","name":"없는 수업","box_2d":[140,810,220,970]}]}"""
+                .formatted(json.writeValueAsString(json.readTree(resource("tt01-synthetic-hand-made-model-answer.json")).path("hours")));
 
         // when
-        List<ClassDraft> out = service.parse(answer, resource("tt01-everytime.jpg")).classes();
+        List<ClassDraft> out = service.parse(answer, resource("tt01-synthetic.png")).classes();
 
         // then
         assertThat(out).containsExactly(new ClassDraft("FRI", "09:00", "10:00", "없는 수업"));
@@ -191,7 +193,7 @@ class TimetableGeometryTest {
     }
 
     private List<ClassDraft> answers() throws IOException {
-        JsonNode root = json.readTree(resource("tt01-everytime.answer.json"));
+        JsonNode root = json.readTree(resource("tt01-synthetic.answer.json"));
         List<ClassDraft> out = new java.util.ArrayList<>();
         for (JsonNode c : root.path("classes")) {
             out.add(new ClassDraft(c.path("dayOfWeek").asString(), c.path("startTime").asString(), c.path("endTime").asString(), c.path("name").asString()));
