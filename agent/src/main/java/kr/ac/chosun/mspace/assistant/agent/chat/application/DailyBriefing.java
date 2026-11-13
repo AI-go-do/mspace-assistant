@@ -411,13 +411,20 @@ public class DailyBriefing {
         }
     }
 
-    /** "다음 교내 셔틀은 IT융합대학 앞 12:10이에요(시간표 기준)." 시간표가 없거나 남은 차가 없으면 뺀다 */
+    /**
+     * 지금 시각 없는 운행 중이면 "지금 본관 순환 버스는 07:40~17:00 수시 운행(5~10분 간격)이에요(시간표 기준).",
+     * 아니면 "다음 교내 셔틀은 사회과학관 버스 12:30이에요(시간표 기준)." 시간표가 없거나 남은 차가 없으면 뺀다
+     */
     private static void appendShuttle(StringBuilder sb, Shuttle shuttle) {
         if (shuttle == null) {
             return;
         }
-        sb.append(" 다음 교내 셔틀은 ").append(shuttle.stop() == null || shuttle.stop().isBlank() ? "" : shuttle.stop() + " ")
-                .append(shuttle.next()).append("이에요(시간표 기준).");
+        String name = shuttle.name() == null || shuttle.name().isBlank() ? "교내 셔틀" : shuttle.name();
+        if (shuttle.running() != null) {
+            sb.append(" 지금 ").append(name).append("는 ").append(shuttle.running()).append("이에요(시간표 기준).");
+            return;
+        }
+        sb.append(" 다음 교내 셔틀은 ").append(name).append(' ').append(shuttle.next()).append("이에요(시간표 기준).");
     }
 
     /** 날씨·셔틀 결과에서 브리핑에 쓰는 값만. 실패·없음은 null */
@@ -431,18 +438,20 @@ public class DailyBriefing {
         }
         Shuttle shuttle = null;
         if (shuttleNode != null && shuttleNode.path("code").asString(null) == null) { // NO_TIMETABLE이면 뺀다
-            String best = null;
-            String stop = null;
+            Shuttle running = null;
+            Shuttle earliest = null;
             for (JsonNode route : shuttleNode.path("routes")) {
+                String name = route.path("name").asString(null);
+                String now = route.path("running").asString(null);
+                if (now != null && running == null) {
+                    running = new Shuttle(name, null, now);
+                }
                 String next = route.path("next").path(0).asString(null);
-                if (next != null && (best == null || next.compareTo(best) < 0)) {
-                    best = next;
-                    stop = route.path("stop").asString(null);
+                if (next != null && (earliest == null || next.compareTo(earliest.next()) < 0)) {
+                    earliest = new Shuttle(name, next, null);
                 }
             }
-            if (best != null) {
-                shuttle = new Shuttle(stop, best);
-            }
+            shuttle = running != null ? running : earliest;
         }
         return new Campus(weather, shuttle);
     }
@@ -589,8 +598,14 @@ public class DailyBriefing {
                           boolean umbrella) {
     }
 
-    /** 가장 가까운 다음 셔틀 출발 (시간표 기준, campus_shuttle) */
-    public record Shuttle(String stop, String next) {
+    /**
+     * 브리핑에 쓰는 셔틀 한 줄 (시간표 기준, campus_shuttle).
+     *
+     * @param name    노선 이름
+     * @param next    가장 가까운 다음 출발 HH:mm. running이 있으면 null
+     * @param running 지금 걸친 시각 없는 운행 (예: "07:40~17:00 수시 운행(5~10분 간격)")
+     */
+    public record Shuttle(String name, String next, String running) {
     }
 
     /**

@@ -44,13 +44,18 @@ public class CampusShuttle {
             return new ShuttleTimes(day, dayName, hhmm(from), "NO_TIMETABLE", List.of(), shuttle.basis(), NO_TIMETABLE_NOTE);
         }
         List<ShuttleTimes.RouteTimes> routes = shuttle.routes().stream()
-                .filter(r -> r.days().contains(day.getDayOfWeek()) && !r.departures().isEmpty())
-                .map(r -> new ShuttleTimes.RouteTimes(r.name(), r.stop(),
-                        r.departures().stream().filter(t -> !t.isBefore(from)).limit(NEXT_COUNT).map(CampusShuttle::hhmm).toList(),
-                        hhmm(r.departures().getLast())))
+                .filter(r -> r.runs(shuttle.season()) && r.days().contains(day.getDayOfWeek())
+                        && (!r.departures().isEmpty() || !r.windows().isEmpty()))
+                .map(r -> {
+                    CampusProperties.Window running = r.runningAt(from);
+                    return new ShuttleTimes.RouteTimes(r.name(), r.stop(),
+                            r.departures().stream().filter(t -> !t.isBefore(from)).limit(NEXT_COUNT).map(CampusShuttle::hhmm).toList(),
+                            r.departures().isEmpty() ? null : hhmm(r.departures().getLast()),
+                            running == null ? null : running.text());
+                })
                 .toList();
         String note = routes.isEmpty() ? NO_SERVICE_NOTE
-                : routes.stream().allMatch(r -> r.next().isEmpty()) ? NONE_LEFT_NOTE : null;
+                : routes.stream().allMatch(r -> r.next().isEmpty() && r.running() == null) ? NONE_LEFT_NOTE : null;
         return new ShuttleTimes(day, dayName, hhmm(from), null, routes, shuttle.basis(), note);
     }
 

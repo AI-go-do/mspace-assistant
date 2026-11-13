@@ -3,6 +3,7 @@ package kr.ac.chosun.mspace.assistant.mcp.campus.application;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -17,7 +18,7 @@ public record CampusProperties(Weather weather, Shuttle shuttle) {
 
     public CampusProperties {
         weather = weather == null ? new Weather(true, null, 0, 0, null, null, 0, null) : weather;
-        shuttle = shuttle == null ? new Shuttle(null, List.of()) : shuttle;
+        shuttle = shuttle == null ? new Shuttle(null, null, List.of()) : shuttle;
     }
 
     /**
@@ -44,32 +45,92 @@ public record CampusProperties(Weather weather, Shuttle shuttle) {
         }
     }
 
+    /** 학기 중·방학 중. 학교 공지가 둘을 나눠 적는다 */
+    public enum Season { SEMESTER, VACATION }
+
     /**
      * @param basis  답에 꼭 붙이는 한 줄 (시간표 기준이라 늦거나 빠를 수 있다)
-     * @param routes 노선별 출발 시각. 비어 있으면 도구가 "시간표가 아직 없어요"로 답한다 (지어내지 않게)
+     * @param season 지금 학기 중인지 방학 중인지. 노선의 season과 맞는 것만 쓴다. 비면 학기 중
+     * @param routes 노선별 시간표. 비어 있으면 도구가 "시간표가 아직 없어요"로 답한다 (지어내지 않게)
      */
-    public record Shuttle(String basis, List<Route> routes) {
+    public record Shuttle(String basis, Season season, List<Route> routes) {
 
         public Shuttle {
             basis = basis == null || basis.isBlank()
                     ? "학교가 정한 시간표 기준이에요. 실시간 위치가 아니라 조금 늦거나 빠를 수 있어요." : basis;
+            season = season == null ? Season.SEMESTER : season;
             routes = routes == null ? List.of() : List.copyOf(routes);
         }
     }
 
     /**
-     * @param name       노선 이름 (예: "교내 순환")
-     * @param stop       타는 곳 (예: "IT융합대학 앞")
+     * @param name       노선 이름 (예: "본관 순환 버스")
+     * @param stop       운행 구간 또는 타는 곳 (공지에 적힌 그대로)
+     * @param season     이 시간표를 쓰는 때. 비면 학기 중·방학 중 모두
      * @param days       운행 요일. 비면 월~금
-     * @param departures 그 정류장 출발 시각 (HH:mm)
+     * @param departures 정해진 출발 시각 (HH:mm)
+     * @param windows    시간대 운행 (공지가 "07:40~17:00 수시", "17:00~18:45 15분 간격"처럼 적은 것)
      */
-    public record Route(String name, String stop, List<DayOfWeek> days, List<LocalTime> departures) {
+    public record Route(String name, String stop, Season season, List<DayOfWeek> days, List<LocalTime> departures,
+                        List<Window> windows) {
 
         public Route {
             days = days == null || days.isEmpty()
                     ? List.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
                     : List.copyOf(days);
-            departures = departures == null ? List.of() : departures.stream().sorted().toList();
+            windows = windows == null ? List.of() : windows.stream().sorted(java.util.Comparator.comparing(Window::from)).toList();
+            List<LocalTime> all = new ArrayList<>(departures == null ? List.of() : departures);
+            windows.forEach(w -> all.addAll(w.departures()));
+            departures = all.stream().distinct().sorted().toList();
+        }
+
+        /** 이 시각에 걸친, 간격이 없는 시간대 ("수시 운행" 등). 없으면 null */
+        public Window runningAt(LocalTime t) {
+            return windows.stream().filter(w -> w.every() == null && !t.isBefore(w.from()) && t.isBefore(w.to()))
+                    .findFirst().orElse(null);
+        }
+
+        public boolean runs(Season now) {
+            return season == null || season == now;
+        }
+    }
+
+    /**
+     * @param from  시작 (HH:mm)
+     * @param to    끝 (HH:mm)
+     * @param every 배차 간격. 있으면 from부터 to까지 이 간격의 출발 시각으로 펼친다. 없으면 "수시 운행"처럼 시각 없이 안내만
+     * @param note  학생에게 그대로 전할 말 (예: "수시 운행(5~10분 간격)", "본관 버스 이용")
+     */
+    public record Window(LocalTime from, LocalTime to, Duration every, String note) {
+
+        public Window {
+            if (from == null || to == null || to.isBefore(from)) {
+                throw new IllegalArgumentException("셔틀 시간대는 from ≤ to여야 해요: " + from + "~" + to);
+            }
+            if (every != null && (every.isZero() || every.isNegative())) {
+                throw new IllegalArgumentException("셔틀 배차 간격은 0보다 커야 해요: " + every);
+            }
+        }
+
+        /** 간격 운행이면 from, from+every, … ≤ to. 아니면 빈 목록 */
+        List<LocalTime> departures() {
+            if (every == null) {
+                return List.of();
+            }
+            List<LocalTime> out = new ArrayList<>();
+            for (LocalTime t = from; !t.isAfter(to); t = t.plus(every)) {
+                out.add(t);
+                if (t.plus(every).isBefore(t)) { // 자정을 넘기면 멈춘다
+                    break;
+                }
+            }
+            return out;
+        }
+
+        /** "07:40~17:00 수시 운행(5~10분 간격)" */
+        public String text() {
+            String range = "%02d:%02d~%02d:%02d".formatted(from.getHour(), from.getMinute(), to.getHour(), to.getMinute());
+            return note == null || note.isBlank() ? range : range + " " + note;
         }
     }
 }

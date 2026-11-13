@@ -284,7 +284,8 @@ class DailyBriefingTest {
              "rainChance":70,"umbrella":true,"nowTemperature":9.0,"nowSummary":"흐림","note":"Open-Meteo 예보 기준이에요."}""";
     static final String SHUTTLE = """
             {"date":"2026-11-06","dayOfWeek":"금","after":"08:00","code":null,
-             "routes":[{"name":"교내 순환","stop":"IT융합대학 앞","next":["08:30","09:00"],"last":"18:00"}],
+             "routes":[{"name":"사회과학관 버스","stop":"설립기념탑 → 미대 → 사회과학관 → 설립기념탑","next":["08:30","08:40"],"last":"17:00","running":null},
+                       {"name":"글로벌하우스 버스","stop":"글로벌하우스 → 해오름관","next":["09:20"],"last":"18:30","running":null}],
              "basis":"학교가 정한 시간표 기준이에요.","note":null}""";
 
     @Test
@@ -304,7 +305,28 @@ class DailyBriefingTest {
         assertThat(b.campus().weather().umbrella()).isTrue();
         assertThat(b.campus().shuttle().next()).isEqualTo("08:30");
         assertThat(b.text()).startsWith("11월 6일 금요일 브리핑이에요. 오늘 광주 조선대는 비, 8~15도예요. 비 올 확률 70%라 우산을 챙기세요. ");
-        assertThat(b.text()).endsWith("다음 교내 셔틀은 IT융합대학 앞 08:30이에요(시간표 기준).");
+        assertThat(b.text()).endsWith("다음 교내 셔틀은 사회과학관 버스 08:30이에요(시간표 기준).");
+    }
+
+    @Test
+    @DisplayName("아침 브리핑: 지금 수시 운행 중인 노선이 있으면 출발 시각 대신 운행 시간대를 알려 준다")
+    void shuttleRunning() {
+        // given: 본관 순환 버스는 07:40~17:00 수시 운행(학교 공지), 사회과학관 버스는 08:30 출발
+        String shuttle = """
+                {"date":"2026-11-06","code":null,"routes":[
+                 {"name":"본관 순환 버스","stop":"설립기념탑 → 미대","next":["17:00"],"last":"23:00","running":"07:40~17:00 수시 운행(5~10분 간격)"},
+                 {"name":"사회과학관 버스","stop":"설립기념탑 → 미대 → 사회과학관","next":["08:30"],"last":"17:00","running":null}],
+                 "basis":"시간표 기준","note":null}""";
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", shuttle), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().shuttle().running()).isEqualTo("07:40~17:00 수시 운행(5~10분 간격)");
+        assertThat(b.text()).endsWith("지금 본관 순환 버스는 07:40~17:00 수시 운행(5~10분 간격)이에요(시간표 기준).");
     }
 
     @Test

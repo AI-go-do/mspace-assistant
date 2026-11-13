@@ -3,6 +3,7 @@ package kr.ac.chosun.mspace.assistant.mcp.campus;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -20,12 +21,12 @@ class CampusShuttleTest {
     static final Clock FRIDAY_NOON = Clock.fixed(Instant.parse("2026-11-13T03:05:00Z"), ZoneId.of("UTC"));
 
     static CampusProperties props(List<CampusProperties.Route> routes) {
-        return new CampusProperties(null, new CampusProperties.Shuttle(null, routes));
+        return new CampusProperties(null, new CampusProperties.Shuttle(null, null, routes));
     }
 
     static CampusProperties.Route route(String... times) {
-        return new CampusProperties.Route("교내 순환", "IT융합대학 앞", null,
-                java.util.Arrays.stream(times).map(LocalTime::parse).toList());
+        return new CampusProperties.Route("교내 순환", "IT융합대학 앞", null, null,
+                java.util.Arrays.stream(times).map(LocalTime::parse).toList(), null);
     }
 
     @Test
@@ -93,5 +94,63 @@ class CampusShuttleTest {
         // then
         assertThat(t.routes().getFirst().next()).containsExactly("13:00");
         assertThat(t.after()).isEqualTo("12:10");
+    }
+
+    static CampusProperties.Window window(String from, String to, Integer everyMinutes, String note) {
+        return new CampusProperties.Window(LocalTime.parse(from), LocalTime.parse(to),
+                everyMinutes == null ? null : Duration.ofMinutes(everyMinutes), note);
+    }
+
+    /** 학교 공지(교내버스 안내)의 본관 순환 버스 학기 중 시간표 */
+    static CampusProperties.Route mainLoop(CampusProperties.Season season) {
+        return new CampusProperties.Route("본관 순환 버스", "설립기념탑 → 미대", season, null, null, List.of(
+                window("07:40", "17:00", null, "수시 운행(5~10분 간격)"),
+                window("17:00", "18:45", 15, null),
+                window("18:45", "20:00", null, "저녁 시간, 20:00에 다시 출발"),
+                window("20:00", "23:00", 20, null)));
+    }
+
+    @Test
+    @DisplayName("수시 운행 시간대에는 시각을 지어내지 않고 운행 시간대를 알려 주고, 간격 운행은 시각으로 펼친다")
+    void windows() {
+        // when: 금 12:05
+        ShuttleTimes t = new CampusShuttle(props(List.of(mainLoop(null))), FRIDAY_NOON).next(null, null);
+
+        // then
+        ShuttleTimes.RouteTimes r = t.routes().getFirst();
+        assertThat(r.running()).isEqualTo("07:40~17:00 수시 운행(5~10분 간격)");
+        assertThat(r.next()).containsExactly("17:00", "17:15", "17:30");
+        assertThat(r.last()).isEqualTo("23:00");
+        assertThat(t.note()).isNull();
+    }
+
+    @Test
+    @DisplayName("저녁 시간(18:45~20:00)에는 그 안내와 20:00 출발을 함께 준다")
+    void dinnerBreak() {
+        // when
+        ShuttleTimes t = new CampusShuttle(props(List.of(mainLoop(null))), FRIDAY_NOON)
+                .next(null, LocalTime.parse("19:00"));
+
+        // then
+        assertThat(t.routes().getFirst().running()).isEqualTo("18:45~20:00 저녁 시간, 20:00에 다시 출발");
+        assertThat(t.routes().getFirst().next()).containsExactly("20:00", "20:20", "20:40");
+    }
+
+    @Test
+    @DisplayName("방학 중 설정이면 학기 중 노선은 빼고 방학 노선만 본다")
+    void seasonFilter() {
+        // given
+        var vacation = new CampusProperties.Route("본관 순환 버스", "설립기념탑 → 미대", CampusProperties.Season.VACATION, null,
+                List.of(LocalTime.parse("12:45")), List.of(window("08:20", "09:00", 10, null)));
+        var props = new CampusProperties(null, new CampusProperties.Shuttle(null, CampusProperties.Season.VACATION,
+                List.of(mainLoop(CampusProperties.Season.SEMESTER), vacation)));
+
+        // when
+        ShuttleTimes t = new CampusShuttle(props, FRIDAY_NOON).next(null, LocalTime.parse("08:00"));
+
+        // then
+        assertThat(t.routes()).hasSize(1);
+        assertThat(t.routes().getFirst().next()).containsExactly("08:20", "08:30", "08:40");
+        assertThat(t.routes().getFirst().last()).isEqualTo("12:45");
     }
 }
