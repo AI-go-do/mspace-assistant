@@ -199,7 +199,10 @@ public class ReadTimetableImage {
             int n = sorted.size();
             double shift = n % 2 == 1 ? sorted.get(n / 2) : (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2;
             shift = Math.round(shift * 2) / 2.0;  // 눈금 글자 위치 차이는 0, 30분 단위로 생긴다
-            if (Math.abs(shift) > 0.75) {
+            final double s = shift;
+            // 칸 절반 이상이 같은 만큼(±15분) 밀려 있어야 통째로 옮긴다. 제각각이면 어느 칸이 맞는지 몰라 재지 않는다
+            long agree = diffs.stream().filter(d -> Math.abs(d - s) <= 0.25).count();
+            if (Math.abs(shift) > 0.75 || agree * 2 < diffs.size()) {
                 return NONE;
             }
             double slope = calibration.slope();
