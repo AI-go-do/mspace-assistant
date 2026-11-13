@@ -16,6 +16,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -30,6 +31,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>수업이 있는 날 대표자 예약이 없으면 {@code find_available_rooms}를 한 번 더 불러 "수업 끝나고 쓸 수 있는 가장 이른 칸"을
  *       고르고, 화면 버튼용 문장({@code suggestions}, "15:30 2번 방 2시간 잡아 줘")을 준다. 누르면 채팅으로 가서 확인 카드까지 간다</li>
  *   <li>번호·학번·이름은 도구 결과에 없다(게이트웨이가 가림). 문장에도 방·시각만 들어간다</li>
+ *   <li>11차 회의(11/13) 아침 브리핑: 날씨({@code campus_weather})·교내 셔틀({@code campus_shuttle})을 앞뒤에 한 줄씩 붙인다.
+ *       둘 다 덤이라 실패하거나 시간표가 없으면 문장에서 조용히 뺀다(브리핑 전체를 막지 않는다)</li>
  * </ul>
  */
 @Service
@@ -52,17 +55,25 @@ public class DailyBriefing {
     private final Clock clock;
     private final JsonMapper json;
     private final AgentProperties.Rules rules;
+    private final boolean campus;
 
     @Autowired
-    public DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json, AgentProperties props) {
-        this(tools, clock, json, props.rules());
+    public DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json, AgentProperties props,
+                         @Value("${mspace.agent.briefing.campus:true}") boolean campus) {
+        this(tools, clock, json, props.rules(), campus);
     }
 
+    /** 학교 생활(날씨·셔틀) 없이. 기존 테스트가 부르는 도구 순서를 그대로 보게 */
     DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json, AgentProperties.Rules rules) {
+        this(tools, clock, json, rules, false);
+    }
+
+    DailyBriefing(ToolGateway tools, Clock clock, JsonMapper json, AgentProperties.Rules rules, boolean campus) {
         this.tools = tools;
         this.clock = clock;
         this.json = json;
         this.rules = rules;
+        this.campus = campus;
     }
 
     public Briefing today(UserHeaders headers) {
@@ -75,7 +86,9 @@ public class DailyBriefing {
             Reservations reservations = reservations(call(session, "my_reservations", Map.of()), now);
             Rooms rooms = rooms(call(session, "room_status", Map.of()));
             Options options = options(session, scheduleNode, reservations, now);
-            String text = text(now, schedule, options.freePeriod(), options.afterClass(), reservations, rooms);
+            Campus campusInfo = campus ? campus(call(session, "campus_weather", Map.of()), call(session, "campus_shuttle", Map.of()))
+                    : Campus.NONE;
+            String text = text(now, schedule, options.freePeriod(), options.afterClass(), reservations, rooms, campusInfo);
             List<String> suggestions = new ArrayList<>();
             if (options.afterClass() != null && options.afterClass().suggestion() != null) {
                 suggestions.add(options.afterClass().suggestion());
@@ -84,7 +97,7 @@ public class DailyBriefing {
                 suggestions.add(options.freePeriod().suggestion());
             }
             return new Briefing(today.toString(), dayName(now), now.toOffsetDateTime().toString(), schedule, options.freePeriod(),
-                    options.afterClass(), reservations, rooms, text, List.copyOf(hints), List.copyOf(suggestions));
+                    options.afterClass(), reservations, rooms, text, List.copyOf(hints), List.copyOf(suggestions), campusInfo);
         }
     }
 
@@ -365,14 +378,77 @@ public class DailyBriefing {
 
     static String text(ZonedDateTime now, Schedule schedule, FreePeriod freePeriod, AfterClass afterClass, Reservations reservations,
                        Rooms rooms) {
+        return text(now, schedule, freePeriod, afterClass, reservations, rooms, Campus.NONE);
+    }
+
+    static String text(ZonedDateTime now, Schedule schedule, FreePeriod freePeriod, AfterClass afterClass, Reservations reservations,
+                       Rooms rooms, Campus campus) {
         StringBuilder sb = new StringBuilder();
         sb.append(now.getMonthValue()).append("월 ").append(now.getDayOfMonth()).append("일 ").append(dayName(now))
                 .append("요일 브리핑이에요. ");
+        appendWeather(sb, campus.weather());
         appendClasses(sb, schedule);
         appendOptions(sb, freePeriod, afterClass);
         appendReservations(sb, reservations);
         appendRooms(sb, rooms);
+        appendShuttle(sb, campus.shuttle());
         return sb.toString().trim();
+    }
+
+    /** "오늘 광주 조선대는 비, 8~15도예요. 비 올 확률 70%라 우산을 챙기세요." 날씨를 못 받았으면 뺀다 */
+    private static void appendWeather(StringBuilder sb, Weather weather) {
+        if (weather == null || weather.summary() == null) {
+            return;
+        }
+        sb.append("오늘 ").append(weather.place()).append("는 ").append(weather.summary());
+        if (weather.minTemperature() != null && weather.maxTemperature() != null) {
+            sb.append(", ").append(Math.round(weather.minTemperature())).append('~').append(Math.round(weather.maxTemperature()))
+                    .append("도");
+        }
+        sb.append("예요. ");
+        if (weather.umbrella() && weather.rainChance() != null) {
+            sb.append("비 올 확률 ").append(weather.rainChance()).append("%라 우산을 챙기세요. ");
+        }
+    }
+
+    /** "다음 교내 셔틀은 IT융합대학 앞 12:10이에요(시간표 기준)." 시간표가 없거나 남은 차가 없으면 뺀다 */
+    private static void appendShuttle(StringBuilder sb, Shuttle shuttle) {
+        if (shuttle == null) {
+            return;
+        }
+        sb.append(" 다음 교내 셔틀은 ").append(shuttle.stop() == null || shuttle.stop().isBlank() ? "" : shuttle.stop() + " ")
+                .append(shuttle.next()).append("이에요(시간표 기준).");
+    }
+
+    /** 날씨·셔틀 결과에서 브리핑에 쓰는 값만. 실패·없음은 null */
+    private static Campus campus(JsonNode weatherNode, JsonNode shuttleNode) {
+        Weather weather = null;
+        if (weatherNode != null && weatherNode.path("summary").isString()) {
+            weather = new Weather(weatherNode.path("place").asString(""), weatherNode.path("summary").asString(),
+                    number(weatherNode.path("minTemperature")), number(weatherNode.path("maxTemperature")),
+                    weatherNode.path("rainChance").isNumber() ? weatherNode.path("rainChance").asInt() : null,
+                    weatherNode.path("umbrella").asBoolean(false));
+        }
+        Shuttle shuttle = null;
+        if (shuttleNode != null && shuttleNode.path("code").asString(null) == null) { // NO_TIMETABLE이면 뺀다
+            String best = null;
+            String stop = null;
+            for (JsonNode route : shuttleNode.path("routes")) {
+                String next = route.path("next").path(0).asString(null);
+                if (next != null && (best == null || next.compareTo(best) < 0)) {
+                    best = next;
+                    stop = route.path("stop").asString(null);
+                }
+            }
+            if (best != null) {
+                shuttle = new Shuttle(stop, best);
+            }
+        }
+        return new Campus(weather, shuttle);
+    }
+
+    private static Double number(JsonNode node) {
+        return node.isNumber() ? node.asDouble() : null;
     }
 
     /** 수업 */
@@ -492,7 +568,21 @@ public class DailyBriefing {
      */
     public record Briefing(String date, String dayOfWeek, String generatedAt, Schedule schedule, FreePeriod freePeriod,
                            AfterClass afterClass, Reservations reservations, Rooms rooms, String text, List<String> hints,
-                           List<String> suggestions) {
+                           List<String> suggestions, Campus campus) {
+    }
+
+    /** 날씨·셔틀 (11차 회의 아침 브리핑). 못 받았거나 꺼 두면 둘 다 null */
+    public record Campus(Weather weather, Shuttle shuttle) {
+        static final Campus NONE = new Campus(null, null);
+    }
+
+    /** 오늘 날씨. 숫자는 예보 서버 값 그대로 (campus_weather) */
+    public record Weather(String place, String summary, Double minTemperature, Double maxTemperature, Integer rainChance,
+                          boolean umbrella) {
+    }
+
+    /** 가장 가까운 다음 셔틀 출발 (시간표 기준, campus_shuttle) */
+    public record Shuttle(String stop, String next) {
     }
 
     /**

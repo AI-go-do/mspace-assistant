@@ -40,6 +40,14 @@ public abstract class McpToolTestSupport {
     static void coreUrl(DynamicPropertyRegistry registry) {
         registry.add("mspace.core.base-url", core::baseUrl);
         registry.add("mspace.core.timeout", () -> "1s");
+        // 날씨 예보 서버도 같은 가짜 서버(/v1/forecast)로. 테스트끼리 결과가 섞이지 않게 기억해 두지 않는다
+        registry.add("mspace.campus.weather.base-url", core::baseUrl);
+        registry.add("mspace.campus.weather.cache", () -> "0s");
+        registry.add("mspace.campus.weather.timeout", () -> "1s");
+        // 셔틀 시간표 (테스트용 가짜 시각. 실제 학교 시간표 아님)
+        registry.add("mspace.campus.shuttle.routes[0].name", () -> "교내 순환");
+        registry.add("mspace.campus.shuttle.routes[0].stop", () -> "IT융합대학 앞");
+        registry.add("mspace.campus.shuttle.routes[0].departures", () -> "08:30,09:00,12:10,13:00,18:00");
     }
 
     @LocalServerPort

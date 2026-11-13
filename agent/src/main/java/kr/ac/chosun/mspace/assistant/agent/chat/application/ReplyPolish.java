@@ -46,6 +46,9 @@ final class ReplyPolish {
         m.put("my_schedule", "내 시간표");
         m.put("week_plan", "주간 계획");
         m.put("briefing", "오늘 브리핑");
+        m.put("campus_weather", "날씨");
+        m.put("campus_shuttle", "셔틀 시간");
+        m.put("cafeteria_crowd", "식당 혼잡도");
         TOOL_WORDS = Map.copyOf(m);
     }
 

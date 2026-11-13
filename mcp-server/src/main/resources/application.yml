@@ -60,6 +60,28 @@ mspace:
     plan-days: 7
     plan-from-time: "09:00"
 
+  # 학교 생활 도구 (11차 회의 11/13, 재웅 제안: 아침 브리핑). 예약 코어는 부르지 않는다
+  campus:
+    weather:
+      # Open-Meteo: 키 없음. 학교 좌표만 보낸다(학생 정보 없음). 끄면 campus_weather가 "볼 수 없어요"로 답한다
+      enabled: ${CAMPUS_WEATHER_ENABLED:true}
+      base-url: ${CAMPUS_WEATHER_URL:https://api.open-meteo.com}
+      latitude: 35.1408       # 조선대 (확인 필요)
+      longitude: 126.9300
+      place: 광주 조선대
+      timeout: 3s
+      umbrella-percent: 50    # 비 올 확률이 이 값 이상이면 우산
+      cache: 10m              # 같은 예보를 다시 쓰는 시간
+    shuttle:
+      basis: 학교가 정한 시간표 기준이에요. 실시간 위치가 아니라 조금 늦거나 빠를 수 있어요.
+      # 노선별 출발 시각. 학교 공지로 확인한 시각만 넣는다(비면 도구가 "시간표가 아직 없어요"). 모양:
+      # routes:
+      #   - name: 교내 순환
+      #     stop: IT융합대학 앞
+      #     days: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
+      #     departures: ["08:30", "09:00"]
+      routes: []
+
 logging:
   level:
     # MCP 요청 본문(사용자 말이 들어 있을 수 있음)을 로그에 남기지 않게 SDK 로그는 경고 이상만
