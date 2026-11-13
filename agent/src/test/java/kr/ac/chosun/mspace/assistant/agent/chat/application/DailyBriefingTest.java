@@ -278,4 +278,113 @@ class DailyBriefingTest {
         assertThat(n.text()).contains("수업 끝나고 오늘 쓸 수 있는 방은 없어요.");
         assertThat(noScheduleCalls).noneMatch(c -> c.startsWith("find_available_rooms"));
     }
+
+    static final String WEATHER = """
+            {"date":"2026-11-06","place":"광주 조선대","summary":"비","minTemperature":8.1,"maxTemperature":15.2,
+             "rainChance":70,"umbrella":true,"nowTemperature":9.0,"nowSummary":"흐림","note":"Open-Meteo 예보 기준이에요."}""";
+    static final String SHUTTLE = """
+            {"date":"2026-11-06","dayOfWeek":"금","after":"08:00","code":null,
+             "routes":[{"name":"사회과학관 버스","stop":"설립기념탑 → 미대 → 사회과학관 → 설립기념탑","next":["08:30","08:40"],"last":"17:00","running":null},
+                       {"name":"글로벌하우스 버스","stop":"글로벌하우스 → 해오름관","next":["09:20"],"last":"18:30","running":null}],
+             "basis":"학교가 정한 시간표 기준이에요.","note":null}""";
+
+    @Test
+    @DisplayName("아침 브리핑(11차 회의): 날씨는 맨 앞, 다음 셔틀은 맨 뒤에 한 줄씩. 우산은 비 올 확률이 높을 때만")
+    void campusLines() {
+        // given
+        List<String> called = new ArrayList<>();
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_weather", WEATHER, "campus_shuttle", SHUTTLE), called);
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(called).contains("campus_weather{}", "campus_shuttle{}");
+        assertThat(b.campus().weather().umbrella()).isTrue();
+        assertThat(b.campus().shuttle().next()).isEqualTo("08:30");
+        assertThat(b.text()).startsWith("11월 6일 금요일 브리핑이에요. 오늘 광주 조선대는 비, 8~15도예요. 비 올 확률 70%라 우산을 챙기세요. ");
+        assertThat(b.text()).endsWith("다음 교내 셔틀은 사회과학관 버스 08:30이에요(시간표 기준).");
+    }
+
+    @Test
+    @DisplayName("아침 브리핑: 지금 수시 운행 중인 노선이 있으면 출발 시각 대신 운행 시간대를 알려 준다")
+    void shuttleRunning() {
+        // given: 본관 순환 버스는 07:40~17:00 수시 운행(학교 공지), 사회과학관 버스는 08:30 출발
+        String shuttle = """
+                {"date":"2026-11-06","code":null,"routes":[
+                 {"name":"본관 순환 버스","stop":"설립기념탑 → 미대","next":["17:00"],"last":"23:00","running":"07:40~17:00 수시 운행(5~10분 간격)"},
+                 {"name":"사회과학관 버스","stop":"설립기념탑 → 미대 → 사회과학관","next":["08:30"],"last":"17:00","running":null}],
+                 "basis":"시간표 기준","note":null}""";
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", shuttle), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().shuttle().running()).isEqualTo("07:40~17:00 수시 운행(5~10분 간격)");
+        assertThat(b.text()).endsWith("지금 본관 순환 버스는 07:40~17:00 수시 운행(5~10분 간격)이에요(시간표 기준).");
+    }
+
+    @Test
+    @DisplayName("아침 브리핑: 수시 운행이 곧 시작하면 그 시간대를 \"오늘\"로 알려 준다 (17:00 출발보다 먼저)")
+    void shuttleUpcoming() {
+        // given: 07:00에 본 본관 순환 버스
+        String shuttle = """
+                {"date":"2026-11-06","code":null,"routes":[
+                 {"name":"본관 순환 버스","stop":"설립기념탑 → 미대","next":["17:00"],"last":"23:00","running":null,
+                  "upcoming":"07:40~17:00 수시 운행(5~10분 간격)"}],"basis":"시간표 기준","note":null}""";
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", shuttle), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().shuttle().now()).isFalse();
+        assertThat(b.text()).endsWith("오늘 본관 순환 버스는 07:40~17:00 수시 운행(5~10분 간격)이에요(시간표 기준).");
+    }
+
+    @Test
+    @DisplayName("브리핑: 앞 노선이 곧 시작하고 뒤 노선이 지금 운행 중이면 지금 운행 중인 노선을 말한다")
+    void shuttleRunningBeatsUpcoming() {
+        // given: 18:30, 본관은 저녁 쉼(곧 시작) · 사회과학관은 야간 운행 중
+        String shuttle = """
+                {"date":"2026-11-06","code":null,"routes":[
+                 {"name":"본관 순환 버스","stop":"설립기념탑 → 미대","next":["20:00"],"last":"23:00","running":null,
+                  "upcoming":"18:45~20:00 저녁 시간, 20:00에 다시 출발"},
+                 {"name":"사회과학관 버스","stop":"사회과학관","next":[],"last":null,
+                  "running":"17:00~23:00 본관 야간 버스 이용","upcoming":null}],"basis":"시간표 기준","note":null}""";
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", shuttle), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().shuttle().now()).isTrue();
+        assertThat(b.campus().shuttle().name()).isEqualTo("사회과학관 버스");
+    }
+
+    @Test
+    @DisplayName("아침 브리핑: 날씨가 실패하고 셔틀 시간표가 없으면 두 줄 다 빼고 나머지는 그대로")
+    void campusMissing() {
+        // given
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", "{\"code\":\"NO_TIMETABLE\",\"routes\":[],\"note\":\"없어요\"}"), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().weather()).isNull();
+        assertThat(b.campus().shuttle()).isNull();
+        assertThat(b.text()).doesNotContain("셔틀", "우산", "광주").endsWith("지금 바로 쓸 수 있는 방은 2번 방, 3번 방 두 개예요.");
+    }
 }

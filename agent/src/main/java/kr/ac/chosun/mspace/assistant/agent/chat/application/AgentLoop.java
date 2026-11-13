@@ -319,7 +319,7 @@ public class AgentLoop {
                 if (SCHEDULE_TOOL.equals(tool) || WEEK_PLAN_TOOL.equals(tool)) {
                     sawSchedule(outcome.json());
                 }
-                if (!SCHEDULE_TOOL.equals(tool)) {
+                if (!SCHEDULE_TOOL.equals(tool) && !CAMPUS_TOOLS.contains(tool)) {
                     lookedUpAt = now; // week_plan도 예약 시스템(빈방)을 본 결과라 조회 시각을 남긴다
                 }
             }
@@ -420,6 +420,9 @@ public class AgentLoop {
     }
 
     static final String SCHEDULE_TOOL = "my_schedule";
+    /** 학교 생활 도구(11차 회의). 예약 시스템 조회가 아니라 "(예약 시스템 … 조회 기준)" 꼬리말을 붙이지 않는다 */
+    static final java.util.Set<String> CAMPUS_TOOLS = java.util.Set.of("campus_weather", "campus_shuttle", "cafeteria_crowd",
+            "city_bus_arrival");
     static final String WEEK_PLAN_TOOL = "week_plan";
 
     /** 최상위 "code":"NO_SCHEDULE"만. 과목명에 같은 글자가 있어도 시간표 없음으로 보지 않는다 */
@@ -520,11 +523,17 @@ public class AgentLoop {
                   (도구 호출 기록은 대화에 다시 실리지 않는다). "그걸 어떻게 알아?"처럼 물으면 그 시각에 예약 시스템을
                   조회했다고 답하고, 확인하지 않았다고 사과하지 않는다. 꼬리말이 없는 답은 조회한 것이 아니니,
                   근거를 묻거나 다시 확인해 달라면 그 자리에서 도구를 불러 답한다.
+                  예외: 날씨·셔틀·시내버스·식당 혼잡도 답에는 꼬리말이 붙지 않지만 그 도구로 조회한 결과다. 근거를 물으면 날씨는 예보, 셔틀은 학교 시간표, 시내버스는 광주 버스정보를 보고 답했다고 말한다.
                 - "잠시만 기다려 주세요", "확인해 드릴게요"처럼 나중에 하겠다는 말은 하지 않는다. 네 답이 나가면
                   대화 차례가 끝나므로, 할 일은 이번 답 안에서 도구를 불러 끝낸다.
+                - 날씨("비 와?", "우산 챙겨야 해?")는 campus_weather, 교내 셔틀("셔틀 언제 와?")은 campus_shuttle,
+                  시내버스("419번 언제 와?", "시내버스 몇 분 남았어?")는 city_bus_arrival,
+                  식당 혼잡도("식당 붐벼?")는 cafeteria_crowd로 본다. 결과에 없는 날씨·시각·혼잡도는 지어내지 않는다.
+                  셔틀은 시간표 기준이라 basis 문장을 같이 전하고, code가 NO_TIMETABLE·NOT_CONNECTED·BUS_UNAVAILABLE이면 note를 그대로 전한다.
+                  다른 지역 날씨·IT융합대학 앞이 아닌 정류장처럼 이 도구들로 모르는 것은 모른다고 말한다.
                 - 꼬리말 "(예약 시스템 … 조회 기준)"은 네가 쓰지 않는다. 코드가 도구를 부른 답 끝에 한 번 붙인다.
                 - 답에 도구 이름(find_available_rooms 같은 영문 snake_case)을 쓰지 않는다. 학생 말로 쓴다:
-                  빈방 찾기, 지금 빈 방, 내 예약, 이용 규칙, 예약, 지금 바로 쓰기, 예약 취소, 퇴실, 연장, 내 시간표, 주간 계획.
+                  빈방 찾기, 지금 빈 방, 내 예약, 이용 규칙, 예약, 지금 바로 쓰기, 예약 취소, 퇴실, 연장, 내 시간표, 주간 계획, 날씨, 셔틀 시간, 시내버스, 식당 혼잡도.
                 """.formatted(today, rules.slotMinutes(), rules.maxHours(), rules.advanceDays())
                 + teamRule(myTeams) + persona.promptRule() + "\n";
     }
