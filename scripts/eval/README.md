@@ -130,7 +130,7 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 | 파일 | 하는 일 |
 |---|---|
 | `agent/src/test/resources/eval/timetable/tt01-synthetic.png` + `.answer.json` | **합성 그림**과 정답. 과목·강의실·시각은 모두 지어낸 값이고 `timetable/make_synthetic.py`로 다시 만들어요. 같은 색 칸이 붙은 곳, 다른 색 칸이 붙은 곳, 50분 수업을 넣었어요 |
-| `agent/src/test/resources/eval/timetable-varied/tvNN-*.png|jpg` (11/13, TS-19) | **여러 모양 합성 12장**: 폰 고해상도, 8시 시작·토요일, 다크 모드, 옅은 색 칸, 위 잘림, 작은 JPEG, 눈금이 줄 위·칸 가운데, 30분 실선·점선, 50분 수업, 태블릿, 축소·확대. `timetable/make_varied.py`로 다시 만들어요. 사진마다 `.answer.json`(정답)과 `.sim-model-answer.json`(실제 모델 실수를 흉내 낸 답)이 있어요 |
+| `agent/src/test/resources/eval/timetable-varied/tvNN-*.png\|jpg` (11/13, TS-19) | **여러 모양 합성 12장**: 폰 고해상도, 8시 시작·토요일, 다크 모드, 옅은 색 칸, 위 잘림, 작은 JPEG, 눈금이 줄 위·칸 가운데, 30분 실선·점선, 50분 수업, 태블릿, 축소·확대. `timetable/make_varied.py`로 다시 만들어요. 사진마다 `.answer.json`(정답)과 `.sim-model-answer.json`(실제 모델 실수를 흉내 낸 답)이 있어요 |
 | `TimetableVariedCasesTest` | 키 없이 매번 도는 검사. 위 13장(+ `EVAL_TIMETABLE_DIR`이 있으면 그 사진도)에서 "모델 시각 그대로"와 "픽셀 재기"를 칸 단위로 나란히 찍고, 사진마다 픽셀 재기 90% 이상을 요구해요 |
 | 레포 밖 폴더(`EVAL_TIMETABLE_DIR`) | 실제 캡처처럼 레포에 둘 수 없는 사진. 같은 이름 규칙(`ttNN*.jpg` + `.answer.json`)으로 두면 함께 재요. **실제 사람 시간표는 레포에 넣지 않아요**(11/12, 인터넷에서 구한 캡처를 뺌) |
 | `prompts/timetable-v1.txt` | 예전 지시문(시각만 받음) = 기준 |

@@ -195,7 +195,9 @@ public class ReadTimetableImage {
             if (diffs.isEmpty()) {
                 return NONE;
             }
-            double shift = diffs.stream().sorted().toList().get(diffs.size() / 2);
+            List<Double> sorted = diffs.stream().sorted().toList();
+            int n = sorted.size();
+            double shift = n % 2 == 1 ? sorted.get(n / 2) : (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2;
             shift = Math.round(shift * 2) / 2.0;  // 눈금 글자 위치 차이는 0, 30분 단위로 생긴다
             if (Math.abs(shift) > 0.75) {
                 return NONE;

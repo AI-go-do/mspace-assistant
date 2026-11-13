@@ -56,18 +56,31 @@ class TimetableVariedCasesTest {
         for (int i = 0; i < images.size(); i++) {
             Path image = images.get(i);
             String id = image.getFileName().toString().replaceFirst("\\.(jpg|png)$", "");
+            boolean outside = i >= repoCount;
+            // 레포 밖 사진은 파일 이름에 이름·학번이 있을 수 있어 순번만 쓴다
+            String label = outside ? "outside-" + (i - repoCount + 1) : id;
             Path modelFile = Files.exists(image.resolveSibling(id + ".sim-model-answer.json"))
                     ? image.resolveSibling(id + ".sim-model-answer.json")
                     : image.resolveSibling(id + "-hand-made-model-answer.json");
             if (!Files.exists(modelFile)) {
+                // 레포 사진에 모델 답이 빠지면 검사에서 조용히 빠지지 않게 실패시킨다. 레포 밖 사진만 건너뛴다
+                assertThat(outside).as("모델 답 파일이 없어요: %s", label).isTrue();
                 continue;
             }
-            String modelText = Files.readString(modelFile, StandardCharsets.UTF_8);
-            List<ClassDraft> answers = answers(image.resolveSibling(id + ".answer.json"));
-            String label = i < repoCount ? id : "outside-" + (i - repoCount + 1);
+            String modelText;
+            List<ClassDraft> answers;
+            byte[] bytes;
+            try {
+                modelText = Files.readString(modelFile, StandardCharsets.UTF_8);
+                answers = answers(image.resolveSibling(id + ".answer.json"));
+                bytes = Files.readAllBytes(image);
+            } catch (IOException | RuntimeException e) {
+                // 원인 예외를 붙이지 않는다: 메시지에 원래 파일 경로가 들어 있다
+                throw new IllegalStateException("사진·정답·모델 답 파일을 읽지 못했어요: " + label);
+            }
             rows.add(new Row(label,
                     TimetableScorer.score(service.modelTimes(modelText), answers),
-                    TimetableScorer.score(service.measured(modelText, Files.readAllBytes(image)), answers)));
+                    TimetableScorer.score(service.measured(modelText, bytes), answers)));
         }
 
         // then
