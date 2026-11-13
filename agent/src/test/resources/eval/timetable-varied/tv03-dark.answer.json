@@ -1,0 +1,78 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "다크 모드(어두운 바탕·어두운 선·어두운 칸 색)",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "10:00",
+   "endTime": "11:30",
+   "name": "선형대수"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "11:30",
+   "endTime": "13:00",
+   "name": "데이터베이스"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "09:00",
+   "endTime": "10:30",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "10:30",
+   "endTime": "12:30",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "14:00",
+   "endTime": "15:00",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "09:00",
+   "endTime": "11:00",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "11:00",
+   "endTime": "12:30",
+   "name": "동아리"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "10:30",
+   "endTime": "13:30",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "14:00",
+   "endTime": "16:00",
+   "name": "근로"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "16:00",
+   "endTime": "17:30",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "09:30",
+   "endTime": "11:30",
+   "name": "데이터베이스"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "12:00",
+   "endTime": "13:30",
+   "name": "데이터베이스"
+  }
+ ]
+}

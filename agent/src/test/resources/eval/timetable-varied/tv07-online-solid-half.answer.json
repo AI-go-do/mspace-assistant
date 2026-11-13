@@ -1,0 +1,66 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "눈금이 줄 위에 걸침 + 30분 실선(옅게) + 24시간 눈금",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "10:30",
+   "endTime": "12:00",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "12:00",
+   "endTime": "15:00",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "09:00",
+   "endTime": "11:00",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "10:00",
+   "endTime": "12:00",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "13:30",
+   "endTime": "14:30",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "14:30",
+   "endTime": "16:00",
+   "name": "영어회화"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "09:00",
+   "endTime": "10:00",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "11:00",
+   "endTime": "12:00",
+   "name": "체육"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "13:30",
+   "endTime": "15:00",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "10:00",
+   "endTime": "12:00",
+   "name": "동아리"
+  }
+ ]
+}

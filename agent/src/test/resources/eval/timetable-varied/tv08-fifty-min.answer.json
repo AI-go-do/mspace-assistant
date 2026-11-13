@@ -1,0 +1,54 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "50분 수업(교시) 위주, 9시 시작",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "10:00",
+   "endTime": "11:50",
+   "name": "글쓰기"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "10:00",
+   "endTime": "10:50",
+   "name": "체육"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "11:00",
+   "endTime": "11:50",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "12:00",
+   "endTime": "12:50",
+   "name": "컴퓨터네트워크"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "10:00",
+   "endTime": "10:50",
+   "name": "선형대수"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "10:00",
+   "endTime": "11:50",
+   "name": "영어회화"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "13:00",
+   "endTime": "13:50",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "15:00",
+   "endTime": "15:50",
+   "name": "근로"
+  }
+ ]
+}

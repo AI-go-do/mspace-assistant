@@ -120,7 +120,7 @@ public class ReadTimetableImage {
             return new Draft(List.of(), 0, "시간표를 읽지 못했어요. 더 선명한 사진으로 다시 올리거나 직접 입력해 주세요.");
         }
         JsonNode classes = root.path("classes");
-        Measurer measurer = Measurer.of(image, root.path("hours"));
+        Measurer measurer = Measurer.of(image, root.path("hours"), classes);
         List<ClassDraft> out = new ArrayList<>();
         int dropped = 0;
         if (classes.isArray()) {
@@ -144,12 +144,19 @@ public class ReadTimetableImage {
         return new Draft(List.copyOf(out), dropped, note);
     }
 
-    /** 그림 + 눈금 보정이 다 될 때만 칸을 잰다. 하나라도 안 되면 NONE(모델 시각 그대로) */
+    /**
+     * 그림 + 눈금 보정이 다 될 때만 칸을 잰다. 하나라도 안 되면 NONE(모델 시각 그대로).
+     * 정각 가로줄로 맞추지 못한 그림(gridAligned=false)은 눈금 글자 위치가 앱마다 달라 통째로 밀릴 수 있다.
+     * 그때는 픽셀로 잰 길이·간격은 믿고, 전체 위치만 "모델 시작 시각 − 잰 시작 시각"의 중앙값만큼 옮긴다(모델+픽셀 함께 쓰기).
+     * 그 차이가 45분을 넘으면 어느 쪽이 맞는지 모르니 재지 않는다.
+     */
     private record Measurer(TimetableGeometry geometry, TimetableGeometry.Calibration calibration) {
 
         static final Measurer NONE = new Measurer(null, null);
+        /** 같은 칸에서 잰 시각과 모델 시각이 이보다 멀면 다른 칸을 잰 것으로 보고 모델 시각을 쓴다 */
+        static final int MAX_DISAGREE_MINUTES = 150;
 
-        static Measurer of(byte[] image, JsonNode hours) {
+        static Measurer of(byte[] image, JsonNode hours, JsonNode classes) {
             if (image == null || !hours.isArray()) {
                 return NONE;
             }
@@ -165,11 +172,45 @@ public class ReadTimetableImage {
             if (geometry.isEmpty()) {
                 return NONE;
             }
-            return geometry.get().calibrate(labels).map(c -> new Measurer(geometry.get(), c)).orElse(NONE);
+            Optional<TimetableGeometry.Calibration> cal = geometry.get().calibrate(labels);
+            if (cal.isEmpty()) {
+                return NONE;
+            }
+            Measurer m = new Measurer(geometry.get(), cal.get());
+            return cal.get().gridAligned() ? m : m.alignedToModel(classes);
         }
 
-        /** {시작, 끝}. 잰 길이가 10분 미만이면 잘못 잰 것으로 보고 빈 값 */
-        Optional<LocalTime[]> times(JsonNode boxNode) {
+        /** 잰 시작과 모델 시작의 차이(시간) 중앙값만큼 절편을 옮긴다. 45분 넘게 다르거나 비교할 칸이 없으면 NONE */
+        private Measurer alignedToModel(JsonNode classes) {
+            List<Double> diffs = new ArrayList<>();
+            if (classes.isArray()) {
+                for (JsonNode c : classes) {
+                    LocalTime model = time(c.path("startTime").asString(""));
+                    Optional<double[]> edges = box(c.path("box_2d")).flatMap(b -> geometry.measure(b, calibration));
+                    if (model != null && edges.isPresent()) {
+                        diffs.add(model.toSecondOfDay() / 3600.0 - calibration.hourAt(edges.get()[0]));
+                    }
+                }
+            }
+            if (diffs.isEmpty()) {
+                return NONE;
+            }
+            List<Double> sorted = diffs.stream().sorted().toList();
+            int n = sorted.size();
+            double shift = n % 2 == 1 ? sorted.get(n / 2) : (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2;
+            shift = Math.round(shift * 2) / 2.0;  // 눈금 글자 위치 차이는 0, 30분 단위로 생긴다
+            final double s = shift;
+            // 칸 절반 이상이 같은 만큼(±15분) 밀려 있어야 통째로 옮긴다. 제각각이면 어느 칸이 맞는지 몰라 재지 않는다
+            long agree = diffs.stream().filter(d -> Math.abs(d - s) <= 0.25).count();
+            if (Math.abs(shift) > 0.75 || agree * 2 < diffs.size()) {
+                return NONE;
+            }
+            double slope = calibration.slope();
+            return new Measurer(geometry, new TimetableGeometry.Calibration(calibration.intercept() - shift * slope, slope, false));
+        }
+
+        /** {시작, 끝}. 잰 길이가 10분 미만이거나 모델 시각과 너무 멀면 빈 값 */
+        Optional<LocalTime[]> times(JsonNode boxNode, LocalTime modelStart) {
             if (geometry == null) {
                 return Optional.empty();
             }
@@ -177,6 +218,9 @@ public class ReadTimetableImage {
                 Optional<LocalTime> start = TimetableGeometry.timeAt(edges[0], calibration);
                 Optional<LocalTime> end = TimetableGeometry.timeAt(edges[1], calibration);
                 if (start.isEmpty() || end.isEmpty() || end.get().isBefore(start.get().plusMinutes(10))) {
+                    return Optional.empty();
+                }
+                if (modelStart != null && Math.abs(start.get().toSecondOfDay() - modelStart.toSecondOfDay()) > MAX_DISAGREE_MINUTES * 60) {
                     return Optional.empty();
                 }
                 return Optional.of(new LocalTime[] {start.get(), end.get()});
@@ -205,7 +249,7 @@ public class ReadTimetableImage {
         String day = c.path("dayOfWeek").asString("").trim().toUpperCase(Locale.ROOT);
         LocalTime start = time(c.path("startTime").asString(""));
         LocalTime end = time(c.path("endTime").asString(""));
-        Optional<LocalTime[]> measured = measurer.times(c.path("box_2d"));
+        Optional<LocalTime[]> measured = measurer.times(c.path("box_2d"), start);
         if (measured.isPresent()) {
             start = measured.get()[0];
             end = measured.get()[1];

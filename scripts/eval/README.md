@@ -130,6 +130,8 @@ EVAL_ONLY=C05,C18 EVAL_MODELS=gemini:gemini-3.5-flash-lite ./mvnw -q -pl agent t
 | 파일 | 하는 일 |
 |---|---|
 | `agent/src/test/resources/eval/timetable/tt01-synthetic.png` + `.answer.json` | **합성 그림**과 정답. 과목·강의실·시각은 모두 지어낸 값이고 `timetable/make_synthetic.py`로 다시 만들어요. 같은 색 칸이 붙은 곳, 다른 색 칸이 붙은 곳, 50분 수업을 넣었어요 |
+| `agent/src/test/resources/eval/timetable-varied/tvNN-*.png\|jpg` (11/13, TS-19) | **여러 모양 합성 12장**: 폰 고해상도, 8시 시작·토요일, 다크 모드, 옅은 색 칸, 위 잘림, 작은 JPEG, 눈금이 줄 위·칸 가운데, 30분 실선·점선, 50분 수업, 태블릿, 축소·확대. `timetable/make_varied.py`로 다시 만들어요. 사진마다 `.answer.json`(정답)과 `.sim-model-answer.json`(실제 모델 실수를 흉내 낸 답)이 있어요 |
+| `TimetableVariedCasesTest` | 키 없이 매번 도는 검사. 위 13장(+ `EVAL_TIMETABLE_DIR`이 있으면 그 사진도)에서 "모델 시각 그대로"와 "픽셀 재기"를 칸 단위로 나란히 찍고, 사진마다 픽셀 재기 90% 이상을 요구해요 |
 | 레포 밖 폴더(`EVAL_TIMETABLE_DIR`) | 실제 캡처처럼 레포에 둘 수 없는 사진. 같은 이름 규칙(`ttNN*.jpg` + `.answer.json`)으로 두면 함께 재요. **실제 사람 시간표는 레포에 넣지 않아요**(11/12, 인터넷에서 구한 캡처를 뺌) |
 | `prompts/timetable-v1.txt` | 예전 지시문(시각만 받음) = 기준 |
 | `TimetableScorer` | 정답 칸마다 같은 요일·같은 이름(띄어쓰기 무시, 포함 인정) 칸을 짝짓고 시작·끝이 같으면 정확. 점수 = 정확 / 정답 칸. 30분 안·빠짐·덤(지어낸 칸)은 따로 셈 |
@@ -153,4 +155,5 @@ EVAL_TIMETABLE=1 EVAL_TIMETABLE_DIR="$HOME/mspace-eval-photos" ./mvnw -q -pl age
 - 결과 폴더(`results/`)는 커밋돼요. 레포 밖 사진은 파일 이름 대신 `outside-1`처럼 순번으로 적고, 점수와 틀린 칸 **개수**만 남겨요(모델 원문·과목명은 안 남김)
 - 한도·장애로 답이 없던 회차는 0점으로 섞지 않고 "실패" 칸에 따로 세요
 - 모델은 `EVAL_TIMETABLE_MODEL`(기본 `gemini-3.5-flash-lite`)
-- CI에서는 `TimetableGeometryTest`가 손 만든 모델 답(위치를 일부러 흔듦)으로 픽셀 재기만 검사해요
+- CI에서는 `TimetableGeometryTest`가 손 만든 모델 답(위치를 일부러 흔듦)으로, `TimetableVariedCasesTest`가 여러 모양 12장으로 픽셀 재기를 검사해요
+- `EVAL_TIMETABLE_VARIED=1`을 더하면 여러 모양 12장도 진짜 모델로 재요. 12장 × 2회 × 2번 = **48번 호출**이라 한도가 넉넉한 날에 돌려요

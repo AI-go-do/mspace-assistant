@@ -1,0 +1,84 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "가로로 넓은 태블릿(1600 너비), 토요일, 한 시간 60픽셀",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "09:00",
+   "endTime": "10:00",
+   "name": "영어회화"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "11:00",
+   "endTime": "12:30",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "14:00",
+   "endTime": "15:30",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "10:00",
+   "endTime": "11:30",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "11:30",
+   "endTime": "13:00",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "09:30",
+   "endTime": "11:00",
+   "name": "컴퓨터네트워크"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "10:30",
+   "endTime": "11:30",
+   "name": "컴퓨터네트워크"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "12:30",
+   "endTime": "13:30",
+   "name": "컴퓨터네트워크"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "10:30",
+   "endTime": "12:30",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "14:00",
+   "endTime": "17:00",
+   "name": "데이터베이스"
+  },
+  {
+   "dayOfWeek": "SAT",
+   "startTime": "09:30",
+   "endTime": "12:30",
+   "name": "컴퓨터네트워크"
+  },
+  {
+   "dayOfWeek": "SAT",
+   "startTime": "12:30",
+   "endTime": "14:30",
+   "name": "영어회화"
+  },
+  {
+   "dayOfWeek": "SAT",
+   "startTime": "14:30",
+   "endTime": "16:00",
+   "name": "체육"
+  }
+ ]
+}
