@@ -7,6 +7,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,14 +42,15 @@ class CampusToolsTest extends McpToolTestSupport {
     }
 
     @Test
-    @DisplayName("도구 목록에 campus_weather·campus_shuttle·cafeteria_crowd가 읽기 전용으로 보인다")
+    @DisplayName("도구 목록에 campus_weather·campus_shuttle·cafeteria_crowd·city_bus_arrival이 읽기 전용으로 보인다")
     void listsTools() {
         // when
         List<Tool> tools = connect(USER).listTools().tools().stream()
-                .filter(t -> List.of("campus_weather", "campus_shuttle", "cafeteria_crowd").contains(t.name())).toList();
+                .filter(t -> List.of("campus_weather", "campus_shuttle", "cafeteria_crowd", "city_bus_arrival").contains(t.name()))
+                .toList();
 
         // then
-        assertThat(tools).hasSize(3);
+        assertThat(tools).hasSize(4);
         assertThat(tools).allSatisfy(t -> assertThat(t.annotations().readOnlyHint()).isTrue());
     }
 
@@ -147,6 +149,40 @@ class CampusToolsTest extends McpToolTestSupport {
         // then
         assertThat(result.isError()).isFalse();
         assertThat(text(result)).contains("NOT_CONNECTED", "아직 볼 수 없어요");
+    }
+
+    @Test
+    @DisplayName("시내버스: 정류소 ID로 도착 정보를 받아 남은 분 순으로. 키는 보내고 학생 헤더는 보내지 않는다")
+    void cityBus() {
+        // given
+        core.stubFor(get(urlPathEqualTo("/arriveInfo")).willReturn(okJson("""
+                {"RESULT":{"RESULT_CODE":"SUCCESS"},"ROW_COUNT":2,"BUSSTOP_LIST":[
+                 {"LINE_NAME":"57","REMAIN_MIN":9,"REMAIN_STOP":4},
+                 {"LINE_NAME":"419","REMAIN_MIN":"3","REMAIN_STOP":"1"}]}""")));
+
+        // when
+        CallToolResult result = call(USER, "city_bus_arrival", Map.of());
+
+        // then
+        assertThat(result.isError()).isFalse();
+        assertThat(text(result)).contains("\"arsId\":\"1177\"", "\"line\":\"419\",\"minutes\":3,\"stops\":1", "광주 버스정보 기준");
+        assertThat(text(result).indexOf("\"419\"")).isLessThan(text(result).indexOf("\"57\""));
+        core.verify(getRequestedFor(urlPathEqualTo("/arriveInfo")).withQueryParam("BUSSTOP_ID", equalTo("2873"))
+                .withQueryParam("serviceKey", equalTo("test-key")).withoutHeader("Authorization"));
+    }
+
+    @Test
+    @DisplayName("시내버스: API가 실패하면 도착 시간을 지어내지 않고 BUS_UNAVAILABLE과 정류장 번호")
+    void cityBusDown() {
+        // given
+        core.stubFor(get(urlPathEqualTo("/arriveInfo")).willReturn(serverError()));
+
+        // when
+        CallToolResult result = call(USER, "city_bus_arrival", Map.of());
+
+        // then
+        assertThat(result.isError()).isFalse();
+        assertThat(text(result)).contains("BUS_UNAVAILABLE", "1177").doesNotContain("\"minutes\"");
     }
 
     @Test

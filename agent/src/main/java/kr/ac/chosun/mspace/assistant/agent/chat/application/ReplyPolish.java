@@ -49,6 +49,7 @@ final class ReplyPolish {
         m.put("campus_weather", "날씨");
         m.put("campus_shuttle", "셔틀 시간");
         m.put("cafeteria_crowd", "식당 혼잡도");
+        m.put("city_bus_arrival", "시내버스");
         TOOL_WORDS = Map.copyOf(m);
     }
 

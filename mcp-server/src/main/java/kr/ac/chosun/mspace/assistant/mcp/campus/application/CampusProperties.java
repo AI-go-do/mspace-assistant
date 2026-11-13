@@ -12,13 +12,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @param weather 날씨 예보 (Open-Meteo, 키 없음)
  * @param shuttle 교내 셔틀 시간표 (정해진 시각. 실시간 위치 아님)
+ * @param cityBus IT융합대학 앞 시내버스 도착 정보 (광주 버스정보 공공 API, 키 필요)
  */
 @ConfigurationProperties("mspace.campus")
-public record CampusProperties(Weather weather, Shuttle shuttle) {
+public record CampusProperties(Weather weather, Shuttle shuttle, CityBus cityBus) {
 
     public CampusProperties {
         weather = weather == null ? new Weather(true, null, 0, 0, null, null, 0, null) : weather;
         shuttle = shuttle == null ? new Shuttle(null, null, List.of()) : shuttle;
+        cityBus = cityBus == null ? new CityBus(null, null, null, null, null, null, null, null, null) : cityBus;
     }
 
     /**
@@ -42,6 +44,40 @@ public record CampusProperties(Weather weather, Shuttle shuttle) {
             timeout = timeout == null ? Duration.ofSeconds(3) : timeout;
             umbrellaPercent = umbrellaPercent <= 0 ? 50 : umbrellaPercent;
             cache = cache == null ? Duration.ofMinutes(10) : cache;
+        }
+    }
+
+    /**
+     * 시내버스 도착 정보. 공공데이터포털 "전남광주통합특별시_광주버스정보"(https://www.data.go.kr/data/15157923/openapi.do).
+     * 서비스 키가 비면 도구가 "아직 연결 전"으로 답한다 (키는 .env의 GWANGJU_BUS_KEY에만, 커밋하지 않는다).
+     *
+     * @param serviceKey  공공데이터포털에서 받은 일반 인증키(Decoding 값)
+     * @param baseUrl     API 주소. 테스트에서 가짜 서버로 바꾼다
+     * @param arrivePath  도착 정보 경로 (키 받은 뒤 실제 응답으로 확인 필요)
+     * @param stationPath 정류소 정보 경로 (ARS 번호 → 정류소 ID 찾기)
+     * @param arsId       정류장 표지판 번호. IT융합대학 앞은 1177 (영준 11/13)
+     * @param busstopId   API가 쓰는 정류소 ID. 비면 처음 한 번 정류소 정보에서 arsId로 찾는다
+     * @param stopName    답에 쓰는 정류장 이름
+     * @param timeout     연결·읽기 제한
+     * @param cache       같은 도착 정보를 다시 쓰는 시간 (학생이 많아도 API 호출을 줄인다)
+     */
+    public record CityBus(String serviceKey, String baseUrl, String arrivePath, String stationPath, String arsId,
+                          String busstopId, String stopName, Duration timeout, Duration cache) {
+
+        public CityBus {
+            serviceKey = serviceKey == null ? "" : serviceKey.strip();
+            baseUrl = baseUrl == null || baseUrl.isBlank() ? "https://apis.data.go.kr/6290000/gj_bis" : baseUrl.strip();
+            arrivePath = arrivePath == null || arrivePath.isBlank() ? "/arriveInfo" : arrivePath.strip();
+            stationPath = stationPath == null || stationPath.isBlank() ? "/stationInfo" : stationPath.strip();
+            arsId = arsId == null || arsId.isBlank() ? "1177" : arsId.strip();
+            busstopId = busstopId == null ? "" : busstopId.strip();
+            stopName = stopName == null || stopName.isBlank() ? "IT융합대학" : stopName;
+            timeout = timeout == null ? Duration.ofSeconds(3) : timeout;
+            cache = cache == null ? Duration.ofSeconds(30) : cache;
+        }
+
+        public boolean connected() {
+            return !serviceKey.isBlank();
         }
     }
 

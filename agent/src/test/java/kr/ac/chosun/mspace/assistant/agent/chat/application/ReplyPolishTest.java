@@ -54,7 +54,7 @@ class ReplyPolishTest {
         assertThat(ReplyPolish.hideToolNames("cancel_reservation과 usage_rules가 있어요"))
                 .isEqualTo("예약 취소와 이용 규칙이 있어요");
         assertThat(ReplyPolish.hideToolNames("밑줄 없는 답")).isEqualTo("밑줄 없는 답");
-        assertThat(ReplyPolish.TOOL_WORDS).as("mcp-server 도구 15개(학교 생활 3개 포함) + briefing").hasSize(16);
+        assertThat(ReplyPolish.TOOL_WORDS).as("mcp-server 도구 16개(학교 생활 4개 포함) + briefing").hasSize(17);
     }
 
     @Test

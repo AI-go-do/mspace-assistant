@@ -21,7 +21,7 @@ class CampusShuttleTest {
     static final Clock FRIDAY_NOON = Clock.fixed(Instant.parse("2026-11-13T03:05:00Z"), ZoneId.of("UTC"));
 
     static CampusProperties props(List<CampusProperties.Route> routes) {
-        return new CampusProperties(null, new CampusProperties.Shuttle(null, null, routes));
+        return new CampusProperties(null, new CampusProperties.Shuttle(null, null, routes), null);
     }
 
     static CampusProperties.Route route(String... times) {
@@ -143,7 +143,7 @@ class CampusShuttleTest {
         var vacation = new CampusProperties.Route("본관 순환 버스", "설립기념탑 → 미대", CampusProperties.Season.VACATION, null,
                 List.of(LocalTime.parse("12:45")), List.of(window("08:20", "09:00", 10, null)));
         var props = new CampusProperties(null, new CampusProperties.Shuttle(null, CampusProperties.Season.VACATION,
-                List.of(mainLoop(CampusProperties.Season.SEMESTER), vacation)));
+                List.of(mainLoop(CampusProperties.Season.SEMESTER), vacation)), null);
 
         // when
         ShuttleTimes t = new CampusShuttle(props, FRIDAY_NOON).next(null, LocalTime.parse("08:00"));
