@@ -48,6 +48,7 @@ public class OllamaLlmClient implements LlmClient {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", props.model());
         body.put("stream", false);
+        body.put("options", Map.of("num_ctx", props.numCtx()));
         body.put("messages", messages(system, conversation));
         if (!tools.isEmpty()) {
             body.put("tools", tools.stream().map(OllamaLlmClient::tool).toList());

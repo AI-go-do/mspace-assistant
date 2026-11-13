@@ -10,14 +10,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param model          도구 호출을 지원하는 모델이어야 한다. 기본 qwen2.5:7b (확인 필요: 돌릴 기기 메모리에 맞는지 #9에서 측정)
  * @param timeout        응답 읽기 최대 시간. 대화 전체 상한(mspace.agent.chat-timeout 45초)·nginx 60초 안에 들게 40초
  * @param connectTimeout 연결 최대 시간. 서버가 꺼져 있으면 빨리 알리게 짧게 둔다
+ * @param numCtx         대화 길이 상한(토큰). Ollama 기본 4096은 지시문+도구 약 14,000토큰을 잘라
+ *                       모델이 같은 도구만 되풀이한다(11/13 젯슨 A 실측). 16384에서 qwen2.5:7b가 5.47GB
  */
 @ConfigurationProperties("mspace.llm.ollama")
-public record OllamaProperties(String baseUrl, String model, Duration timeout, Duration connectTimeout) {
+public record OllamaProperties(String baseUrl, String model, Duration timeout, Duration connectTimeout,
+        Integer numCtx) {
 
     public OllamaProperties {
         baseUrl = baseUrl == null || baseUrl.isBlank() ? "http://localhost:11434" : baseUrl;
         model = model == null || model.isBlank() ? "qwen2.5:7b" : model;
         timeout = timeout == null ? Duration.ofSeconds(40) : timeout;
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(5) : connectTimeout;
+        numCtx = numCtx == null ? 16384 : numCtx;
     }
 }

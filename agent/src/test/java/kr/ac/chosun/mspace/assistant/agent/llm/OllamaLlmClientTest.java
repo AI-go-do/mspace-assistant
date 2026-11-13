@@ -37,7 +37,7 @@ class OllamaLlmClientTest {
             Map.of("type", "object", "properties", Map.of("date", Map.of("type", "string"))));
 
     OllamaLlmClient client(Duration timeout) {
-        return new OllamaLlmClient(new OllamaProperties(ollama.baseUrl(), "qwen2.5:7b", timeout, null));
+        return new OllamaLlmClient(new OllamaProperties(ollama.baseUrl(), "qwen2.5:7b", timeout, null, null));
     }
 
     @Test
@@ -56,6 +56,7 @@ class OllamaLlmClientTest {
         ollama.verify(postRequestedFor(urlEqualTo("/api/chat"))
                 .withRequestBody(matchingJsonPath("$.model", equalTo("qwen2.5:7b")))
                 .withRequestBody(matchingJsonPath("$.stream", equalTo("false")))
+                .withRequestBody(matchingJsonPath("$.options.num_ctx", equalTo("16384")))
                 .withRequestBody(matchingJsonPath("$.messages[0].role", equalTo("system")))
                 .withRequestBody(matchingJsonPath("$.tools[0].function.name", equalTo("find_available_rooms"))));
     }

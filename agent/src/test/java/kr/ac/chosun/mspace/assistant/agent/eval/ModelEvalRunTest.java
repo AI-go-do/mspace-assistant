@@ -111,7 +111,7 @@ class ModelEvalRunTest {
                 // 젯슨(GPU 공유 메모리 8GB)은 첫 호출에 모델을 올리느라 느리다. 상한을 늘려 재고 표에 적는다
                 Duration timeout = Duration.ofSeconds(Long.parseLong(env("EVAL_OLLAMA_TIMEOUT", "120")));
                 var client = new OllamaLlmClient(new OllamaProperties(env("OLLAMA_BASE_URL", "http://localhost:11434"), model,
-                        timeout, Duration.ofSeconds(5)));
+                        timeout, Duration.ofSeconds(5), Integer.valueOf(env("OLLAMA_NUM_CTX", "16384"))));
                 yield new EvalRunner.Target("ollama " + model, provider, client, 0,
                         Duration.ofSeconds(Long.parseLong(env("EVAL_CHAT_TIMEOUT", "180"))), -1);
             }
