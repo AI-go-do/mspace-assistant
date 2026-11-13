@@ -48,7 +48,11 @@ class GwangjuBusClient implements BusArrivalPort {
         this.busstopId = this.props.busstopId().isBlank() ? null : this.props.busstopId();
     }
 
+    /** buses가 null이면 실패를 기억한 것이다: 실패도 cache 동안 다시 부르지 않아 API 장애 때 호출이 몰리지 않게 한다 */
     private record Cached(Instant at, List<BusArrivals.Bus> buses) {
+        Optional<List<BusArrivals.Bus>> result() {
+            return Optional.ofNullable(buses);
+        }
     }
 
     @Override
@@ -58,14 +62,14 @@ class GwangjuBusClient implements BusArrivalPort {
         }
         Cached c = cached;
         if (fresh(c, clock.instant())) {
-            return Optional.of(c.buses());
+            return c.result();
         }
         // 캐시가 끝난 순간 학생 여럿이 물어도 API는 한 번만 부른다: 한 요청만 갱신하고 나머지는 기다렸다 새 값을 쓴다
         synchronized (this) {
             c = cached;
             Instant now = clock.instant();
             if (fresh(c, now)) {
-                return Optional.of(c.buses());
+                return c.result();
             }
             return refresh(now);
         }
@@ -76,6 +80,12 @@ class GwangjuBusClient implements BusArrivalPort {
     }
 
     private Optional<List<BusArrivals.Bus>> refresh(Instant now) {
+        Optional<List<BusArrivals.Bus>> result = call();
+        cached = new Cached(now, result.orElse(null));
+        return result;
+    }
+
+    private Optional<List<BusArrivals.Bus>> call() {
         long started = System.nanoTime();
         boolean ok = false;
         try {
@@ -84,7 +94,6 @@ class GwangjuBusClient implements BusArrivalPort {
                 return Optional.empty();
             }
             Optional<List<BusArrivals.Bus>> parsed = parseArrivals(get(props.arrivePath(), "BUSSTOP_ID", id));
-            parsed.ifPresent(b -> cached = new Cached(now, b));
             ok = parsed.isPresent();
             return parsed;
         } catch (RestClientException e) {
