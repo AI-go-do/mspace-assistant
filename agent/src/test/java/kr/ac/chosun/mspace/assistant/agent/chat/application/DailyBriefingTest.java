@@ -330,6 +330,26 @@ class DailyBriefingTest {
     }
 
     @Test
+    @DisplayName("아침 브리핑: 수시 운행이 곧 시작하면 그 시간대를 \"오늘\"로 알려 준다 (17:00 출발보다 먼저)")
+    void shuttleUpcoming() {
+        // given: 07:00에 본 본관 순환 버스
+        String shuttle = """
+                {"date":"2026-11-06","code":null,"routes":[
+                 {"name":"본관 순환 버스","stop":"설립기념탑 → 미대","next":["17:00"],"last":"23:00","running":null,
+                  "upcoming":"07:40~17:00 수시 운행(5~10분 간격)"}],"basis":"시간표 기준","note":null}""";
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", shuttle), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().shuttle().now()).isFalse();
+        assertThat(b.text()).endsWith("오늘 본관 순환 버스는 07:40~17:00 수시 운행(5~10분 간격)이에요(시간표 기준).");
+    }
+
+    @Test
     @DisplayName("아침 브리핑: 날씨가 실패하고 셔틀 시간표가 없으면 두 줄 다 빼고 나머지는 그대로")
     void campusMissing() {
         // given

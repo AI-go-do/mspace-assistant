@@ -74,6 +74,14 @@ public record CampusProperties(Weather weather, Shuttle shuttle, CityBus cityBus
             stopName = stopName == null || stopName.isBlank() ? "IT융합대학" : stopName;
             timeout = timeout == null ? Duration.ofSeconds(3) : timeout;
             cache = cache == null ? Duration.ofSeconds(30) : cache;
+            // 키는 주소 뒤에 붙어 가므로 평문 HTTP로 보내지 않는다 (테스트용 로컬 가짜 서버만 예외)
+            if (!serviceKey.isBlank() && !baseUrl.startsWith("https://") && !isLocal(baseUrl)) {
+                throw new IllegalArgumentException("시내버스 API 키가 있으면 주소는 https여야 해요");
+            }
+        }
+
+        private static boolean isLocal(String url) {
+            return url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1");
         }
 
         public boolean connected() {
@@ -126,6 +134,11 @@ public record CampusProperties(Weather weather, Shuttle shuttle, CityBus cityBus
                     .findFirst().orElse(null);
         }
 
+        /** t 뒤에 시작하는 첫 시각 없는 시간대 (예: 07:00에 본 "07:40~17:00 수시 운행"). 없으면 null */
+        public Window upcomingAfter(LocalTime t) {
+            return windows.stream().filter(w -> w.every() == null && w.from().isAfter(t)).findFirst().orElse(null);
+        }
+
         public boolean runs(Season now) {
             return season == null || season == now;
         }
@@ -143,8 +156,9 @@ public record CampusProperties(Weather weather, Shuttle shuttle, CityBus cityBus
             if (from == null || to == null || to.isBefore(from)) {
                 throw new IllegalArgumentException("셔틀 시간대는 from ≤ to여야 해요: " + from + "~" + to);
             }
-            if (every != null && (every.isZero() || every.isNegative())) {
-                throw new IllegalArgumentException("셔틀 배차 간격은 0보다 커야 해요: " + every);
+            // 하루 이상이면 LocalTime 덧셈이 같은 시각으로 돌아와 펼치기가 끝나지 않는다
+            if (every != null && (every.isZero() || every.isNegative() || every.compareTo(Duration.ofDays(1)) >= 0)) {
+                throw new IllegalArgumentException("셔틀 배차 간격은 0보다 크고 하루보다 짧아야 해요: " + every);
             }
         }
 

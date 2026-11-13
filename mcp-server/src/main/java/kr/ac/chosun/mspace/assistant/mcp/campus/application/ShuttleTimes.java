@@ -18,8 +18,9 @@ public record ShuttleTimes(LocalDate date, String dayOfWeek, String after, Strin
     /**
      * @param next 다음 출발 시각 HH:mm (가까운 순, 최대 3개). 비면 그날 남은 차가 없다
      * @param last    그날 마지막 출발 HH:mm (정해진 시각이 하나도 없으면 null)
-     * @param running 이 시각에 걸친 시각 없는 운행 (예: "07:40~17:00 수시 운행(5~10분 간격)"). 없으면 null
+     * @param running  이 시각에 걸친 시각 없는 운행 (예: "07:40~17:00 수시 운행(5~10분 간격)"). 없으면 null
+     * @param upcoming 아직 시작 전인 시각 없는 운행으로, 다음 정해진 출발보다 먼저 시작하는 것 (예: 07:00에 본 "07:40~17:00 수시 운행"). 없으면 null
      */
-    public record RouteTimes(String name, String stop, List<String> next, String last, String running) {
+    public record RouteTimes(String name, String stop, List<String> next, String last, String running, String upcoming) {
     }
 }

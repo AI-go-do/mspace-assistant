@@ -421,7 +421,7 @@ public class DailyBriefing {
         }
         String name = shuttle.name() == null || shuttle.name().isBlank() ? "교내 셔틀" : shuttle.name();
         if (shuttle.running() != null) {
-            sb.append(" 지금 ").append(name).append("는 ").append(shuttle.running()).append("이에요(시간표 기준).");
+            sb.append(shuttle.now() ? " 지금 " : " 오늘 ").append(name).append("는 ").append(shuttle.running()).append("이에요(시간표 기준).");
             return;
         }
         sb.append(" 다음 교내 셔틀은 ").append(name).append(' ').append(shuttle.next()).append("이에요(시간표 기준).");
@@ -444,11 +444,15 @@ public class DailyBriefing {
                 String name = route.path("name").asString(null);
                 String now = route.path("running").asString(null);
                 if (now != null && running == null) {
-                    running = new Shuttle(name, null, now);
+                    running = new Shuttle(name, null, now, true);
+                }
+                String soon = route.path("upcoming").asString(null);
+                if (soon != null && running == null) {
+                    running = new Shuttle(name, null, soon, false); // 07:00 브리핑에 "07:40~17:00 수시 운행"
                 }
                 String next = route.path("next").path(0).asString(null);
                 if (next != null && (earliest == null || next.compareTo(earliest.next()) < 0)) {
-                    earliest = new Shuttle(name, next, null);
+                    earliest = new Shuttle(name, next, null, false);
                 }
             }
             shuttle = running != null ? running : earliest;
@@ -603,9 +607,10 @@ public class DailyBriefing {
      *
      * @param name    노선 이름
      * @param next    가장 가까운 다음 출발 HH:mm. running이 있으면 null
-     * @param running 지금 걸친 시각 없는 운행 (예: "07:40~17:00 수시 운행(5~10분 간격)")
+     * @param running 지금 걸쳤거나 곧 시작하는 시각 없는 운행 (예: "07:40~17:00 수시 운행(5~10분 간격)")
+     * @param now     running이 지금 운행 중이면 true, 곧 시작이면 false
      */
-    public record Shuttle(String name, String next, String running) {
+    public record Shuttle(String name, String next, String running, boolean now) {
     }
 
     /**

@@ -66,4 +66,17 @@ class CityBusTest {
         assertThat(a.note()).contains("오고 있는 버스가 없어요");
         assertThat(a.measuredAt().toString()).isEqualTo("2026-11-13T14:30+09:00");
     }
+
+    @Test
+    @DisplayName("키가 있으면 http 주소를 막는다 (키가 평문으로 나가지 않게). 로컬 가짜 서버만 예외")
+    void httpsOnlyWithKey() {
+        // when / then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        new CampusProperties.CityBus("k", "http://apis.data.go.kr/6290000/gj_bis", null, null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new CampusProperties.CityBus("k", "http://localhost:8089", null, null, null, null, null, null, null).connected())
+                .isTrue();
+        assertThat(new CampusProperties.CityBus("", "http://apis.data.go.kr", null, null, null, null, null, null, null).connected())
+                .isFalse();
+    }
 }

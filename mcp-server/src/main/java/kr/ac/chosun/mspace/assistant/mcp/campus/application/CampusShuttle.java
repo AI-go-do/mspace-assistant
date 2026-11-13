@@ -48,14 +48,18 @@ public class CampusShuttle {
                         && (!r.departures().isEmpty() || !r.windows().isEmpty()))
                 .map(r -> {
                     CampusProperties.Window running = r.runningAt(from);
-                    return new ShuttleTimes.RouteTimes(r.name(), r.stop(),
-                            r.departures().stream().filter(t -> !t.isBefore(from)).limit(NEXT_COUNT).map(CampusShuttle::hhmm).toList(),
+                    List<LocalTime> next = r.departures().stream().filter(t -> !t.isBefore(from)).limit(NEXT_COUNT).toList();
+                    CampusProperties.Window upcoming = running == null ? r.upcomingAfter(from) : null;
+                    if (upcoming != null && !next.isEmpty() && !upcoming.from().isBefore(next.getFirst())) {
+                        upcoming = null; // 정해진 출발이 먼저면 그걸로 충분하다
+                    }
+                    return new ShuttleTimes.RouteTimes(r.name(), r.stop(), next.stream().map(CampusShuttle::hhmm).toList(),
                             r.departures().isEmpty() ? null : hhmm(r.departures().getLast()),
-                            running == null ? null : running.text());
+                            running == null ? null : running.text(), upcoming == null ? null : upcoming.text());
                 })
                 .toList();
         String note = routes.isEmpty() ? NO_SERVICE_NOTE
-                : routes.stream().allMatch(r -> r.next().isEmpty() && r.running() == null) ? NONE_LEFT_NOTE : null;
+                : routes.stream().allMatch(r -> r.next().isEmpty() && r.running() == null && r.upcoming() == null) ? NONE_LEFT_NOTE : null;
         return new ShuttleTimes(day, dayName, hhmm(from), null, routes, shuttle.basis(), note);
     }
 

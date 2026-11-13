@@ -57,10 +57,25 @@ class GwangjuBusClient implements BusArrivalPort {
             return Optional.empty();
         }
         Cached c = cached;
-        Instant now = clock.instant();
-        if (c != null && c.at().plus(props.cache()).isAfter(now)) {
+        if (fresh(c, clock.instant())) {
             return Optional.of(c.buses());
         }
+        // 캐시가 끝난 순간 학생 여럿이 물어도 API는 한 번만 부른다: 한 요청만 갱신하고 나머지는 기다렸다 새 값을 쓴다
+        synchronized (this) {
+            c = cached;
+            Instant now = clock.instant();
+            if (fresh(c, now)) {
+                return Optional.of(c.buses());
+            }
+            return refresh(now);
+        }
+    }
+
+    private boolean fresh(Cached c, Instant now) {
+        return c != null && c.at().plus(props.cache()).isAfter(now);
+    }
+
+    private Optional<List<BusArrivals.Bus>> refresh(Instant now) {
         long started = System.nanoTime();
         boolean ok = false;
         try {
@@ -120,16 +135,23 @@ class GwangjuBusClient implements BusArrivalPort {
     Optional<List<BusArrivals.Bus>> parseArrivals(String body) {
         try {
             JsonNode root = body == null ? null : json.readTree(body);
-            if (root == null || root.findValue("BUSSTOP_LIST") == null && root.findValue("ROW_COUNT") == null
-                    && root.findValue("ROWCOUNT") == null) {
-                return Optional.empty(); // 모양을 모르는 응답(오류 XML 등)은 "오는 버스 없음"으로 바꾸지 않는다
+            if (root == null) {
+                return Optional.empty();
+            }
+            JsonNode rows = root.findValue("ROW_COUNT") != null ? root.findValue("ROW_COUNT") : root.findValue("ROWCOUNT");
+            int rowCount = rows == null ? -1 : rows.asInt(-1);
+            List<JsonNode> items = list(body, "BUSSTOP_LIST");
+            // 모양을 모르는 응답(오류 XML 등)이나 "N건"이라면서 목록이 없는 응답은 "오는 버스 없음"으로 바꾸지 않는다
+            if (items.isEmpty() && rowCount != 0) {
+                return Optional.empty();
             }
             List<BusArrivals.Bus> buses = new ArrayList<>();
-            for (JsonNode b : list(body, "BUSSTOP_LIST")) {
+            for (JsonNode b : items) {
                 String line = text(b, "LINE_NAME");
-                if (line != null) {
-                    buses.add(new BusArrivals.Bus(line, number(b, "REMAIN_MIN"), number(b, "REMAIN_STOP")));
+                if (line == null) {
+                    return Optional.empty(); // 항목을 읽지 못하면 일부만 보여 주지 않는다
                 }
+                buses.add(new BusArrivals.Bus(line, number(b, "REMAIN_MIN"), number(b, "REMAIN_STOP")));
             }
             buses.sort(Comparator.comparing(BusArrivals.Bus::minutes, Comparator.nullsLast(Comparator.naturalOrder())));
             return Optional.of(List.copyOf(buses));

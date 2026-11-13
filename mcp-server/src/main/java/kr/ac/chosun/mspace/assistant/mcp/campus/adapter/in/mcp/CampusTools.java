@@ -59,10 +59,11 @@ class CampusTools {
                     교내 셔틀버스의 다음 출발 시각을 학교 시간표 기준으로 돌려준다. "셔틀 언제 와?", "다음 버스 몇 시야?",
                     "수업 끝나고 탈 셔틀"처럼 셔틀을 물을 때 쓴다. 실시간 위치는 모른다.
                     routes마다 name(노선), stop(운행 구간), next(가까운 출발 최대 3개, HH:mm), last(그날 마지막),
-                    running(지금 걸친 "수시 운행" 같은 시간대, 없으면 null)이 있다. running이 있으면 그 시간대 안내를 먼저 전한다.
+                    running(지금 걸친 "수시 운행" 같은 시간대, 없으면 null), upcoming(곧 시작하는 그런 시간대)이 있다.
+                    running이나 upcoming이 있으면 그 시간대 안내를 먼저 전한다.
                     답할 때 basis 문장을 꼭 같이 전한다.
                     code가 NO_TIMETABLE이면 시간표가 없는 것이니 note를 그대로 전하고 시각을 지어내지 않는다.
-                    next가 비고 running도 없으면 그 시각 뒤로 남은 차가 없다. 시내버스는 city_bus_arrival로 본다.""",
+                    next·running·upcoming이 모두 비면 그 시각 뒤로 남은 차가 없다. 시내버스는 city_bus_arrival로 본다.""",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     ShuttleTimes campusShuttle(
             McpSyncRequestContext context,

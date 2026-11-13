@@ -153,4 +153,28 @@ class CampusShuttleTest {
         assertThat(t.routes().getFirst().next()).containsExactly("08:20", "08:30", "08:40");
         assertThat(t.routes().getFirst().last()).isEqualTo("12:45");
     }
+
+    @Test
+    @DisplayName("수시 운행 시작 전(07:00)이면 남은 차가 없다고 하지 않고 곧 시작하는 시간대를 알려 준다")
+    void upcomingWindow() {
+        // given: 시각 없는 수시 운행만 있는 노선
+        var route = new CampusProperties.Route("본관 순환 버스", "설립기념탑 → 미대", null, null, null,
+                List.of(window("07:40", "17:00", null, "수시 운행(5~10분 간격)")));
+
+        // when
+        ShuttleTimes t = new CampusShuttle(props(List.of(route)), FRIDAY_NOON).next(null, LocalTime.parse("07:00"));
+
+        // then
+        assertThat(t.routes().getFirst().upcoming()).isEqualTo("07:40~17:00 수시 운행(5~10분 간격)");
+        assertThat(t.routes().getFirst().next()).isEmpty();
+        assertThat(t.note()).isNull();
+    }
+
+    @Test
+    @DisplayName("하루 이상인 배차 간격은 설정에서 막는다 (펼치기가 끝나지 않으니까)")
+    void dayLongInterval() {
+        // when / then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> window("08:00", "09:00", 24 * 60, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
