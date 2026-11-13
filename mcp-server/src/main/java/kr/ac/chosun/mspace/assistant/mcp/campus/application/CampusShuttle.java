@@ -36,8 +36,8 @@ public class CampusShuttle {
     public ShuttleTimes next(LocalDate date, LocalTime after) {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(kr.ac.chosun.mspace.assistant.mcp.common.SeoulTime.ZONE));
         LocalDate day = date == null ? now.toLocalDate() : date;
-        LocalTime from = after != null ? after : day.equals(now.toLocalDate()) ? now.toLocalTime().withSecond(0).withNano(0)
-                : LocalTime.MIN;
+        // 오늘 기본값은 초까지 그대로 비교한다: 12:10:45에 12:10 차를 "다음 차"로 안내하지 않게 (HH:mm은 응답에서만)
+        LocalTime from = after != null ? after : day.equals(now.toLocalDate()) ? now.toLocalTime() : LocalTime.MIN;
         String dayName = day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
         CampusProperties.Shuttle shuttle = props.shuttle();
         if (shuttle.routes().isEmpty()) {

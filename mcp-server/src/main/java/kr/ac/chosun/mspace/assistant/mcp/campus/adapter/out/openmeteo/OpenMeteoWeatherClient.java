@@ -53,7 +53,8 @@ class OpenMeteoWeatherClient implements WeatherPort {
     public Optional<Forecast> forecast() {
         Cached c = cached;
         Instant now = clock.instant();
-        if (c != null && c.at().plus(props.cache()).isAfter(now)) {
+        // 서울 날짜가 바뀌면 남은 시간과 상관없이 새로 받는다 (23:59에 받은 예보에는 모레가 없다)
+        if (c != null && c.at().plus(props.cache()).isAfter(now) && seoulDate(c.at()).equals(seoulDate(now))) {
             return Optional.of(c.forecast());
         }
         long started = System.nanoTime();
@@ -88,6 +89,9 @@ class OpenMeteoWeatherClient implements WeatherPort {
             JsonNode root = json.readTree(body);
             JsonNode daily = root.path("daily");
             JsonNode dates = daily.path("time");
+            if (!dates.isArray()) {
+                return Optional.empty();
+            }
             List<Forecast.Day> days = new ArrayList<>();
             for (int i = 0; i < dates.size(); i++) {
                 days.add(new Forecast.Day(LocalDate.parse(dates.get(i).asString()),
@@ -105,6 +109,10 @@ class OpenMeteoWeatherClient implements WeatherPort {
             log.warn("weather 응답 해석 실패 cause={}", e.getClass().getSimpleName());
             return Optional.empty();
         }
+    }
+
+    private static LocalDate seoulDate(Instant t) {
+        return t.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate();
     }
 
     private static Integer intAt(JsonNode array, int i) {

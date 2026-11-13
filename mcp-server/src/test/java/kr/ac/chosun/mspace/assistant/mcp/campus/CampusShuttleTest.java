@@ -80,4 +80,18 @@ class CampusShuttleTest {
         // then
         assertThat(t.routes().getFirst().next()).containsExactly("08:30", "09:00", "12:10");
     }
+
+    @Test
+    @DisplayName("12:10:45에는 12:10에 떠난 차를 다음 차로 안내하지 않는다")
+    void secondsCount() {
+        // given: 2026-11-13(금) 12:10:45 서울
+        Clock clock = Clock.fixed(Instant.parse("2026-11-13T03:10:45Z"), ZoneId.of("UTC"));
+
+        // when
+        ShuttleTimes t = new CampusShuttle(props(List.of(route("12:10", "13:00"))), clock).next(null, null);
+
+        // then
+        assertThat(t.routes().getFirst().next()).containsExactly("13:00");
+        assertThat(t.after()).isEqualTo("12:10");
+    }
 }
