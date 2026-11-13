@@ -438,24 +438,25 @@ public class DailyBriefing {
         }
         Shuttle shuttle = null;
         if (shuttleNode != null && shuttleNode.path("code").asString(null) == null) { // NO_TIMETABLE이면 뺀다
-            Shuttle running = null;
+            Shuttle ongoing = null; // 지금 운행 중인 구간이 곧 시작할 구간보다 먼저 (18:30 사회과학관 야간 vs 본관 저녁 쉼)
+            Shuttle starting = null;
             Shuttle earliest = null;
             for (JsonNode route : shuttleNode.path("routes")) {
                 String name = route.path("name").asString(null);
                 String now = route.path("running").asString(null);
-                if (now != null && running == null) {
-                    running = new Shuttle(name, null, now, true);
+                if (now != null && ongoing == null) {
+                    ongoing = new Shuttle(name, null, now, true);
                 }
                 String soon = route.path("upcoming").asString(null);
-                if (soon != null && running == null) {
-                    running = new Shuttle(name, null, soon, false); // 07:00 브리핑에 "07:40~17:00 수시 운행"
+                if (soon != null && starting == null) {
+                    starting = new Shuttle(name, null, soon, false); // 07:00 브리핑에 "07:40~17:00 수시 운행"
                 }
                 String next = route.path("next").path(0).asString(null);
                 if (next != null && (earliest == null || next.compareTo(earliest.next()) < 0)) {
                     earliest = new Shuttle(name, next, null, false);
                 }
             }
-            shuttle = running != null ? running : earliest;
+            shuttle = ongoing != null ? ongoing : starting != null ? starting : earliest;
         }
         return new Campus(weather, shuttle);
     }

@@ -30,12 +30,14 @@ class GwangjuBusClientTest {
     @Test
     @DisplayName("0건 응답은 \"오는 버스 없음\"(빈 목록)")
     void zeroRows() {
+        // given / when / then: 해석만 보는 한 줄 검사
         assertThat(client.parseArrivals("{\"ROW_COUNT\":0}")).hasValueSatisfying(b -> assertThat(b).isEmpty());
     }
 
     @Test
     @DisplayName("N건이라면서 목록이 없거나, 모르는 모양이면 실패로 본다 (\"오는 버스 없음\"으로 바꾸지 않음)")
     void brokenShapes() {
+        // given / when / then: 모양이 깨진 응답 세 가지
         assertThat(client.parseArrivals("{\"ROW_COUNT\":2}")).isEmpty();
         assertThat(client.parseArrivals("{\"error\":\"SERVICE_KEY_IS_NOT_REGISTERED\"}")).isEmpty();
         assertThat(client.parseArrivals("{\"ROW_COUNT\":1,\"BUSSTOP_LIST\":[{\"REMAIN_MIN\":3}]}")).isEmpty();
@@ -44,6 +46,7 @@ class GwangjuBusClientTest {
     @Test
     @DisplayName("항목이 하나면 객체로 와도 읽고, 남은 분 순으로 정렬한다")
     void singleObjectAndSort() {
+        // given / when / then: 목록 대신 객체 하나로 온 응답
         assertThat(client.parseArrivals("{\"ROW_COUNT\":1,\"BUSSTOP_LIST\":{\"LINE_NAME\":\"419\",\"REMAIN_MIN\":\"4\"}}"))
                 .hasValueSatisfying(b -> assertThat(b).extracting("line", "minutes").containsExactly(org.assertj.core.groups.Tuple.tuple("419", 4)));
     }
@@ -51,6 +54,7 @@ class GwangjuBusClientTest {
     @Test
     @DisplayName("캐시가 빈 순간 동시에 8명이 물어도 도착 API는 한 번만 부른다 (성공)")
     void concurrentSuccessCallsOnce() throws Exception {
+        // given: 도착 1건을 주는 가짜 API / when: 8명 동시 조회 / then: 호출 1번
         assertThat(concurrentCalls(200, "{\"ROW_COUNT\":1,\"BUSSTOP_LIST\":[{\"LINE_NAME\":\"419\",\"REMAIN_MIN\":4}]}"))
                 .isEqualTo(1);
     }
@@ -58,6 +62,7 @@ class GwangjuBusClientTest {
     @Test
     @DisplayName("API가 실패해도 캐시 시간 동안 실패를 기억해 동시에 8명이 물어도 한 번만 부른다 (실패)")
     void concurrentFailureCallsOnce() throws Exception {
+        // given: 500을 주는 가짜 API / when: 8명 동시 조회 / then: 호출 1번
         assertThat(concurrentCalls(500, "{}")).isEqualTo(1);
     }
 

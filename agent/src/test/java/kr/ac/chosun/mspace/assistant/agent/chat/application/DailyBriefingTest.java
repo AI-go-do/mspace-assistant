@@ -350,6 +350,28 @@ class DailyBriefingTest {
     }
 
     @Test
+    @DisplayName("브리핑: 앞 노선이 곧 시작하고 뒤 노선이 지금 운행 중이면 지금 운행 중인 노선을 말한다")
+    void shuttleRunningBeatsUpcoming() {
+        // given: 18:30, 본관은 저녁 쉼(곧 시작) · 사회과학관은 야간 운행 중
+        String shuttle = """
+                {"date":"2026-11-06","code":null,"routes":[
+                 {"name":"본관 순환 버스","stop":"설립기념탑 → 미대","next":["20:00"],"last":"23:00","running":null,
+                  "upcoming":"18:45~20:00 저녁 시간, 20:00에 다시 출발"},
+                 {"name":"사회과학관 버스","stop":"사회과학관","next":[],"last":null,
+                  "running":"17:00~23:00 본관 야간 버스 이용","upcoming":null}],"basis":"시간표 기준","note":null}""";
+        var tools = fake(Map.of("my_schedule", NO_SCHEDULE, "my_reservations", "{\"reservations\":[]}", "room_status", STATUS,
+                "campus_shuttle", shuttle), new ArrayList<>());
+
+        // when
+        DailyBriefing.Briefing b = new DailyBriefing(tools, CLOCK, JsonMapper.builder().build(),
+                new AgentProperties.Rules(30, 2, 7), true).today(ME);
+
+        // then
+        assertThat(b.campus().shuttle().now()).isTrue();
+        assertThat(b.campus().shuttle().name()).isEqualTo("사회과학관 버스");
+    }
+
+    @Test
     @DisplayName("아침 브리핑: 날씨가 실패하고 셔틀 시간표가 없으면 두 줄 다 빼고 나머지는 그대로")
     void campusMissing() {
         // given
