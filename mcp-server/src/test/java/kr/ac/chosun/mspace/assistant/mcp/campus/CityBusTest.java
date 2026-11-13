@@ -74,6 +74,11 @@ class CityBusTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                         new CampusProperties.CityBus("k", "http://apis.data.go.kr/6290000/gj_bis", null, null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
+        for (String bad : List.of("http://localhost.example.com", "http://127.0.0.1.evil.net", "http://localhost@evil.net", "ftp://localhost")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                            new CampusProperties.CityBus("k", bad, null, null, null, null, null, null, null))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class);
+        }
         assertThat(new CampusProperties.CityBus("k", "http://localhost:8089", null, null, null, null, null, null, null).connected())
                 .isTrue();
         assertThat(new CampusProperties.CityBus("", "http://apis.data.go.kr", null, null, null, null, null, null, null).connected())

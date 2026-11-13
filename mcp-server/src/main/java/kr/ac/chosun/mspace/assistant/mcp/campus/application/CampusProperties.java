@@ -1,5 +1,6 @@
 package kr.ac.chosun.mspace.assistant.mcp.campus.application;
 
+import java.net.URI;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalTime;
@@ -75,13 +76,23 @@ public record CampusProperties(Weather weather, Shuttle shuttle, CityBus cityBus
             timeout = timeout == null ? Duration.ofSeconds(3) : timeout;
             cache = cache == null ? Duration.ofSeconds(30) : cache;
             // 키는 주소 뒤에 붙어 가므로 평문 HTTP로 보내지 않는다 (테스트용 로컬 가짜 서버만 예외)
-            if (!serviceKey.isBlank() && !baseUrl.startsWith("https://") && !isLocal(baseUrl)) {
+            if (!serviceKey.isBlank() && !safe(baseUrl)) {
                 throw new IllegalArgumentException("시내버스 API 키가 있으면 주소는 https여야 해요");
             }
         }
 
-        private static boolean isLocal(String url) {
-            return url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1");
+        /** https면 통과, http는 호스트가 정확히 localhost·127.0.0.1일 때만 (localhost.example.com 같은 우회 막음) */
+        private static boolean safe(String url) {
+            URI uri;
+            try {
+                uri = URI.create(url);
+            } catch (IllegalArgumentException e) {
+                return false;
+            }
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+            String host = uri.getHost();
+            return host != null && (scheme.equals("https")
+                    || scheme.equals("http") && (host.equals("localhost") || host.equals("127.0.0.1")));
         }
 
         public boolean connected() {
