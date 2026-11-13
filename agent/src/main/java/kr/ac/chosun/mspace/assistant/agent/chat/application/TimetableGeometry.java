@@ -35,8 +35,10 @@ final class TimetableGeometry {
             if (v == null || v.length != 4) {
                 return Optional.empty();
             }
-            Box b = new Box(v[0], v[1], v[2], v[3]);
-            boolean inRange = Arrays.stream(v).allMatch(x -> x >= 0 && x <= 1000);
+            // 그림 가장자리에 걸친 글자는 모델이 -3, 1004처럼 조금 넘겨 적기도 해서 20까지는 잘라 쓴다
+            boolean inRange = Arrays.stream(v).allMatch(x -> x >= -20 && x <= 1020);
+            double[] c = Arrays.stream(v).map(x -> Math.max(0, Math.min(1000, x))).toArray();
+            Box b = new Box(c[0], c[1], c[2], c[3]);
             return inRange && b.ymax > b.ymin && b.xmax > b.xmin ? Optional.of(b) : Optional.empty();
         }
     }
@@ -65,11 +67,14 @@ final class TimetableGeometry {
     private final BufferedImage img;
     private final int width;
     private final int height;
+    /** 바탕색 {r, g, b, 밝기}. 밝은·다크 모드 모두 이 색을 기준으로 선과 칸을 가른다 */
+    private final int[] background;
 
     private TimetableGeometry(BufferedImage img) {
         this.img = img;
         this.width = img.getWidth();
         this.height = img.getHeight();
+        this.background = background(img);
     }
 
     /** PNG·JPEG만(자바 기본 ImageIO). WebP나 깨진 그림이면 빈 값 → 모델 시각을 쓴다 */
@@ -104,92 +109,179 @@ final class TimetableGeometry {
     // ---------- 1. 시간 눈금 ----------
 
     /**
-     * 눈금 글자 2개 이상으로 직선을 맞추고, 정각 가로줄이 보이면 그 줄들로 다시 맞춘다.
-     * 글자는 줄 바로 아래(에브리타임)나 줄 가운데(다른 앱)에 놓여 위치가 앱마다 조금 다르지만, 가로줄은 정확하다.
+     * 눈금 글자로 "대략 y → 시각"을 잡고, 그림에서 찾은 정각 가로줄의 간격·위치로 정확히 맞춘다 (TS-19).
+     * <ul>
+     *   <li>눈금 글자: 12시간으로 적힌 오후 숫자(1, 2, 3 …)는 위에서 아래로 줄어들면 12를 더해 고치고, 한두 개 틀린 글자는 중앙값 기울기(Theil–Sen)로 버틴다</li>
+     *   <li>글자가 줄 바로 아래(에브리타임)·칸 가운데·줄 위에 걸침처럼 앱마다 달라, 글자 위치를 그대로 시각으로 쓰지 않는다.
+     *       가로줄들이 한 시간 간격으로 놓인 "위상"을 찾고, 글자 가운데가 그 줄과 같은 높이이거나 그 아래 0.65시간 안에 있다고 보고 정각을 정한다</li>
+     *   <li>가로줄은 바탕색과 조금 다른 무채색 긴 선으로 찾는다(밝은·다크 모드 모두). 30분 실선이 같이 있으면 더 진한 쪽을 정각으로 본다</li>
+     * </ul>
+     * 가로줄을 못 맞추면 글자만으로 맞춘 값(gridAligned=false)을 돌려주고, 호출자는 모델 시각과 견줘 쓴다.
      */
     Optional<Calibration> calibrate(List<HourLabel> labels) {
-        List<double[]> points = new ArrayList<>();
-        for (HourLabel l : labels) {
-            if (l.hour() >= 0 && l.hour() <= 24) {
-                points.add(new double[] {l.hour(), py(l.box().ymin())});
-            }
-        }
-        Optional<Calibration> rough = fit(points, false);
-        if (rough.isEmpty()) {
+        List<double[]> points = labelPoints(labels);
+        Optional<double[]> rough = theilSen(points);
+        if (rough.isEmpty() || rough.get()[1] < 0.015 * height) {
             return Optional.empty();
         }
-        Calibration c = rough.get();
-        // 정각 선: 눈금으로 본 시가 정수에 가까운(±0.3시간) 가로줄만. 30분 점선·머리줄은 여기서 걸러진다
+        double a = rough.get()[0];
+        double p = rough.get()[1];
+        List<double[]> lines = horizontalLines();          // {y, 세기}
+        // 가로줄 위상: f = (y - a) / p 의 소수 부분이 모이는 곳. 0.02 간격 원형 히스토그램, ±0.08 안의 세기 합
+        double bestPhase = Double.NaN;
+        double bestScore = 0;
+        for (int k = 0; k < 50; k++) {
+            double phi = k / 50.0;
+            double score = 0;
+            for (double[] l : lines) {
+                if (circular(frac((l[0] - a) / p) - phi) <= 0.08) {
+                    score += l[1];
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestPhase = phi;
+            }
+        }
+        if (Double.isNaN(bestPhase)) {
+            return Optional.of(new Calibration(a, p, false));
+        }
+        // 글자 가운데는 정각 줄과 같은 높이 ~ 0.65시간 아래. 줄 위상 c(0~1)를 그 범위로 옮긴다(-0.65 ~ 0.35)
+        double shift = bestPhase > 0.35 ? bestPhase - 1 : bestPhase;
         List<double[]> grid = new ArrayList<>();
-        for (double y : horizontalLines()) {
-            double h = c.hourAt(y);
-            long hour = Math.round(h);
-            if (Math.abs(h - hour) <= 0.3 && hour >= 0 && hour <= 24 && grid.stream().noneMatch(p -> p[0] == hour)) {
-                grid.add(new double[] {hour, y});
+        for (double[] l : lines) {
+            double f = (l[0] - a) / p;
+            if (circular(frac(f) - bestPhase) <= 0.12) {
+                long hour = Math.round(f - shift);
+                if (hour >= 0 && hour <= 24) {
+                    grid.add(new double[] {hour, l[0]});
+                }
             }
         }
-        Optional<Calibration> fine = fit(grid, true);
-        // 가로줄 기울기가 눈금 글자 기울기와 크게 다르면(다른 줄을 잡음) 글자 쪽을 믿는다
-        if (fine.isPresent() && Math.abs(fine.get().slope() - c.slope()) <= 0.15 * c.slope()) {
-            return fine;
+        Optional<double[]> fine = theilSen(grid);
+        // 줄 간격이 글자 간격과 15% 넘게 다르면(다른 줄을 잡음) 글자 쪽을 믿는다
+        if (fine.isPresent() && grid.size() >= 3 && Math.abs(fine.get()[1] - p) <= 0.15 * p) {
+            return Optional.of(new Calibration(fine.get()[0], fine.get()[1], true));
         }
-        return rough;
+        return Optional.of(new Calibration(a, p, false));
     }
 
-    private static Optional<Calibration> fit(List<double[]> points, boolean grid) {
-        if (points.stream().map(p -> p[0]).distinct().count() < 2) {
+    /** 눈금 글자 → {시, 글자 가운데 y}. 위에서 아래로 읽어 시가 줄면(12시간 표기) 12를 더한다 */
+    private List<double[]> labelPoints(List<HourLabel> labels) {
+        List<HourLabel> sorted = labels.stream().filter(l -> l.hour() >= 0 && l.hour() <= 24)
+                .sorted(java.util.Comparator.comparingDouble(l -> l.box().ymin() + l.box().ymax())).toList();
+        List<double[]> points = new ArrayList<>();
+        int prev = -1;
+        for (HourLabel l : sorted) {
+            int hour = l.hour();
+            if (prev >= 0 && hour < prev && hour + 12 <= 24 && hour + 12 > prev) {
+                hour += 12;
+            }
+            prev = Math.max(prev, hour);
+            points.add(new double[] {hour, py((l.box().ymin() + l.box().ymax()) / 2)});
+        }
+        return points;
+    }
+
+    /** {절편, 기울기}: 기울기는 두 점씩 짝지은 기울기의 중앙값, 절편은 (y - 기울기×시)의 중앙값. 틀린 점 몇 개에 흔들리지 않는다 */
+    private static Optional<double[]> theilSen(List<double[]> points) {
+        List<Double> slopes = new ArrayList<>();
+        for (int i = 0; i < points.size(); i++) {
+            for (int j = i + 1; j < points.size(); j++) {
+                double dx = points.get(j)[0] - points.get(i)[0];
+                if (dx != 0) {
+                    slopes.add((points.get(j)[1] - points.get(i)[1]) / dx);
+                }
+            }
+        }
+        if (slopes.isEmpty()) {
             return Optional.empty();
         }
-        double n = points.size();
-        double sx = 0;
-        double sy = 0;
-        double sxx = 0;
-        double sxy = 0;
-        for (double[] p : points) {
-            sx += p[0];
-            sy += p[1];
-            sxx += p[0] * p[0];
-            sxy += p[0] * p[1];
+        double slope = medianD(slopes);
+        if (slope <= 0) {
+            return Optional.empty();
         }
-        double slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-        double intercept = (sy - slope * sx) / n;
-        // 한 시간이 그림 높이의 1.5%보다 작으면 읽을 수 없는 그림(또는 hour를 거꾸로 적음)
-        return slope > 0 ? Optional.of(new Calibration(intercept, slope, grid)) : Optional.empty();
+        double intercept = medianD(points.stream().map(pt -> pt[1] - slope * pt[0]).toList());
+        return Optional.of(new double[] {intercept, slope});
     }
 
-    /** 옅은 회색 가로줄(시간표 칸 선)의 y. 무채색 픽셀 중 절반 이상이 옅은 회색인 줄을 모아 묶음 가운데를 쓴다 */
-    List<Double> horizontalLines() {
-        List<Double> lines = new ArrayList<>();
+    private static double frac(double v) {
+        return v - Math.floor(v);
+    }
+
+    /** 원형(0~1) 거리 */
+    private static double circular(double d) {
+        double f = frac(d);
+        return Math.min(f, 1 - f);
+    }
+
+    /**
+     * 가로줄의 {y, 세기}. 한 줄에서 "바탕보다 조금 밝거나 어두운 무채색" 픽셀이 너비의 15% 이상이고 이어진 구간이 6% 이상이면 선으로 본다.
+     * 진한 글자(바탕과 차이 90 넘음)·점선(짧게 끊김)은 빠진다. 붙은 줄은 묶어 가운데를 쓰고, 세기 = 덮은 픽셀 수 × 바탕과의 밝기 차이
+     */
+    List<double[]> horizontalLines() {
+        List<double[]> lines = new ArrayList<>();
         int runStart = -1;
+        double acc = 0;
         for (int y = 0; y <= height; y++) {
-            boolean line = y < height && isLineRow(y);
-            if (line && runStart < 0) {
+            double w = y < height ? lineWeight(y) : 0;
+            if (w > 0 && runStart < 0) {
                 runStart = y;
-            } else if (!line && runStart >= 0) {
-                lines.add((runStart + y - 1) / 2.0);
+                acc = w;
+            } else if (w > 0) {
+                acc = Math.max(acc, w);
+            } else if (runStart >= 0) {
+                lines.add(new double[] {(runStart + y - 1) / 2.0, acc});
                 runStart = -1;
             }
         }
         return lines;
     }
 
-    private boolean isLineRow(int y) {
-        int neutral = 0;
-        int gray = 0;
+    private double lineWeight(int y) {
+        int count = 0;
+        int run = 0;
+        int longest = 0;
+        double contrast = 0;
         for (int x = 0; x < width; x++) {
-            int rgb = img.getRGB(x, y);
-            int r = (rgb >> 16) & 0xFF;
-            int g = (rgb >> 8) & 0xFF;
-            int b = rgb & 0xFF;
-            if (Math.max(r, Math.max(g, b)) - Math.min(r, Math.min(g, b)) < 16) {
-                neutral++;
-                double lum = (r + g + b) / 3.0;
-                if (lum >= 200 && lum <= 250) {
-                    gray++;
-                }
+            int[] c = rgb(x, y);
+            double diff = Math.abs((c[0] + c[1] + c[2]) / 3.0 - background[3]);
+            boolean neutral = Math.max(c[0], Math.max(c[1], c[2])) - Math.min(c[0], Math.min(c[1], c[2])) < 16;
+            if (neutral && diff >= 5 && diff <= 90) {
+                count++;
+                run++;
+                contrast += diff;
+                longest = Math.max(longest, run);
+            } else {
+                run = 0;
             }
         }
-        return neutral >= 0.2 * width && gray >= 0.5 * neutral;
+        return count >= 0.15 * width && longest >= 0.06 * width ? contrast : 0;
+    }
+
+    /** 바탕색 {r, g, b, 밝기}: 성기게 훑어 가장 흔한 색 */
+    private static int[] background(BufferedImage img) {
+        java.util.Map<Integer, int[]> buckets = new java.util.HashMap<>();
+        int stepX = Math.max(1, img.getWidth() / 60);
+        int stepY = Math.max(1, img.getHeight() / 120);
+        for (int y = 0; y < img.getHeight(); y += stepY) {
+            for (int x = 0; x < img.getWidth(); x += stepX) {
+                int v = img.getRGB(x, y);
+                int r = (v >> 16) & 0xFF;
+                int g = (v >> 8) & 0xFF;
+                int b = v & 0xFF;
+                int[] acc = buckets.computeIfAbsent((r / 8) << 10 | (g / 8) << 5 | (b / 8), k -> new int[4]);
+                acc[0] += r;
+                acc[1] += g;
+                acc[2] += b;
+                acc[3]++;
+            }
+        }
+        int[] best = buckets.values().stream().max(java.util.Comparator.comparingInt(a -> a[3])).orElse(new int[] {255, 255, 255, 1});
+        int r = best[0] / best[3];
+        int g = best[1] / best[3];
+        int b = best[2] / best[3];
+        return new int[] {r, g, b, (r + g + b) / 3};
     }
 
     // ---------- 2. 칸 끝 ----------
@@ -209,10 +301,13 @@ final class TimetableGeometry {
         if (w < 6 || y1 - y0 < 4) {
             return Optional.empty();
         }
-        int[] color = blockColor(x0 + w / 5, x1 - w / 5, y0 + (y1 - y0) / 4, y1 - (y1 - y0) / 4);
-        if (color.length == 0) {
+        int[] found = blockColor(x0 + w / 5, x1 - w / 5, y0 + (y1 - y0) / 4, y1 - (y1 - y0) / 4);
+        if (found.length == 0) {
             return Optional.empty();
         }
+        // 옅은 칸은 바탕·회색 선과 색 거리가 가까워, 허용 거리를 칸과 바탕 거리의 절반으로 줄인다(12~30)
+        double tolerance = Math.max(12, Math.min(COLOR_TOLERANCE, distance(found, background) / 2));
+        int[] color = {found[0], found[1], found[2], (int) Math.round(tolerance)};
         // 모델 상자가 30분 가까이 어긋나도 찾게 위아래로 0.45시간 더 본다. 그보다 멀면 다른 칸일 수 있어 보지 않는다
         int margin = (int) Math.round(0.45 * cal.slope());
         int maxGap = (int) Math.round(0.4 * cal.slope());
@@ -237,14 +332,19 @@ final class TimetableGeometry {
         return Optional.of(new double[] {median(tops), median(bottoms) + 1});
     }
 
-    /** 상자 가운데 영역에서 채도가 있는 픽셀을 거칠게 묶어 가장 많은 색. 색칠 안 된 상자면 빈 배열 */
+    /**
+     * 상자 가운데 영역에서 바탕과 다른 픽셀을 거칠게 묶어 가장 많은 색 = 칸 색. 옅은 색(채도 낮음)·다크 모드 칸도 잡는다.
+     * 그 색이 영역의 25%도 안 되면(빈칸 위 선·글자만 걸림) 색칠된 칸이 아니라고 보고 빈 배열
+     */
     private int[] blockColor(int xa, int xb, int ya, int yb) {
         java.util.Map<Integer, int[]> buckets = new java.util.HashMap<>();
+        int all = 0;
         for (int y = Math.max(0, ya); y <= Math.min(height - 1, yb); y++) {
             for (int x = Math.max(0, xa); x <= Math.min(width - 1, xb); x++) {
+                all++;
                 int[] c = rgb(x, y);
-                if (Math.max(c[0], Math.max(c[1], c[2])) - Math.min(c[0], Math.min(c[1], c[2])) < 40) {
-                    continue;  // 흰 글자·바탕·회색 선
+                if (distance(c, background) < 25) {
+                    continue;  // 바탕
                 }
                 int key = (c[0] / 16) << 8 | (c[1] / 16) << 4 | (c[2] / 16);
                 int[] acc = buckets.computeIfAbsent(key, k -> new int[4]);
@@ -255,10 +355,14 @@ final class TimetableGeometry {
             }
         }
         int[] best = buckets.values().stream().max(java.util.Comparator.comparingInt(a -> a[3])).orElse(null);
-        if (best == null || best[3] < 10) {
+        if (best == null || best[3] < 10 || best[3] < 0.25 * all) {
             return new int[0];
         }
         return new int[] {best[0] / best[3], best[1] / best[3], best[2] / best[3]};
+    }
+
+    private static double distance(int[] c, int[] d) {
+        return Math.sqrt(Math.pow(c[0] - d[0], 2) + Math.pow(c[1] - d[1], 2) + Math.pow(c[2] - d[2], 2));
     }
 
     /** 상자 가운데에서 가장 가까운 칸 색 픽셀(글자 위에서 시작하지 않게) */
@@ -283,7 +387,7 @@ final class TimetableGeometry {
         for (int y = from + dir; dir < 0 ? y >= limit : y <= limit; y += dir) {
             if (same(x, y, color)) {
                 last = y;
-            } else if (Math.abs(y - last) > maxGap || separator(y, dir, xa, xb, color)) {
+            } else if (Math.abs(y - last) > maxGap || separator(y, dir, xa, xb, color) || gap(y, dir, xa, xb, color, maxGap)) {
                 break;
             }
         }
@@ -306,6 +410,21 @@ final class TimetableGeometry {
         return false;
     }
 
+    /**
+     * 칸 너비 전체에 칸 색이 거의 없는 줄이 한 시간의 10%(최소 3줄) 넘게 이어진 뒤 다시 꽉 찬 줄이 나오면 칸 사이 틈(10분 쉬는 시간 등)이다.
+     * 굵은 흰 글자도 한두 줄은 거의 비어 보일 수 있어, 짧게 빈 줄은 글자로 본다
+     */
+    private boolean gap(int y, int dir, int xa, int xb, int[] color, int maxGap) {
+        int need = Math.max(3, (int) Math.round(maxGap / 4.0));
+        int n = 0;
+        int yy = y;
+        while (yy >= 0 && yy < height && n <= maxGap && coverage(yy, xa, xb, color) < 0.1) {
+            n++;
+            yy += dir;
+        }
+        return n >= need && n <= maxGap && coverage(yy, xa, xb, color) >= 0.9;
+    }
+
     /** 그 줄(xa~xb)에서 칸 색인 픽셀 비율 */
     private double coverage(int y, int xa, int xb, int[] color) {
         if (y < 0 || y >= height) {
@@ -323,9 +442,7 @@ final class TimetableGeometry {
     }
 
     private boolean same(int x, int y, int[] color) {
-        int[] c = rgb(x, y);
-        double d = Math.sqrt(Math.pow(c[0] - color[0], 2) + Math.pow(c[1] - color[1], 2) + Math.pow(c[2] - color[2], 2));
-        return d <= COLOR_TOLERANCE;
+        return distance(rgb(x, y), color) <= (color.length > 3 ? color[3] : COLOR_TOLERANCE);
     }
 
     // ---------- 3. 시각 ----------
@@ -355,6 +472,12 @@ final class TimetableGeometry {
 
     private int px(double v) {
         return (int) Math.round(v / 1000.0 * width);
+    }
+
+    private static double medianD(List<Double> v) {
+        List<Double> s = v.stream().sorted().toList();
+        int n = s.size();
+        return n % 2 == 1 ? s.get(n / 2) : (s.get(n / 2 - 1) + s.get(n / 2)) / 2.0;
     }
 
     private static double median(List<Integer> v) {

@@ -59,14 +59,18 @@ class TimetableEvalRunTest {
         int runs = Integer.parseInt(env("EVAL_RUNS", "2"));
 
         List<Path> dirs = new ArrayList<>(List.of(Path.of(TimetableEvalRunTest.class.getResource("/eval/timetable").toURI())));
+        if (!env("EVAL_TIMETABLE_VARIED", "").isBlank()) {
+            // 여러 모양 합성 그림 12장(TS-19). 사진 × 회차 × 2번 호출이라 한도를 많이 쓴다(12장·2회차 = 48번)
+            dirs.add(Path.of(TimetableEvalRunTest.class.getResource("/eval/timetable-varied").toURI()));
+        }
+        List<Path> repoDirs = List.copyOf(dirs);  // 레포 안 합성 그림 폴더
         if (!env("EVAL_TIMETABLE_DIR", "").isBlank()) {
             dirs.add(Path.of(env("EVAL_TIMETABLE_DIR", "")));
         }
-        Path repoDir = dirs.get(0);
         List<Path> images = new ArrayList<>();
         for (Path dir : dirs) {
             try (Stream<Path> s = Files.list(dir)) {
-                s.filter(p -> p.getFileName().toString().matches("tt\\d+[^.]*\\.(jpg|png)")).sorted().forEach(images::add);
+                s.filter(p -> p.getFileName().toString().matches("t[tv]\\d+[^.]*\\.(jpg|png)")).sorted().forEach(images::add);
             }
         }
         assertThat(images).isNotEmpty();
@@ -81,7 +85,7 @@ class TimetableEvalRunTest {
             byte[] bytes = Files.readAllBytes(image);
             String mime = image.toString().endsWith(".png") ? "image/png" : "image/jpeg";
             // 레포 밖 사진(실제 사람 시간표일 수 있음)은 과목명이 들어가는 원문·틀린 칸을 결과에 남기지 않고 점수만 남긴다
-            boolean outside = !image.getParent().equals(repoDir);
+            boolean outside = !repoDirs.contains(image.getParent());
             // 파일 이름에도 이름·학번이 있을 수 있어 결과에는 순번만 쓴다(정답 파일은 원래 이름으로 읽음)
             String label = outside ? "outside-" + (++outsideCount) : id;
             List<ClassDraft> answers;

@@ -1,0 +1,48 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "위가 잘린 캡처(머리줄·9시 눈금 없음, 9시 반부터 보임)",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "09:30",
+   "endTime": "12:30",
+   "name": "운영체제"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "09:30",
+   "endTime": "10:30",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "09:30",
+   "endTime": "11:00",
+   "name": "글쓰기"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "10:00",
+   "endTime": "11:30",
+   "name": "동아리"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "11:30",
+   "endTime": "13:00",
+   "name": "동아리"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "09:30",
+   "endTime": "12:30",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "12:30",
+   "endTime": "15:30",
+   "name": "글쓰기"
+  }
+ ]
+}

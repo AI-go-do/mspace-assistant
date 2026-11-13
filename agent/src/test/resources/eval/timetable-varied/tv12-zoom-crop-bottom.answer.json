@@ -1,0 +1,84 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "1.5배 확대 + 아래 잘림 + 모델이 눈금 하나 빼먹고 하나 틀림",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "09:30",
+   "endTime": "10:30",
+   "name": "글쓰기"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "09:00",
+   "endTime": "10:30",
+   "name": "확률과 통계"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "10:30",
+   "endTime": "12:00",
+   "name": "운영체제"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "12:30",
+   "endTime": "15:30",
+   "name": "데이터베이스"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "10:30",
+   "endTime": "11:30",
+   "name": "자료구조"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "13:00",
+   "endTime": "14:30",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "15:30",
+   "endTime": "17:00",
+   "name": "데이터베이스"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "09:00",
+   "endTime": "10:30",
+   "name": "근로"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "11:00",
+   "endTime": "12:30",
+   "name": "인공지능개론"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "13:00",
+   "endTime": "16:00",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "10:00",
+   "endTime": "11:30",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "11:30",
+   "endTime": "13:00",
+   "name": "운영체제"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "14:00",
+   "endTime": "15:30",
+   "name": "웹프로그래밍"
+  }
+ ]
+}

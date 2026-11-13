@@ -177,6 +177,46 @@ class TimetableGeometryTest {
     }
 
     @Test
+    @DisplayName("가로줄이 없는 앱 + 눈금이 칸 가운데: 길이는 픽셀로, 전체 위치는 모델 시작 시각 중앙값으로 맞춘다 (TS-19)")
+    void noGridLinesUsesModelStartsForOffset() throws IOException {
+        // given: 줄 없는 다크 바탕, 8시 줄 y=40, 한 시간 40픽셀. 눈금 글자는 칸 가운데(정각 + 20픽셀)라 글자만 믿으면 30분 밀린다
+        BufferedImage img = new BufferedImage(400, 600, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(28, 28, 30));
+        g.fillRect(0, 0, 400, 600);
+        g.setColor(new Color(63, 94, 150));
+        g.fillRect(50, 81, 100, 59);    // 9:00~10:30
+        g.fillRect(50, 201, 100, 79);   // 12:00~14:00
+        g.fillRect(160, 121, 100, 99);  // 10:00~12:30
+        g.dispose();
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", png);
+        StringBuilder hours = new StringBuilder("[");
+        for (int hour = 8; hour <= 18; hour++) {
+            int cy = 40 + (hour - 8) * 40 + 20;
+            hours.append(hour > 8 ? "," : "").append("{\"hour\":").append(hour > 12 ? hour - 12 : hour).append(",\"box_2d\":[")
+                    .append(Math.round((cy - 7) / 600.0 * 1000)).append(",10,").append(Math.round((cy + 7) / 600.0 * 1000)).append(",40]}");
+        }
+        hours.append("]");
+        // 모델 시작은 맞고 끝은 틀림(끝을 30~60분 더 내려 읽기)
+        String answer = """
+                {"hours":%s,"classes":[
+                  {"dayOfWeek":"MON","startTime":"09:00","endTime":"11:00","name":"자료구조","box_2d":[135,125,233,375]},
+                  {"dayOfWeek":"MON","startTime":"12:00","endTime":"15:00","name":"운영체제","box_2d":[335,125,467,375]},
+                  {"dayOfWeek":"TUE","startTime":"10:00","endTime":"13:00","name":"알고리즘","box_2d":[202,400,367,650]}]}"""
+                .formatted(hours);
+
+        // when
+        List<ClassDraft> out = service.parse(answer, png.toByteArray()).classes();
+
+        // then
+        assertThat(out).containsExactly(
+                new ClassDraft("MON", "09:00", "10:30", "자료구조"),
+                new ClassDraft("MON", "12:00", "14:00", "운영체제"),
+                new ClassDraft("TUE", "10:00", "12:30", "알고리즘"));
+    }
+
+    @Test
     @DisplayName("픽셀이 너무 많은 그림(압축은 작아도)은 풀지 않고 재기를 건너뛴다 (메모리 보호)")
     void hugeImageIsNotDecoded() throws IOException {
         // given: 4100×4100 흑백 PNG. 파일은 작지만 픽셀은 1,681만 개로 상한(1,600만) 초과

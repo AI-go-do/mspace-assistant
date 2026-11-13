@@ -1,0 +1,54 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "60%로 줄인 캡처(흐림) + 30분 점선 + 왼쪽 일부 잘림",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "09:30",
+   "endTime": "11:30",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "12:30",
+   "endTime": "14:00",
+   "name": "체육"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "09:30",
+   "endTime": "12:30",
+   "name": "선형대수"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "12:30",
+   "endTime": "13:30",
+   "name": "동아리"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "15:00",
+   "endTime": "17:00",
+   "name": "확률과 통계"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "09:30",
+   "endTime": "10:30",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "10:30",
+   "endTime": "12:00",
+   "name": "체육"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "10:00",
+   "endTime": "11:30",
+   "name": "확률과 통계"
+  }
+ ]
+}

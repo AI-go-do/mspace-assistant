@@ -1,0 +1,60 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "다크 + 눈금 칸 가운데 + 모델이 오후 눈금을 1, 2, 3으로 적음",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "09:30",
+   "endTime": "10:30",
+   "name": "근로"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "12:00",
+   "endTime": "13:30",
+   "name": "자료구조"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "10:30",
+   "endTime": "11:30",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "10:30",
+   "endTime": "12:30",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "12:30",
+   "endTime": "14:00",
+   "name": "근로"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "14:30",
+   "endTime": "16:00",
+   "name": "이산수학"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "10:30",
+   "endTime": "11:30",
+   "name": "영어회화"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "13:00",
+   "endTime": "14:30",
+   "name": "운영체제"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "09:00",
+   "endTime": "10:30",
+   "name": "알고리즘"
+  }
+ ]
+}

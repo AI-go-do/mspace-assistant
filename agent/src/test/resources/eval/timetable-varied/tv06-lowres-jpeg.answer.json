@@ -1,0 +1,66 @@
+{
+ "source": "합성 그림(scripts/eval/timetable/make_varied.py). 과목·시각은 모두 지어낸 값",
+ "note": "작은 그림(한 시간 34픽셀) + JPEG 60",
+ "classes": [
+  {
+   "dayOfWeek": "MON",
+   "startTime": "10:00",
+   "endTime": "12:00",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "MON",
+   "startTime": "13:00",
+   "endTime": "14:30",
+   "name": "글쓰기"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "10:30",
+   "endTime": "12:00",
+   "name": "선형대수"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "12:00",
+   "endTime": "13:00",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "TUE",
+   "startTime": "13:30",
+   "endTime": "15:00",
+   "name": "캡스톤디자인"
+  },
+  {
+   "dayOfWeek": "WED",
+   "startTime": "10:00",
+   "endTime": "11:30",
+   "name": "알고리즘"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "09:30",
+   "endTime": "10:30",
+   "name": "글쓰기"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "11:30",
+   "endTime": "14:30",
+   "name": "웹프로그래밍"
+  },
+  {
+   "dayOfWeek": "THU",
+   "startTime": "14:30",
+   "endTime": "16:00",
+   "name": "동아리"
+  },
+  {
+   "dayOfWeek": "FRI",
+   "startTime": "10:30",
+   "endTime": "12:00",
+   "name": "체육"
+  }
+ ]
+}
