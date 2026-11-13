@@ -569,6 +569,14 @@ public class DailyBriefing {
     public record Briefing(String date, String dayOfWeek, String generatedAt, Schedule schedule, FreePeriod freePeriod,
                            AfterClass afterClass, Reservations reservations, Rooms rooms, String text, List<String> hints,
                            List<String> suggestions, Campus campus) {
+
+        /** 날씨·셔틀 없이 (11/13 전 모양. 화면 테스트·예시가 이 모양으로 만든다) */
+        public Briefing(String date, String dayOfWeek, String generatedAt, Schedule schedule, FreePeriod freePeriod,
+                        AfterClass afterClass, Reservations reservations, Rooms rooms, String text, List<String> hints,
+                        List<String> suggestions) {
+            this(date, dayOfWeek, generatedAt, schedule, freePeriod, afterClass, reservations, rooms, text, hints, suggestions,
+                    Campus.NONE);
+        }
     }
 
     /** 날씨·셔틀 (11차 회의 아침 브리핑). 못 받았거나 꺼 두면 둘 다 null */
